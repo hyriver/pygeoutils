@@ -5,7 +5,7 @@ dependencies:
   - python=3.6
   - setuptools
   - xarray
-  - scipy
+  - pygeoogc
+  - geopandas
   - rasterio
   - shapely
-  - dataclasses

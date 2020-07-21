@@ -1,13 +1,13 @@
-name: py3dep
+name: pygeoutils-dev
 channels:
   - conda-forge
 dependencies:
   - python>=3.8
   - setuptools
   - pip
-  - pygeoogc
   - xarray
-  - scipy
+  - pygeoogc
+  - geopandas
   - rasterio
   - shapely
 
