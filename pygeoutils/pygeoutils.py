@@ -1,25 +1,18 @@
 """Some utilities for Hydrodata."""
 import numbers
 import os
-from concurrent import futures
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union, ValuesView
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, ValuesView
 from warnings import warn
 
 import geopandas as gpd
-import networkx as nx
 import numpy as np
-import pandas as pd
-import pyproj
 import rasterio as rio
 import simplejson as json
 import xarray as xr
-from owslib.wms import WebMapService
-from pandas._libs.missing import NAType
 from pygeoogc import MatchCRS
 from rasterio import mask as rio_mask
-from rasterio import warp as rio_warp
-from shapely.geometry import LineString, Point, Polygon, box, mapping, shape
+from shapely.geometry import LineString, Point, Polygon, box
 
 from .exceptions import InvalidInputType
 

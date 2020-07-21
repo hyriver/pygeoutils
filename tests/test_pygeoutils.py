@@ -1,9 +1,10 @@
-import pytest
-from shapely.geometry import Polygon
 import shutil
 
 import pygeoogc as ogc
+import pytest
 from pygeoogc import WFS, ArcGISRESTful, ServiceURL
+from shapely.geometry import Polygon
+
 import pygeoutils as utils
 
 
