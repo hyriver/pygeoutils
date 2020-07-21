@@ -1,5 +1,5 @@
-setuptools
-xarray
 geopandas
 rasterio
+setuptools
 shapely
+xarray
