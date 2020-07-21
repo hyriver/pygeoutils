@@ -75,11 +75,11 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 Quickstart
 ----------
 
-To demonstrate capabilities of PyGeoUtils let use
+To demonstrate capabilities of PyGeoUtils lets use
 `PyGeoOGC <https://github.com/cheginit/pygeoogc>`__ to access
 `National Wetlands Inventory <https://www.fws.gov/wetlands/>`__ from WMS, and
 `FEMA National Flood Hazard <https://www.fema.gov/national-flood-hazard-layer-nfhl>`__
-via WFS. Then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` using PyGeoUtils.
+via WFS, then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` using PyGeoUtils.
 
 .. code-block:: python
 
@@ -110,7 +110,7 @@ via WFS. Then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` usin
         crs="epsg:3857",
     )
 
-    wetlands = utils.gtiff2xarray(r_dict, geometry, "epsg:4326")
+    wetlands = geoutils.gtiff2xarray(r_dict, geometry, "epsg:4326")
 
     url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
     wfs = WFS(
@@ -122,7 +122,7 @@ via WFS. Then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` usin
     bbox = geometry.bounds
     bbox = (bbox[1], bbox[0], bbox[3], bbox[2])
     r = wfs.getfeature_bybox(bbox, box_crs="epsg:4326")
-    flood = utils.json2geodf(r.json(), "epsg:4269", "epsg:4326")
+    flood = geoutils.json2geodf(r.json(), "epsg:4269", "epsg:4326")
 
 Contributing
 ------------
