@@ -1,0 +1,11 @@
+name: pygeoutils
+channels:
+  - conda-forge
+dependencies:
+  - python=3.6
+  - setuptools
+  - xarray
+  - scipy
+  - rasterio
+  - shapely
+  - dataclasses
