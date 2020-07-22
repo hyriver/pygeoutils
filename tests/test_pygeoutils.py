@@ -59,7 +59,7 @@ def test_json2geodf(geometry_urb):
     bbox = geometry_urb.bounds
     bbox = (bbox[1], bbox[0], bbox[3], bbox[2])
     r = wfs.getfeature_bybox(bbox, box_crs="epsg:4326")
-    flood = utils.json2geodf(r.json(), "epsg:4269", "epsg:4326")
+    flood = utils.json2geodf([r.json(), r.json()], "epsg:4269", "epsg:4326")
 
     assert abs(flood["ELEV"].sum() - 630417.6) < 1e-1
 
