@@ -10,6 +10,7 @@ dependencies:
   - geopandas
   - rasterio
   - shapely
+  - simplejson
 
   - dask
   - netCDF4

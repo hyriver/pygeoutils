@@ -2,4 +2,5 @@ geopandas
 rasterio
 setuptools
 shapely
+simplejson
 xarray

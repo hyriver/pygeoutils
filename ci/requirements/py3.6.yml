@@ -9,3 +9,4 @@ dependencies:
   - geopandas
   - rasterio
   - shapely
+  - simplejson
