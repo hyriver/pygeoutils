@@ -5,8 +5,8 @@ dependencies:
   - python>=3.8
   - setuptools
   - pip
-  - xarray
   - pygeoogc
+  - xarray
   - geopandas
   - rasterio
   - shapely

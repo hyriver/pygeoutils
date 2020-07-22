@@ -10,3 +10,4 @@ dependencies:
   - rasterio
   - shapely
   - simplejson
+  - pygeoogc
