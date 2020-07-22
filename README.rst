@@ -51,7 +51,8 @@ and provides utilities for manipulating (Geo)JSON and GeoTIFF data:
 - ``gtiff2xarray``: For converting (Geo)TIFF objects to `xarray <https://xarray.pydata.org/>`__
   datasets.
 
-Moreover, requests for additional functionalities can be submitted via
+All these function handle all necessary CRS transformations. Moreover, requests for additional
+functionalities can be submitted via
 `issue tracker <https://github.com/cheginit/pygeoutils/issues>`__.
 
 
