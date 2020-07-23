@@ -2,6 +2,15 @@
 History
 =======
 
+
+0.1.4 (2020-07-22)
+------------------
+
+- Refactor ``griff2xarray`` and added support for WMS 1.3.0 and WFS 2.0.0.
+- Add ``MatchCRS`` class.
+- Remove dependency on PyGeoOGC.
+- Increase test coverage.
+
 0.1.3 (2020-07-21)
 ------------------
 
