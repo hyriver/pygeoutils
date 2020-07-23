@@ -5,9 +5,7 @@ dependencies:
   - python=3.6
   - setuptools
   - xarray
-  - pygeoogc
   - geopandas
   - rasterio
   - shapely
   - simplejson
-  - pygeoogc
