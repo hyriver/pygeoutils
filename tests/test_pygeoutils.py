@@ -6,6 +6,8 @@ from shapely.geometry import Polygon
 import pygeoutils as geoutils
 from pygeoutils import MatchCRS
 
+DEF_CRS = "epsg:4326"
+
 
 @pytest.fixture
 def geometry_nat():
@@ -30,9 +32,9 @@ def geometry_urb():
 def test_gtiff2array(geometry_nat):
     url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
     wms = WMS(url_wms, layers="0", outformat="image/tiff", crs="epsg:3857",)
-    r_dict = wms.getmap_bybox(geometry_nat.bounds, 1e3, box_crs="epsg:4326",)
-    wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, "epsg:4326")
-    wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat, "epsg:4326")
+    r_dict = wms.getmap_bybox(geometry_nat.bounds, 1e3, box_crs=DEF_CRS,)
+    geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, DEF_CRS)
+    wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat, DEF_CRS)
 
     assert abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
 
@@ -48,8 +50,8 @@ def test_json2geodf(geometry_urb):
         version="2.0.0",
     )
     bbox = geometry_urb.bounds
-    r = wfs.getfeature_bybox(bbox, box_crs="epsg:4326")
-    flood = geoutils.json2geodf([r.json(), r.json()], "epsg:4269", "epsg:4326")
+    r = wfs.getfeature_bybox(bbox, box_crs=DEF_CRS)
+    flood = geoutils.json2geodf([r.json(), r.json()], "epsg:4269", DEF_CRS)
 
     assert abs(flood["ELEV"].sum() - 630417.6) < 1e-1
 
@@ -148,10 +150,11 @@ def test_path():
 
 def test_matchcrs(geometry_urb):
     bounds = geometry_urb.bounds
+    crs = "epsg:2149"
     points = ((bounds[0], bounds[2]), (bounds[1], bounds[3]))
-    geom = MatchCRS.geometry(geometry_urb, "epsg:4326", "epsg:2149")
-    bbox = MatchCRS.bounds(geometry_urb.bounds, "epsg:4326", "epsg:2149")
-    coords = MatchCRS.coords(points, "epsg:4326", "epsg:2149")
+    geom = MatchCRS.geometry(geometry_urb, DEF_CRS, crs)
+    bbox = MatchCRS.bounds(geometry_urb.bounds, DEF_CRS, crs)
+    coords = MatchCRS.coords(points, DEF_CRS, crs)
     assert (
         abs(geom.area - 2475726907.644) < 1e-3
         and abs(bbox[0] - (-3654031.190)) < 1e-3
