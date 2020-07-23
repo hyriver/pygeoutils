@@ -186,7 +186,7 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
             else:
                 holes.append(ring[::-1])  # wind inner rings clockwise for RFC 7946 compliance
 
-        uncontainedHoles = []
+        uncontained_holes = []
 
         # while there are holes left...
         while holes:
@@ -212,12 +212,12 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
             # ring is not contained in any outer ring
             # sometimes this happens https://github.com/Esri/esri-leaflet/issues/320
             if not contained:
-                uncontainedHoles.append(hole)
+                uncontained_holes.append(hole)
 
         # if we couldn't match any holes using contains we can try intersects...
-        while uncontainedHoles:
+        while uncontained_holes:
             # pop a hole off out stack
-            hole = uncontainedHoles.pop()
+            hole = uncontained_holes.pop()
 
             # loop over all outer rings and see if any intersect our hole.
             intersects = False
