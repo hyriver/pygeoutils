@@ -8,7 +8,7 @@ import numpy as np
 import pyproj
 import rasterio as rio
 import rasterio.features as rio_features
-import rasterio.warp as rio_warp
+import rasterio.transform as rio_transform
 import simplejson as json
 import xarray as xr
 from shapely.geometry import LineString, Point, Polygon, box
@@ -271,7 +271,9 @@ def gtiff2xarray(
     """
     var_name = {lyr: f"{''.join(n for n in lyr.split('_')[:-1])}" for lyr in r_dict.keys()}
 
-    ds = xr.merge([_create_dataset(r, var_name[lyr]) for lyr, r in r_dict.items()])
+    ds = xr.merge(
+        [_create_dataset(r, var_name[lyr]) for lyr, r in r_dict.items()], combine_attrs="override"
+    )
     ds = _geometry_mask(ds, geometry, geo_crs)
 
     if len(ds.variables) - len(ds.dims) == 1:
@@ -312,15 +314,19 @@ def _create_dataset(content: bytes, name: str,) -> Union[xr.Dataset, xr.DataArra
     return ds
 
 
-def _geometry_mask(ds: Union[xr.Dataset, xr.DataArray], geometry: Polygon, geo_crs: str):
+def _geometry_mask(
+    ds: Union[xr.Dataset, xr.DataArray],
+    geometry: Union[Polygon, Tuple[float, float, float, float]],
+    geo_crs: str,
+):
     """Mask a ``xarray.Dataset`` based on a geometry.
 
     Parameters
     ----------
     ds : xarray.Dataset or xarray.DataArray
         The dataset(array) to be masked
-    geometry : Polygon
-        The geometry to mask the data
+    geometry : Polygon or tuple of length 4
+        The geometry or bounding box to mask the data
     geo_crs : str
         The spatial reference of the input geometry
 
@@ -330,27 +336,19 @@ def _geometry_mask(ds: Union[xr.Dataset, xr.DataArray], geometry: Polygon, geo_c
         The input dataset with a mask applied (np.nan)
     """
     if isinstance(geometry, tuple):
-        check_bbox(geometry)  # type: ignore
-        _geometry = box(*geometry)
+        _geometry = box(*MatchCRS.bounds(geometry, geo_crs, ds.crs))  # type: ignore
     elif isinstance(geometry, Polygon):
-        _geometry = geometry
+        _geometry = MatchCRS.geometry(geometry, geo_crs, ds.crs)
     else:
         raise InvalidInputType("geometry", "Polygon or tuple of length 4")
 
-    left, bottom, right, top = _geometry.bounds
-    height, width = list(ds.sizes.values())[-2:]
-    transform = rio_warp.calculate_default_transform(
-        geo_crs, geo_crs, width, height, left, bottom, right, top
-    )[0]
+    west, south, east, north = _geometry.bounds
+    height, width = ds.sizes["y"], ds.sizes["x"]
+    transform = rio_transform.from_bounds(west, south, east, north, width, height)
     _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
-    mask = xr.DataArray(_mask, dims=list(ds.sizes.keys())[-2:])
+    mask = xr.DataArray(_mask, dims=("y", "x"))
 
-    def mask_da(da):
-        da = da.where(mask, drop=True)
-        da.attrs["nodatavals"] = (np.nan,)
-        return da
-
-    return ds.map(mask_da)
+    return ds.where(mask)
 
 
 class MatchCRS:
