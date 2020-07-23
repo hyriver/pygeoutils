@@ -1,8 +1,8 @@
-"""Top-level package for PyNHD."""
+"""Top-level package for PyGeoUtils."""
 from pkg_resources import DistributionNotFound, get_distribution
 
 from .exceptions import InvalidInputType
-from .pygeoutils import arcgis2geojson, gtiff2xarray, json2geodf
+from .pygeoutils import MatchCRS, arcgis2geojson, check_bbox, gtiff2xarray, json2geodf
 
 try:
     __version__ = get_distribution(__name__).version

@@ -1,26 +1,26 @@
 """Some utilities for Hydrodata."""
 import numbers
-import os
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, ValuesView
+from typing import Any, Dict, List, Optional, Tuple, Union
 from warnings import warn
 
 import geopandas as gpd
 import numpy as np
+import pyproj
 import rasterio as rio
+import rasterio.features as rio_features
+import rasterio.warp as rio_warp
 import simplejson as json
 import xarray as xr
-from pygeoogc import MatchCRS
-from rasterio import mask as rio_mask
 from shapely.geometry import LineString, Point, Polygon, box
+from shapely.ops import transform
 
 from .exceptions import InvalidInputType
 
+DEF_CRS = "epsg:4326"
+
 
 def json2geodf(
-    content: Union[List[Dict[str, Any]], Dict[str, Any]],
-    in_crs: str = "epsg:4326",
-    crs: str = "epsg:4326",
+    content: Union[List[Dict[str, Any]], Dict[str, Any]], in_crs: str = DEF_CRS, crs: str = DEF_CRS,
 ) -> gpd.GeoDataFrame:
     """Create GeoDataFrame from (Geo)JSON.
 
@@ -252,7 +252,6 @@ def gtiff2xarray(
     r_dict: Dict[str, bytes],
     geometry: Union[Polygon, Tuple[float, float, float, float]],
     geo_crs: str,
-    data_dir: Optional[Union[str, Path]] = None,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert responses from ``pygeoogc.wms_bybox`` to ``xarray.Dataset``.
 
@@ -264,140 +263,139 @@ def gtiff2xarray(
         The geometry to mask the data that should be in the same CRS as the r_dict.
     geo_crs : str
         The spatial reference of the input geometry.
-    data_dir : str or Path, optional
-        The directory to save the output as ``tiff`` images.
 
     Returns
     -------
     xarray.Dataset or xarray.DataAraay
         The dataset or data array based on the number of variables.
     """
-    if data_dir is not None:
-        check_dir(Path(data_dir, "dummy"))
-
-    _fpath = {lyr: f'{lyr.split(":")[-1].lower().replace(" ", "_")}.tiff' for lyr in r_dict.keys()}
-    fpath = {lyr: None if data_dir is None else Path(data_dir, fn) for lyr, fn in _fpath.items()}
     var_name = {lyr: f"{''.join(n for n in lyr.split('_')[:-1])}" for lyr in r_dict.keys()}
 
-    ds = xr.merge(
-        [
-            _create_dataset(r, geometry, geo_crs, var_name[lyr], fpath[lyr])
-            for lyr, r in r_dict.items()
-        ]
-    )
-
-    def mask_da(da):
-        if not np.isnan(da.nodatavals[0]):
-            msk = da < da.nodatavals[0] if da.nodatavals[0] > 0 else da > da.nodatavals[0]
-            _da = da.where(msk, drop=True)
-            _da.attrs["nodatavals"] = (np.nan,)
-            return _da
-        return da
-
-    ds = ds.map(mask_da)
+    ds = xr.merge([_create_dataset(r, var_name[lyr]) for lyr, r in r_dict.items()])
+    ds = _geometry_mask(ds, geometry, geo_crs)
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
     return ds
 
 
-def _create_dataset(
-    content: bytes,
-    geometry: Union[Polygon, Tuple[float, float, float, float]],
-    geo_crs: str,
-    name: str,
-    fpath: Optional[Union[str, Path]] = None,
-) -> Union[xr.Dataset, xr.DataArray]:
+def _create_dataset(content: bytes, name: str,) -> Union[xr.Dataset, xr.DataArray]:
     """Create dataset from a response clipped by a geometry.
 
     Parameters
     ----------
     content : requests.Response
         The response to be processed
-    geometry : Polygon or tuple of length 4
-        The geometry for masking the data
-    geo_crs : str
-        The spatial reference of the input geometry
     name : str
         Variable name in the dataset
-    fpath : str or Path, optinal
-        The path save the file, defaults to None i.e., don't save as an image.
 
     Returns
     -------
     xarray.Dataset
         Generated xarray DataSet or DataArray
     """
-    if not isinstance(geometry, (Polygon, tuple)):
-        raise InvalidInputType("geometry", "Polygon or tuple of length 4")
-
     with rio.MemoryFile() as memfile:
         memfile.write(content)
         with memfile.open() as src:
-            if src.nodata is None:
-                try:
-                    nodata = np.iinfo(src.dtypes[0]).max
-                except ValueError:
-                    nodata = np.nan
-            else:
-                nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+            ds = xr.open_rasterio(src)
+            try:
+                ds = ds.squeeze("band", drop=True)
+            except ValueError:
+                pass
+            ds.name = name
 
-            if isinstance(geometry, Polygon):
-                _geometry = [MatchCRS.geometry(geometry, geo_crs, src.crs)]
-            else:
-                _geometry = [box(*MatchCRS.bounds(geometry, geo_crs, src.crs))]
-
-            masked, transform = rio_mask.mask(src, _geometry, crop=True, nodata=nodata)
-            meta = src.meta
-            meta.update(
-                {
-                    "width": masked.shape[2],
-                    "height": masked.shape[1],
-                    "transform": transform,
-                    "nodata": nodata,
-                }
-            )
-
-            if fpath is not None:
-                check_dir(fpath)
-                with rio.open(fpath, "w", **meta) as dest:
-                    dest.write(masked)
-
-            with rio.vrt.WarpedVRT(src, **meta) as vrt:
-                ds = xr.open_rasterio(vrt)
-                ds.data = masked
-                try:
-                    ds = ds.squeeze("band", drop=True)
-                except ValueError:
-                    pass
-                ds.name = name
-
-                ds.attrs["transform"] = transform
-                ds.attrs["res"] = (transform[0], transform[4])
-                ds.attrs["bounds"] = tuple(vrt.bounds)
-                ds.attrs["nodatavals"] = vrt.nodatavals
-                ds.attrs["crs"] = vrt.crs
+            ds.attrs["transform"] = src.transform
+            ds.attrs["res"] = (src.transform[0], src.transform[4])
+            ds.attrs["bounds"] = tuple(src.bounds)
+            ds.attrs["nodatavals"] = src.nodatavals
+            ds.attrs["crs"] = src.crs
     return ds
 
 
-def check_dir(
-    fpath_itr: Optional[
-        Union[ValuesView[Optional[Union[str, Path]]], List[Optional[Union[str, Path]]], str, Path]
-    ]
-) -> None:
-    """Create parent directory for a file if doesn't exist."""
-    if isinstance(fpath_itr, (str, Path)):
-        fpath_itr = [fpath_itr]
-    elif not isinstance(fpath_itr, Iterable):
-        raise InvalidInputType("fpath_itr", "str or iterable")
+def _geometry_mask(ds: Union[xr.Dataset, xr.DataArray], geometry: Polygon, geo_crs: str):
+    """Mask a ``xarray.Dataset`` based on a geometry.
 
-    for f in fpath_itr:
-        if f is None:
-            continue
+    Parameters
+    ----------
+    ds : xarray.Dataset or xarray.DataArray
+        The dataset(array) to be masked
+    geometry : Polygon
+        The geometry to mask the data
+    geo_crs : str
+        The spatial reference of the input geometry
 
-        parent = Path(f).parent
-        if not parent.is_dir():
-            try:
-                os.makedirs(parent)
-            except OSError:
-                raise OSError(f"Parent directory cannot be created: {parent}")
+    Returns
+    -------
+    xarray.Dataset or xarray.DataArray
+        The input dataset with a mask applied (np.nan)
+    """
+    if isinstance(geometry, tuple):
+        check_bbox(geometry)  # type: ignore
+        _geometry = box(*geometry)
+    elif isinstance(geometry, Polygon):
+        _geometry = geometry
+    else:
+        raise InvalidInputType("geometry", "Polygon or tuple of length 4")
+
+    left, bottom, right, top = _geometry.bounds
+    height, width = list(ds.sizes.values())[-2:]
+    transform = rio_warp.calculate_default_transform(
+        geo_crs, geo_crs, width, height, left, bottom, right, top
+    )[0]
+    _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
+    mask = xr.DataArray(_mask, dims=list(ds.sizes.keys())[-2:])
+
+    def mask_da(da):
+        da = da.where(mask, drop=True)
+        da.attrs["nodatavals"] = (np.nan,)
+        return da
+
+    return ds.map(mask_da)
+
+
+class MatchCRS:
+    """Match CRS of a input geometry (Polygon, bbox, coord) with the output CRS.
+
+    Parameters
+    ----------
+    geometry : tuple or Polygon
+        The input geometry (Polygon, bbox, coord)
+    in_crs : str
+        The spatial reference of the input geometry
+    out_crs : str
+        The target spatial reference
+    """
+
+    @staticmethod
+    def geometry(geom: Polygon, in_crs: str, out_crs: str) -> Polygon:
+        if not isinstance(geom, Polygon):
+            raise InvalidInputType("geom", "Polygon")
+
+        project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
+        return transform(project, geom)
+
+    @staticmethod
+    def bounds(
+        geom: Tuple[float, float, float, float], in_crs: str, out_crs: str
+    ) -> Tuple[float, float, float, float]:
+        if not isinstance(geom, tuple) and len(geom) != 4:
+            raise InvalidInputType("geom", "tuple of length 4", "(west, south, east, north)")
+
+        project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
+        return transform(project, box(*geom)).bounds
+
+    @staticmethod
+    def coords(
+        geom: Tuple[Tuple[float, ...], Tuple[float, ...]], in_crs: str, out_crs: str
+    ) -> Tuple[Any, ...]:
+        if not isinstance(geom, tuple) and len(geom) != 2:
+            raise InvalidInputType("geom", "tuple of length 2", "((xs), (ys))")
+
+        project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
+        return tuple(zip(*[project(x, y) for x, y in zip(*geom)]))
+
+
+def check_bbox(bbox: Tuple[float, float, float, float]) -> None:
+    """Check if an input inbox is a tuple of length 4."""
+    if not isinstance(bbox, tuple) or len(bbox) != 4:
+        raise InvalidInputType("bbox", "tuple", "(west, south, east, north)")
