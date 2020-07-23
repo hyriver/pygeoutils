@@ -34,7 +34,7 @@ def test_gtiff2array(geometry_nat):
     wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, "epsg:4326")
     wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat, "epsg:4326")
 
-    assert abs(wetlands.isel(band=0).mean().values.item() - 16.276) < 1e-3
+    assert abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
 
 
 def test_json2geodf(geometry_urb):
