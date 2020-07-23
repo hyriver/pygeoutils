@@ -1,5 +1,4 @@
 geopandas
-pygeoogc
 rasterio
 setuptools
 shapely
