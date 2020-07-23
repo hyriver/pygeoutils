@@ -1,11 +1,10 @@
-import shutil
-
-import pygeoogc as ogc
+"""Tests for PyGeoUtils"""
 import pytest
-from pygeoogc import WFS, ArcGISRESTful, ServiceURL
+from pygeoogc import WFS, WMS, ArcGISRESTful, ServiceURL
 from shapely.geometry import Polygon
 
-import pygeoutils as utils
+import pygeoutils as geoutils
+from pygeoutils import MatchCRS
 
 
 @pytest.fixture
@@ -30,21 +29,12 @@ def geometry_urb():
 
 def test_gtiff2array(geometry_nat):
     url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
-    layer = "0"
-    r_dict = ogc.wms_bybox(
-        url_wms,
-        layer,
-        geometry_nat.bounds,
-        1e3,
-        "image/tiff",
-        box_crs="epsg:4326",
-        crs="epsg:3857",
-    )
-    wetlands = utils.gtiff2xarray(r_dict, geometry_nat.bounds, "epsg:4326", "tmp")
-    wetlands = utils.gtiff2xarray(r_dict, geometry_nat, "epsg:4326")
-    shutil.rmtree("tmp", ignore_errors=True)
+    wms = WMS(url_wms, layers="0", outformat="image/tiff", crs="epsg:3857",)
+    r_dict = wms.getmap_bybox(geometry_nat.bounds, 1e3, box_crs="epsg:4326",)
+    wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, "epsg:4326")
+    wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat, "epsg:4326")
 
-    assert abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
+    assert abs(wetlands.isel(band=0).mean().values.item() - 16.276) < 1e-3
 
 
 def test_json2geodf(geometry_urb):
@@ -55,11 +45,12 @@ def test_json2geodf(geometry_urb):
         layer="public_NFHL:Base_Flood_Elevations",
         outformat="esrigeojson",
         crs="epsg:4269",
+        version="2.0.0",
     )
     bbox = geometry_urb.bounds
     bbox = (bbox[1], bbox[0], bbox[3], bbox[2])
     r = wfs.getfeature_bybox(bbox, box_crs="epsg:4326")
-    flood = utils.json2geodf([r.json(), r.json()], "epsg:4269", "epsg:4326")
+    flood = geoutils.json2geodf([r.json(), r.json()], "epsg:4269", "epsg:4326")
 
     assert abs(flood["ELEV"].sum() - 630417.6) < 1e-1
 
@@ -78,7 +69,7 @@ def test_ring():
         ],
         "spatialReference": {"wkid": 4326},
     }
-    _ring = utils.arcgis2geojson(ring)
+    _ring = geoutils.arcgis2geojson(ring)
     res = {
         "type": "MultiPolygon",
         "coordinates": [
@@ -99,7 +90,7 @@ def test_ring():
 
 def test_point():
     point = {"x": -118.15, "y": 33.80, "z": 10.0, "spatialReference": {"wkid": 4326}}
-    _point = utils.arcgis2geojson(point)
+    _point = geoutils.arcgis2geojson(point)
     res = {"type": "Point", "coordinates": [-118.15, 33.8, 10.0]}
     assert _point == res
 
@@ -114,7 +105,7 @@ def test_multipoint():
         ],
         "spatialReference": {"wkid": 4326},
     }
-    _mpoint = utils.arcgis2geojson(mpoint)
+    _mpoint = geoutils.arcgis2geojson(mpoint)
     res = {
         "type": "MultiPoint",
         "coordinates": [
@@ -140,7 +131,7 @@ def test_path():
         ],
         "spatialReference": {"wkid": 4326},
     }
-    _path = utils.arcgis2geojson(path)
+    _path = geoutils.arcgis2geojson(path)
     res = {
         "type": "MultiLineString",
         "coordinates": [
@@ -154,3 +145,16 @@ def test_path():
         ],
     }
     assert _path == res
+
+
+def test_matchcrs(geometry_urb):
+    bounds = geometry_urb.bounds
+    points = ((bounds[0], bounds[2]), (bounds[1], bounds[3]))
+    geom = MatchCRS.geometry(geometry_urb, "epsg:4326", "epsg:2149")
+    bbox = MatchCRS.bounds(geometry_urb.bounds, "epsg:4326", "epsg:2149")
+    coords = MatchCRS.coords(points, "epsg:4326", "epsg:2149")
+    assert (
+        abs(geom.area - 2475726907.644) < 1e-3
+        and abs(bbox[0] - (-3654031.190)) < 1e-3
+        and abs(coords[0][-1] == (-2877067.244)) < 1e-3
+    )
