@@ -48,7 +48,6 @@ def test_json2geodf(geometry_urb):
         version="2.0.0",
     )
     bbox = geometry_urb.bounds
-    bbox = (bbox[1], bbox[0], bbox[3], bbox[2])
     r = wfs.getfeature_bybox(bbox, box_crs="epsg:4326")
     flood = geoutils.json2geodf([r.json(), r.json()], "epsg:4269", "epsg:4326")
 

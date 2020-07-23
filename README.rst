@@ -84,7 +84,7 @@ via WFS, then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` usin
 
 .. code-block:: python
 
-    from pygeoogc import WFS, wms_bybox, MatchCRS
+    from pygeoogc import WFS, WMS, MatchCRS
     from shapely.geometry import Polygon
     import pygeoutils as geoutils
 
@@ -100,17 +100,17 @@ via WFS, then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` usin
     )
 
     url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
-    layer = "0"
-    r_dict = wms_bybox(
+    wms = WMS(
         url_wms,
-        layer,
-        geometry.bounds,
-        1e3,
-        "image/tiff",
-        box_crs="epsg:4326",
+        layers="0",
+        outformat="image/tiff",
         crs="epsg:3857",
     )
-
+    r_dict = wms.getmap_bybox(
+        geometry.bounds,
+        1e3,
+        box_crs="epsg:4326",
+    )
     wetlands = geoutils.gtiff2xarray(r_dict, geometry, "epsg:4326")
 
     url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
@@ -120,9 +120,7 @@ via WFS, then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` usin
         outformat="esrigeojson",
         crs="epsg:4269",
     )
-    bbox = geometry.bounds
-    bbox = (bbox[1], bbox[0], bbox[3], bbox[2])
-    r = wfs.getfeature_bybox(bbox, box_crs="epsg:4326")
+    r = wfs.getfeature_bybox(geometry.bounds, box_crs="epsg:4326")
     flood = geoutils.json2geodf(r.json(), "epsg:4269", "epsg:4326")
 
 Contributing
