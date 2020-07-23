@@ -84,9 +84,9 @@ via WFS, then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` usin
 
 .. code-block:: python
 
-    from pygeoogc import WFS, WMS, MatchCRS
-    from shapely.geometry import Polygon
     import pygeoutils as geoutils
+    from pygeoogc import WFS, WMS
+    from shapely.geometry import Polygon
 
 
     geometry =  Polygon(
