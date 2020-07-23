@@ -57,7 +57,7 @@ def json2geodf(
     return geodf.drop_duplicates()
 
 
-def arcgis2geojson(arcgis: Dict[str, Any], idAttribute: Optional[str] = None) -> Dict[str, Any]:
+def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dict[str, Any]:
     """Convert ESRIGeoJSON format to GeoJSON.
 
     Notes
@@ -68,7 +68,7 @@ def arcgis2geojson(arcgis: Dict[str, Any], idAttribute: Optional[str] = None) ->
     ----------
     arcgis : str or binary
         The ESRIGeoJSON format str (or binary)
-    idAttribute : str
+    id_attr : str
         ID of the attribute of interest
 
     Returns
@@ -77,14 +77,13 @@ def arcgis2geojson(arcgis: Dict[str, Any], idAttribute: Optional[str] = None) ->
         A GeoJSON file readable by GeoPandas
     """
 
-    def convert(arcgis, idAttribute=None):
+    def convert(arcgis, id_attr=None):
         """Convert an ArcGIS JSON object to a GeoJSON object."""
         geojson = {}
 
         if "features" in arcgis and arcgis["features"]:
             geojson["type"] = "FeatureCollection"
-            geojson["features"] = []
-            geojson["features"] = [convert(feature, idAttribute) for feature in arcgis["features"]]
+            geojson["features"] = [convert(feature, id_attr) for feature in arcgis["features"]]
 
         if (
             "x" in arcgis
@@ -144,7 +143,7 @@ def arcgis2geojson(arcgis: Dict[str, Any], idAttribute: Optional[str] = None) ->
                 geojson["properties"] = arcgis["attributes"]
                 try:
                     attributes = arcgis["attributes"]
-                    keys = [idAttribute, "OBJECTID", "FID"] if idAttribute else ["OBJECTID", "FID"]
+                    keys = [id_attr, "OBJECTID", "FID"] if id_attr else ["OBJECTID", "FID"]
                     for key in keys:
                         if key in attributes and (
                             isinstance(attributes[key], (numbers.Number, str))
@@ -163,10 +162,10 @@ def arcgis2geojson(arcgis: Dict[str, Any], idAttribute: Optional[str] = None) ->
 
     def rings2geojson(rings):
         """Check for holes in the ring and fill them."""
-        outerRings = []
+        outer_rings = []
         holes = []
         x = None  # iterable
-        outerRing = None  # current outer ring being evaluated
+        outer_ring = None  # current outer ring being evaluated
         hole = None  # current hole being evaluated
 
         for ring in rings:
@@ -181,7 +180,7 @@ def arcgis2geojson(arcgis: Dict[str, Any], idAttribute: Optional[str] = None) ->
             )
             # Clock-wise check
             if total >= 0:
-                outerRings.append(
+                outer_rings.append(
                     [ring[::-1]]
                 )  # wind outer rings counterclockwise for RFC 7946 compliance
             else:
@@ -196,16 +195,16 @@ def arcgis2geojson(arcgis: Dict[str, Any], idAttribute: Optional[str] = None) ->
 
             # loop over all outer rings and see if they contain our hole.
             contained = False
-            x = len(outerRings) - 1
+            x = len(outer_rings) - 1
             while x >= 0:
-                outerRing = outerRings[x][0]
-                l1, l2 = LineString(outerRing), LineString(hole)
+                outer_ring = outer_rings[x][0]
+                l1, l2 = LineString(outer_ring), LineString(hole)
                 p2 = Point(hole[0])
                 intersects = l1.intersects(l2)
                 contains = l1.contains(p2)
                 if not intersects and contains:
                     # the hole is contained push it into our polygon
-                    outerRings[x].append(hole)
+                    outer_rings[x].append(hole)
                     contained = True
                     break
                 x = x - 1
@@ -222,30 +221,30 @@ def arcgis2geojson(arcgis: Dict[str, Any], idAttribute: Optional[str] = None) ->
 
             # loop over all outer rings and see if any intersect our hole.
             intersects = False
-            x = len(outerRings) - 1
+            x = len(outer_rings) - 1
             while x >= 0:
-                outerRing = outerRings[x][0]
-                l1, l2 = LineString(outerRing), LineString(hole)
+                outer_ring = outer_rings[x][0]
+                l1, l2 = LineString(outer_ring), LineString(hole)
                 intersects = l1.intersects(l2)
                 if intersects:
                     # the hole is contained push it into our polygon
-                    outerRings[x].append(hole)
+                    outer_rings[x].append(hole)
                     intersects = True
                     break
                 x = x - 1
 
             if not intersects:
-                outerRings.append([hole[::-1]])
+                outer_rings.append([hole[::-1]])
 
-        if len(outerRings) == 1:
-            return {"type": "Polygon", "coordinates": outerRings[0]}
+        if len(outer_rings) == 1:
+            return {"type": "Polygon", "coordinates": outer_rings[0]}
 
-        return {"type": "MultiPolygon", "coordinates": outerRings}
+        return {"type": "MultiPolygon", "coordinates": outer_rings}
 
     if isinstance(arcgis, str):
-        return json.dumps(convert(json.loads(arcgis), idAttribute))
+        return json.dumps(convert(json.loads(arcgis), id_attr))
 
-    return convert(arcgis, idAttribute)
+    return convert(arcgis, id_attr)
 
 
 def gtiff2xarray(
