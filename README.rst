@@ -40,6 +40,8 @@
 
 |
 
+🚨 **This package is under heavy development and breaking changes are likely to happen.** 🚨
+
 Features
 --------
 
