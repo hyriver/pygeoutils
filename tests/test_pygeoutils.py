@@ -1,6 +1,6 @@
 """Tests for PyGeoUtils"""
 import pytest
-from pygeoogc import WFS, WMS, ArcGISRESTful, ServiceURL
+from pygeoogc import WFS, WMS
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
