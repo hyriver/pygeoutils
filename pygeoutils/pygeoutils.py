@@ -11,8 +11,8 @@ import rasterio.features as rio_features
 import rasterio.transform as rio_transform
 import simplejson as json
 import xarray as xr
+from shapely import ops
 from shapely.geometry import LineString, Point, Polygon, box
-from shapely.ops import transform
 
 from .exceptions import InvalidInputType
 
@@ -369,7 +369,7 @@ class MatchCRS:
             raise InvalidInputType("geom", "Polygon")
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        return transform(project, geom)
+        return ops.transform(project, geom)
 
     @staticmethod
     def bounds(
@@ -379,7 +379,7 @@ class MatchCRS:
             raise InvalidInputType("geom", "tuple of length 4", "(west, south, east, north)")
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        return transform(project, box(*geom)).bounds
+        return ops.transform(project, box(*geom)).bounds
 
     @staticmethod
     def coords(
