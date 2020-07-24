@@ -3,10 +3,11 @@ History
 =======
 
 
-0.1.5 (2020-07-23)
+0.1.6 (2020-07-23)
 ------------------
 
 - Fixed the issue with flipped mask in ``WMS``.
+- Removed ``drop_duplicates`` since it may cause issues in some instances.
 
 
 0.1.4 (2020-07-22)

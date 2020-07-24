@@ -54,7 +54,7 @@ def json2geodf(
     if in_crs != crs:
         geodf = geodf.to_crs(crs)
 
-    return geodf.drop_duplicates()
+    return geodf
 
 
 def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dict[str, Any]:
