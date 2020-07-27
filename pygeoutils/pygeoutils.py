@@ -273,7 +273,7 @@ def gtiff2xarray(
     ds = xr.merge(
         [_create_dataset(r, var_name[lyr]) for lyr, r in r_dict.items()], combine_attrs="override"
     )
-    ds = _geometry_mask(ds, geometry, geo_crs)
+    ds = xarray_geomask(ds, geometry, geo_crs)
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
@@ -313,7 +313,7 @@ def _create_dataset(content: bytes, name: str,) -> Union[xr.Dataset, xr.DataArra
     return ds
 
 
-def _geometry_mask(
+def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
     geometry: Union[Polygon, Tuple[float, float, float, float]],
     geo_crs: str,
