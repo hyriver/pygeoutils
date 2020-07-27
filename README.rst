@@ -52,6 +52,7 @@ and provides utilities for manipulating (Geo)JSON and GeoTIFF data:
 - ``arcgis2geojson``: For converting ESRIGeoJSON objects to standard GeoJSON format.
 - ``gtiff2xarray``: For converting (Geo)TIFF objects to `xarray <https://xarray.pydata.org/>`__
   datasets.
+- ``xarray_geomask``: For masking a ``xarray.Dataset`` or ``xarray.DataArray`` using a polygon.
 
 All these function handle all necessary CRS transformations. Moreover, requests for additional
 functionalities can be submitted via
@@ -128,8 +129,6 @@ via WFS, then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` usin
 Contributing
 ------------
 
-Contirbutions are very welcomed. Please read
-`CODE_OF_CONDUCT.rst <https://github.com/cheginit/pygeoutils/blob/master/CODE_OF_CONDUCT.rst>`__
-and
-`CONTRIBUTING.rst <https://github.com/cheginit/pygeoutils/blob/master/CONTRIBUTING.rst>`__
-files for instructions.
+Contributions are very welcomed. Please read
+`CONTRIBUTING.rst <https://github.com/cheginit/pygeoogc/blob/master/CONTRIBUTING.rst>`__
+file for instructions.
