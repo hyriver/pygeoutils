@@ -270,9 +270,21 @@ def gtiff2xarray(
     """
     var_name = {lyr: f"{''.join(n for n in lyr.split('_')[:-1])}" for lyr in r_dict.keys()}
 
-    ds = xr.merge(
-        [_create_dataset(r, var_name[lyr]) for lyr, r in r_dict.items()], combine_attrs="override"
-    )
+    attrs = {}
+    with rio.MemoryFile() as memfile:
+        memfile.write(list(r_dict.values())[0])
+        with memfile.open() as src:
+            attrs["transform"] = src.transform
+            attrs["res"] = (src.transform[0], src.transform[4])
+            attrs["bounds"] = tuple(src.bounds)
+            attrs["nodatavals"] = src.nodatavals
+            attrs["crs"] = src.crs
+
+    ds = xr.merge([_create_dataset(r, var_name[lyr]) for lyr, r in r_dict.items()])
+
+    for a, v in attrs.items():
+        ds.attrs[a] = v
+
     ds = xarray_geomask(ds, geometry, geo_crs)
 
     if len(ds.variables) - len(ds.dims) == 1:
