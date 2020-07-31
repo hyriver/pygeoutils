@@ -2,6 +2,11 @@
 History
 =======
 
+0.1.8 (unreleased)
+------------------
+
+- Retaind the compatibility with ``xarray`` 0.15 by removing the ``attrs`` flag.
+- Added ``xarray_geomask`` function and made it a public function.
 
 0.1.6 (2020-07-23)
 ------------------
