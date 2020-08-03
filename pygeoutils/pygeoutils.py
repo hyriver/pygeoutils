@@ -8,6 +8,7 @@ import numpy as np
 import pyproj
 import rasterio as rio
 import rasterio.features as rio_features
+import rasterio.mask as rio_mask
 import rasterio.transform as rio_transform
 import simplejson as json
 import xarray as xr
@@ -280,48 +281,42 @@ def gtiff2xarray(
             attrs["nodatavals"] = src.nodatavals
             attrs["crs"] = src.crs
 
+    _geometry = [geo2polygon(geometry, geo_crs, attrs["crs"])]
+
+    def _create_dataset(content: bytes, name: str) -> Union[xr.Dataset, xr.DataArray]:
+        with rio.MemoryFile() as memfile:
+            memfile.write(content)
+            with memfile.open() as src:
+                out_image, out_transform = rio_mask.mask(src, _geometry, crop=True)
+                meta = src.meta
+                meta.update(
+                    {
+                        "driver": "GTiff",
+                        "height": out_image.shape[1],
+                        "width": out_image.shape[2],
+                        "transform": out_transform,
+                    }
+                )
+
+                with rio.vrt.WarpedVRT(src, **meta) as vrt:
+                    ds = xr.open_rasterio(vrt)
+                    try:
+                        ds = ds.squeeze("band", drop=True)
+                    except ValueError:
+                        pass
+                    ds.name = name
+        return ds
+
     ds = xr.merge([_create_dataset(r, var_name[lyr]) for lyr, r in r_dict.items()])
 
     for a, v in attrs.items():
-        ds.attrs[a] = v
+        if a not in ds.attrs:
+            ds.attrs[a] = v
 
     ds = xarray_geomask(ds, geometry, geo_crs)
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
-    return ds
-
-
-def _create_dataset(content: bytes, name: str,) -> Union[xr.Dataset, xr.DataArray]:
-    """Create dataset from a response clipped by a geometry.
-
-    Parameters
-    ----------
-    content : requests.Response
-        The response to be processed
-    name : str
-        Variable name in the dataset
-
-    Returns
-    -------
-    xarray.Dataset
-        Generated xarray DataSet or DataArray
-    """
-    with rio.MemoryFile() as memfile:
-        memfile.write(content)
-        with memfile.open() as src:
-            ds = xr.open_rasterio(src)
-            try:
-                ds = ds.squeeze("band", drop=True)
-            except ValueError:
-                pass
-            ds.name = name
-
-            ds.attrs["transform"] = src.transform
-            ds.attrs["res"] = (src.transform[0], src.transform[4])
-            ds.attrs["bounds"] = tuple(src.bounds)
-            ds.attrs["nodatavals"] = src.nodatavals
-            ds.attrs["crs"] = src.crs
     return ds
 
 
@@ -346,20 +341,14 @@ def xarray_geomask(
     xarray.Dataset or xarray.DataArray
         The input dataset with a mask applied (np.nan)
     """
-    if isinstance(geometry, tuple):
-        _geometry = box(*MatchCRS.bounds(geometry, geo_crs, ds.crs))  # type: ignore
-    elif isinstance(geometry, Polygon):
-        _geometry = MatchCRS.geometry(geometry, geo_crs, ds.crs)
-    else:
-        raise InvalidInputType("geometry", "Polygon or tuple of length 4")
-
+    _geometry = geo2polygon(geometry, geo_crs, ds.crs)
     west, south, east, north = _geometry.bounds
     height, width = ds.sizes["y"], ds.sizes["x"]
     transform = rio_transform.from_bounds(west, south, east, north, width, height)
     _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
     mask = xr.DataArray(_mask, dims=("y", "x"))
 
-    return ds.where(mask)
+    return ds.where(mask, drop=True)
 
 
 class MatchCRS:
@@ -408,3 +397,31 @@ def check_bbox(bbox: Tuple[float, float, float, float]) -> None:
     """Check if an input inbox is a tuple of length 4."""
     if not isinstance(bbox, tuple) or len(bbox) != 4:
         raise InvalidInputType("bbox", "tuple", "(west, south, east, north)")
+
+
+def geo2polygon(
+    geometry: Union[Polygon, Tuple[float, float, float, float]], geo_crs: str, crs: str
+) -> Polygon:
+    """Convert a geometry to a Shapely's Polygon and transform to any CRS.
+
+    Parameters
+    ----------
+    geometry : Polygon or tuple of length 4
+        A Polygon or bounding box (west, south, east, north).
+    geo_crs : str
+        THe spatial reference of the input geometry
+    crs : str
+        The target spatial reference.
+
+    Returns
+    -------
+    Polygon
+        A Polygon in the target CRS.
+    """
+    if isinstance(geometry, tuple):
+        return box(*MatchCRS.bounds(geometry, geo_crs, crs))  # type: ignore
+
+    if isinstance(geometry, Polygon):
+        return MatchCRS.geometry(geometry, geo_crs, crs)
+
+    raise InvalidInputType("geometry", "Polygon or tuple of length 4")

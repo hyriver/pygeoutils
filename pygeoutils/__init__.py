@@ -6,6 +6,7 @@ from .pygeoutils import (
     MatchCRS,
     arcgis2geojson,
     check_bbox,
+    geo2polygon,
     gtiff2xarray,
     json2geodf,
     xarray_geomask,
