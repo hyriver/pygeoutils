@@ -7,6 +7,10 @@ History
 
 - Retaind the compatibility with ``xarray`` 0.15 by removing the ``attrs`` flag.
 - Added ``xarray_geomask`` function and made it a public function.
+- More efficient handling of large geotiff responses by croping the response before
+  converting it into a dataset.
+- Added a new function called ``geo2polygon`` for converting and transforming
+  a polygon or bounding box into a Shapley's Polygon in the target CRS.
 
 0.1.6 (2020-07-23)
 ------------------
