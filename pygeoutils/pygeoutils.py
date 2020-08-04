@@ -313,7 +313,7 @@ def gtiff2xarray(
         if a not in ds.attrs:
             ds.attrs[a] = v
 
-    ds = xarray_geomask(ds, geometry, geo_crs)
+    ds = xarray_geomask(ds, _geometry[0], attrs["crs"])
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
