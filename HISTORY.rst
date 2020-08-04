@@ -2,7 +2,7 @@
 History
 =======
 
-0.1.8 (unreleased)
+0.1.8 (2020-08-03)
 ------------------
 
 - Retaind the compatibility with ``xarray`` 0.15 by removing the ``attrs`` flag.
