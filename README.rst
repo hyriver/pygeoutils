@@ -82,7 +82,7 @@ functionalities can be submitted via
 Installation
 ------------
 
-You can install pygeoutils using ``pip`` after installing ``libgdal`` on your system
+You can install PyGeoUtils using ``pip`` after installing ``libgdal`` on your system
 (for example, in Ubuntu run ``sudo apt install libgdal-dev``):
 
 .. code-block:: console
@@ -96,14 +96,14 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 
     $ conda install -c conda-forge pygeoutils
 
-Quickstart
-----------
+Quick start
+-----------
 
 To demonstrate capabilities of PyGeoUtils lets use
 `PyGeoOGC <https://github.com/cheginit/pygeoogc>`__ to access
 `National Wetlands Inventory <https://www.fws.gov/wetlands/>`__ from WMS, and
 `FEMA National Flood Hazard <https://www.fema.gov/national-flood-hazard-layer-nfhl>`__
-via WFS, then convert the outpus to ``GeoDataFrame`` and ``xarray.Dataset`` using PyGeoUtils.
+via WFS, then convert the output to ``GeoDataFrame`` and ``xarray.Dataset`` using PyGeoUtils.
 
 .. code-block:: python
 

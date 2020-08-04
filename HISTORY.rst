@@ -5,7 +5,7 @@ History
 0.1.8 (2020-08-03)
 ------------------
 
-- Retaind the compatibility with ``xarray`` 0.15 by removing the ``attrs`` flag.
+- Retained the compatibility with ``xarray`` 0.15 by removing the ``attrs`` flag.
 - Added ``xarray_geomask`` function and made it a public function.
 - More efficient handling of large geotiff responses by croping the response before
   converting it into a dataset.
