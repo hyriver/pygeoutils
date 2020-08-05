@@ -7,13 +7,13 @@ dependencies:
   - pip
   - pygeoogc
   - xarray
+  - netCDF4
   - geopandas
   - rasterio
   - shapely
   - simplejson
 
   - dask
-  - netCDF4
   - bottleneck
 
   - setuptools_scm

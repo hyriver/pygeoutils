@@ -6,6 +6,7 @@ dependencies:
   - setuptools
   - pygeoogc
   - xarray
+  - netCDF4
   - geopandas
   - rasterio
   - shapely
