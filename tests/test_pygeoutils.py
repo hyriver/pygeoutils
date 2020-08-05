@@ -1,4 +1,6 @@
 """Tests for PyGeoUtils"""
+import io
+
 import pytest
 from pygeoogc import WFS, WMS
 from shapely.geometry import Polygon
@@ -161,3 +163,9 @@ def test_matchcrs(geometry_urb):
         and abs(bbox[0] - (-3654031.190)) < 1e-3
         and abs(coords[0][-1] == (-2877067.244)) < 1e-3
     )
+
+
+def test_show_versions():
+    f = io.StringIO()
+    geoutils.show_versions(file=f)
+    assert "INSTALLED VERSIONS" in f.getvalue()
