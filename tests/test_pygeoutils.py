@@ -31,6 +31,7 @@ def geometry_urb():
     )
 
 
+@pytest.mark.flaky(max_runs=3)
 def test_gtiff2array(geometry_nat):
     url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
     wms = WMS(url_wms, layers="0", outformat="image/tiff", crs="epsg:3857",)
@@ -41,6 +42,7 @@ def test_gtiff2array(geometry_nat):
     assert abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
 
 
+@pytest.mark.flaky(max_runs=3)
 def test_json2geodf(geometry_urb):
     url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
 
