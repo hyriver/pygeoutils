@@ -269,7 +269,9 @@ def gtiff2xarray(
     xarray.Dataset or xarray.DataAraay
         The dataset or data array based on the number of variables.
     """
-    var_name = {lyr: f"{''.join(n for n in lyr.split('_')[:-1])}" for lyr in r_dict.keys()}
+    var_name = {
+        lyr: "_".join(lyr.split("_")[:-2]) if "_dd_" in lyr else lyr for lyr in r_dict.keys()
+    }
 
     attrs = {}
     with rio.MemoryFile() as memfile:
