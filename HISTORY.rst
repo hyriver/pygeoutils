@@ -5,6 +5,11 @@ History
 0.1.8 (2020-08-03)
 ------------------
 
+- Modified ``griff2xarray`` to reflect the latest changes in ``pygeoogc`` 0.1.7.
+
+0.1.8 (2020-08-03)
+------------------
+
 - Retained the compatibility with ``xarray`` 0.15 by removing the ``attrs`` flag.
 - Added ``xarray_geomask`` function and made it a public function.
 - More efficient handling of large geotiff responses by croping the response before
