@@ -2,7 +2,7 @@
 History
 =======
 
-0.1.8 (2020-08-03)
+0.1.9 (2020-08-11)
 ------------------
 
 - Modified ``griff2xarray`` to reflect the latest changes in ``pygeoogc`` 0.1.7.
