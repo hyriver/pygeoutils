@@ -1,4 +1,4 @@
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/pygeoutils_logo.png
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/pygeoutils_logo.png
     :target: https://github.com/cheginit/pygeoutils
     :align: center
 
@@ -42,7 +42,7 @@ PyGeoUtils: Manipulate (Geo)JSON and (Geo)TIFF data
     :alt: Github Actions
 
 .. image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/cheginit/hydrodata/develop
+    :target: https://mybinder.org/v2/gh/cheginit/hydrodata/master
     :alt: Binder
 
 |
