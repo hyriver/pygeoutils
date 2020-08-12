@@ -89,7 +89,7 @@ You can install PyGeoUtils using ``pip`` after installing ``libgdal`` on your sy
 
     $ pip install pygeoutils
 
-Alternatively, pygeoutils can be installed from the ``conda-forge`` repository
+Alternatively, PyGeoUtils can be installed from the ``conda-forge`` repository
 using `Conda <https://docs.conda.io/en/latest/>`__:
 
 .. code-block:: console
