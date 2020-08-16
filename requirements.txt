@@ -1,4 +1,5 @@
 geopandas
+netCDF4
 rasterio
 setuptools
 shapely
