@@ -1,5 +1,6 @@
 """Some utilities for Hydrodata."""
 import numbers
+from itertools import product
 from typing import Any, Dict, List, Optional, Tuple, Union
 from warnings import warn
 
@@ -252,6 +253,7 @@ def gtiff2xarray(
     r_dict: Dict[str, bytes],
     geometry: Union[Polygon, Tuple[float, float, float, float]],
     geo_crs: str,
+    ds_dims: Tuple[str, str] = ("y", "x"),
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert responses from ``pygeoogc.wms_bybox`` to ``xarray.Dataset``.
 
@@ -263,59 +265,64 @@ def gtiff2xarray(
         The geometry to mask the data that should be in the same CRS as the r_dict.
     geo_crs : str
         The spatial reference of the input geometry.
+    ds_dims : tuple of str, optional
+        The names of the vertical and horizontal dimensions (in that order)
+        of the target dataset, default to ("y", "x").
 
     Returns
     -------
     xarray.Dataset or xarray.DataAraay
         The dataset or data array based on the number of variables.
     """
-    var_name = {
-        lyr: "_".join(lyr.split("_")[:-2]) if "_dd_" in lyr else lyr for lyr in r_dict.keys()
-    }
+    key1 = list(r_dict.keys())[0]
+    if len(r_dict) == 1 and "dd" not in key1:
+        r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
 
-    attrs = {}
+    var_name = {"_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
+
+    rows = {int(lyr.split("_")[-2]) for lyr in r_dict.keys()}
+    cols = {int(lyr.split("_")[-1]) for lyr in r_dict.keys()}
+    ds_grid = np.zeros((len(rows), len(cols))).tolist()
+
     with rio.MemoryFile() as memfile:
-        memfile.write(list(r_dict.values())[0])
+        memfile.write(next(iter(r_dict.values())))
         with memfile.open() as src:
-            attrs["transform"] = src.transform
-            attrs["res"] = (src.transform[0], src.transform[4])
-            attrs["bounds"] = tuple(src.bounds)
-            attrs["nodatavals"] = src.nodatavals
-            attrs["crs"] = src.crs
+            r_crs = get_crs(src.crs)
 
-    _geometry = [geo2polygon(geometry, geo_crs, attrs["crs"])]
+    _geometry = [geo2polygon(geometry, geo_crs, r_crs)]
 
-    def _create_dataset(content: bytes, name: str) -> Union[xr.Dataset, xr.DataArray]:
-        with rio.MemoryFile() as memfile:
-            memfile.write(content)
-            with memfile.open() as src:
-                out_image, out_transform = rio_mask.mask(src, _geometry, crop=True)
-                meta = src.meta
-                meta.update(
-                    {
-                        "driver": "GTiff",
-                        "height": out_image.shape[1],
-                        "width": out_image.shape[2],
-                        "transform": out_transform,
-                    }
-                )
+    def combin(name: str) -> xr.DataArray:
+        for (row, col) in product(rows, cols):
+            with rio.MemoryFile() as memfile:
+                memfile.write(r_dict[f"{name}_dd_{row}_{col}"])
+                with memfile.open() as src:
+                    out_image, out_transform = rio_mask.mask(src, _geometry, crop=True)
+                    meta = src.meta
+                    meta.update(
+                        {
+                            "driver": "GTiff",
+                            "height": out_image.shape[1],
+                            "width": out_image.shape[2],
+                            "transform": out_transform,
+                        }
+                    )
 
-                with rio.vrt.WarpedVRT(src, **meta) as vrt:
-                    ds = xr.open_rasterio(vrt)
-                    try:
-                        ds = ds.squeeze("band", drop=True)
-                    except ValueError:
-                        pass
-                    ds.name = name
-        return ds
+                    with rio.vrt.WarpedVRT(src, **meta) as vrt:
+                        ds = xr.open_rasterio(vrt)
+                        try:
+                            ds = ds.squeeze("band", drop=True)
+                        except ValueError:
+                            pass
+                        ds.name = name
+                        ds.attrs["crs"] = r_crs
 
-    ds = xr.merge([_create_dataset(r, var_name[lyr]) for lyr, r in r_dict.items()])
+            ds_grid[row][col] = ds
+        return xr.combine_nested(ds_grid, ds_dims, combine_attrs="override")
 
-    for a, v in attrs.items():
-        if a not in ds.attrs:
-            ds.attrs[a] = v
+    ds = xr.merge(combin(n) for n in var_name)
+    ds.attrs["crs"] = r_crs
 
-    ds = xarray_geomask(ds, _geometry[0], attrs["crs"])
+    ds = xarray_geomask(ds, _geometry[0], r_crs, ds_dims=ds_dims)
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
@@ -326,6 +333,7 @@ def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
     geometry: Union[Polygon, Tuple[float, float, float, float]],
     geo_crs: str,
+    ds_dims: Tuple[str, str] = ("y", "x"),
 ):
     """Mask a ``xarray.Dataset`` based on a geometry.
 
@@ -337,20 +345,36 @@ def xarray_geomask(
         The geometry or bounding box to mask the data
     geo_crs : str
         The spatial reference of the input geometry
+    ds_dims : tuple of str, optional
+        The names of the vertical and horizontal dimensions (in that order)
+        of the dataset, default to ("y", "x").
 
     Returns
     -------
     xarray.Dataset or xarray.DataArray
         The input dataset with a mask applied (np.nan)
     """
-    _geometry = geo2polygon(geometry, geo_crs, ds.crs)
-    west, south, east, north = _geometry.bounds
-    height, width = ds.sizes["y"], ds.sizes["x"]
-    transform = rio_transform.from_bounds(west, south, east, north, width, height)
-    _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
-    mask = xr.DataArray(_mask, dims=("y", "x"))
+    if not isinstance(ds_dims, tuple) or len(ds_dims) != 2:
+        raise InvalidInputType("ds_dims", "tuple of length 2", '("y", "x")')
 
-    return ds.where(mask, drop=True)
+    if "crs" not in ds.attrs:
+        raise ValueError("The input dataset is missing the crs attribute.")
+
+    _geometry = geo2polygon(geometry, geo_crs, ds.crs)
+
+    west, south, east, north = _geometry.bounds
+    height, width = ds.sizes[ds_dims[0]], ds.sizes[ds_dims[1]]
+
+    transform = rio_transform.from_bounds(west, south, east, north, width, height)
+
+    _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
+    mask = xr.DataArray(_mask, dims=ds_dims)
+
+    ds_masked = ds.where(mask, drop=True)
+    ds_masked.attrs["transform"] = transform
+    ds_masked.attrs["bounds"] = _geometry.bounds
+
+    return ds_masked
 
 
 class MatchCRS:
@@ -427,3 +451,8 @@ def geo2polygon(
         return MatchCRS.geometry(geometry, geo_crs, crs)
 
     raise InvalidInputType("geometry", "Polygon or tuple of length 4")
+
+
+def get_crs(crs: str):
+    """Get correct CRS from a string (mostly for deprecated +init format)."""
+    return pyproj.CRS.from_epsg(pyproj.CRS(crs).to_epsg(20))
