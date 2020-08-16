@@ -53,7 +53,7 @@ lint: ## check style with flake8
 	pre-commit run --all-files
 
 test: ## run tests quickly with the default Python
-	pytest --cov=pygeoutils -n 2 -v
+	pytest --cov=pygeoutils -n 4 -v
 
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source pygeoutils -m pytest -v
