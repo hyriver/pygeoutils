@@ -15,7 +15,7 @@ Types of Contributions
 Report Bugs
 ~~~~~~~~~~~
 
-Report bugs at https://github.com/cheginit/pygeoutils/issues.
+Report bugs at https://github.com/cheginit/py3dep/issues.
 
 If you are reporting a bug, please include:
 
@@ -39,14 +39,14 @@ and "help wanted" is open to whoever wants to implement it.
 Write Documentation
 ~~~~~~~~~~~~~~~~~~~
 
-pygeoutils could always use more documentation, whether as part of the
-official pygeoutils docs, in docstrings, or even on the web in blog posts,
+PyGeoUtils could always use more documentation, whether as part of the
+official PyGeoUtils docs, in docstrings, or even on the web in blog posts,
 articles, and such.
 
 Submit Feedback
 ~~~~~~~~~~~~~~~
 
-The best way to send feedback is to file an issue at https://github.com/cheginit/pygeoutils/issues.
+The best way to send feedback is to file an issue at https://github.com/cheginit/py3dep/issues.
 
 If you are proposing a feature:
 
@@ -58,31 +58,30 @@ If you are proposing a feature:
 Get Started!
 ------------
 
-Ready to contribute? Here's how to set up pygeoutils for local development.
+Ready to contribute? Here's how to set up PyGeoUtils for local development.
 
-1. Fork the pygeoutils repo through the GitHub website.
-2. Clone your fork locally and add the main pygeoutils as the upstream remote:
+1. Fork the PyGeoUtils repo through the GitHub website.
+2. Clone your fork locally and add the main PyGeoUtils as the upstream remote:
 
 .. code-block:: console
 
-    $ git clone git@github.com:your_name_here/pygeoutils.git
-    $ git remote add upstream git@github.com:cheginit/pygeoutils.git
+    $ git clone git@github.com:your_name_here/py3dep.git
+    $ git remote add upstream git@github.com:cheginit/py3dep.git
 
 3. Install your local copy into a virtualenv. Assuming you have Conda installed, this is how you
    can set up your fork for local development:
 
 .. code-block:: console
 
-    $ cd pygeoutils/
+    $ cd py3dep/
     $ conda env create -f ci/requirements/environment.yml
-    $ conda activate pygeoutils-dev
+    $ conda activate py3dep-dev
     $ python -m pip install . --no-deps
 
-4. Check out the ``develop`` branch and create a branch for local development:
+4. Create a branch for local development:
 
 .. code-block:: console
 
-    $ git checkout develop
     $ git checkout -b bugfix-or-feature/name-of-your-bugfix-or-feature
     $ git push
 
@@ -103,7 +102,7 @@ Ready to contribute? Here's how to set up pygeoutils for local development.
 .. code-block:: console
 
     $ git fetch upstream
-    $ git merge upstream/develop
+    $ git merge upstream/name-of-your-branch
 
 7. Then lint and test the code:
 
@@ -121,7 +120,7 @@ Ready to contribute? Here's how to set up pygeoutils for local development.
 
     $ git add .
     $ git commit -m "Your detailed description of your changes."
-    $ git push origin name-of-your-bugfix-or-feature
+    $ git push origin name-of-your-branch
 
 10. Submit a pull request through the GitHub website.
 
