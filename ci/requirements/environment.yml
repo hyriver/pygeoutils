@@ -5,7 +5,6 @@ dependencies:
   - python>=3.8
   - setuptools
   - pip
-  - pygeoogc
   - xarray
   - netCDF4
   - geopandas
@@ -24,3 +23,4 @@ dependencies:
   - coverage
   - pip:
     - numbagg
+    - git+https://github.com/cheginit/pygeoogc.git

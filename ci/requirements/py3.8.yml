@@ -4,10 +4,13 @@ channels:
 dependencies:
   - python=3.8
   - setuptools
-  - pygeoogc
+  - pip
   - xarray
   - netCDF4
   - geopandas
   - rasterio
   - shapely
   - simplejson
+  - pip:
+    - git+https://github.com/cheginit/pygeoogc.git
+
