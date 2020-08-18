@@ -1,17 +1,17 @@
 """Some utilities for Hydrodata."""
 import numbers
-from itertools import product
 from typing import Any, Dict, List, Optional, Tuple, Union
 from warnings import warn
 
+import affine
 import geopandas as gpd
 import numpy as np
+import orjson as json
 import pyproj
 import rasterio as rio
 import rasterio.features as rio_features
 import rasterio.mask as rio_mask
 import rasterio.transform as rio_transform
-import simplejson as json
 import xarray as xr
 from shapely import ops
 from shapely.geometry import LineString, Point, Polygon, box
@@ -274,55 +274,62 @@ def gtiff2xarray(
     xarray.Dataset or xarray.DataAraay
         The dataset or data array based on the number of variables.
     """
-    key1 = list(r_dict.keys())[0]
+    key1 = next(iter(r_dict.keys()))
     if len(r_dict) == 1 and "dd" not in key1:
         r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
 
-    var_name = {"_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
-
-    rows = {int(lyr.split("_")[-2]) for lyr in r_dict.keys()}
-    cols = {int(lyr.split("_")[-1]) for lyr in r_dict.keys()}
-    ds_grid = np.zeros((len(rows), len(cols))).tolist()
+    var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
 
     with rio.MemoryFile() as memfile:
-        memfile.write(next(iter(r_dict.values())))
+        memfile.write(r_dict[next(iter(r_dict.keys()))])
         with memfile.open() as src:
             r_crs = get_crs(src.crs)
+            if src.nodata is None:
+                try:
+                    nodata = np.iinfo(src.dtypes[0]).max
+                except ValueError:
+                    nodata = np.nan
+            else:
+                nodata = np.dtype(src.dtypes[0]).type(src.nodata)
 
-    _geometry = [geo2polygon(geometry, geo_crs, r_crs)]
+    _geometry = geo2polygon(geometry, geo_crs, r_crs)
 
-    def combin(name: str) -> xr.DataArray:
-        for (row, col) in product(rows, cols):
-            with rio.MemoryFile() as memfile:
-                memfile.write(r_dict[f"{name}_dd_{row}_{col}"])
-                with memfile.open() as src:
-                    out_image, out_transform = rio_mask.mask(src, _geometry, crop=True)
-                    meta = src.meta
-                    meta.update(
-                        {
-                            "driver": "GTiff",
-                            "height": out_image.shape[1],
-                            "width": out_image.shape[2],
-                            "transform": out_transform,
-                        }
-                    )
+    def to_dataset(lyr: str) -> xr.DataArray:
+        with rio.MemoryFile() as memfile:
+            memfile.write(r_dict[lyr])
+            with memfile.open() as src:
+                geom = [_geometry.intersection(box(*src.bounds))]
+                if geom[0].is_empty:
+                    msk, transform, _ = rio_mask.raster_geometry_mask(src, [_geometry], invert=True)
+                else:
+                    msk, transform, _ = rio_mask.raster_geometry_mask(src, geom, invert=True)
+                meta = src.meta
+                meta.update(
+                    {
+                        "driver": "GTiff",
+                        "height": msk.shape[0],
+                        "width": msk.shape[1],
+                        "transform": transform,
+                        "nodata": nodata,
+                    }
+                )
 
-                    with rio.vrt.WarpedVRT(src, **meta) as vrt:
-                        ds = xr.open_rasterio(vrt)
-                        try:
-                            ds = ds.squeeze("band", drop=True)
-                        except ValueError:
-                            pass
-                        ds.name = name
-                        ds.attrs["crs"] = r_crs
+                with rio.vrt.WarpedVRT(src, **meta) as vrt:
+                    ds = xr.open_rasterio(vrt)
+                    try:
+                        ds = ds.squeeze("band", drop=True)
+                    except ValueError:
+                        pass
+                    coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
+                    msk_da = xr.DataArray(msk, coords, dims=ds_dims)
+                    ds = ds.where(msk_da, drop=True)
+                    ds.attrs["crs"] = r_crs
+                    ds.name = var_name[lyr]
+                    return ds
 
-            ds_grid[row][col] = ds
-        return xr.combine_nested(ds_grid, ds_dims, combine_attrs="override")
-
-    ds = xr.merge(combin(n) for n in var_name)
+    ds = xr.merge(to_dataset(lyr) for lyr in r_dict.keys())
     ds.attrs["crs"] = r_crs
-
-    ds = xarray_geomask(ds, _geometry[0], r_crs, ds_dims=ds_dims)
+    ds.attrs["transform"] = get_transform(_geometry, ds.sizes[ds_dims[0]], ds.sizes[ds_dims[1]])
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
@@ -361,20 +368,48 @@ def xarray_geomask(
         raise ValueError("The input dataset is missing the crs attribute.")
 
     _geometry = geo2polygon(geometry, geo_crs, ds.crs)
-
-    west, south, east, north = _geometry.bounds
     height, width = ds.sizes[ds_dims[0]], ds.sizes[ds_dims[1]]
-
-    transform = rio_transform.from_bounds(west, south, east, north, width, height)
+    transform = get_transform(_geometry, height, width)
 
     _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
-    mask = xr.DataArray(_mask, dims=ds_dims)
+
+    coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
+    mask = xr.DataArray(_mask, coords, dims=ds_dims)
 
     ds_masked = ds.where(mask, drop=True)
     ds_masked.attrs["transform"] = transform
     ds_masked.attrs["bounds"] = _geometry.bounds
 
     return ds_masked
+
+
+def get_transform(
+    geometry: Union[Polygon, Tuple[float, float, float, float]], width: int, height: int
+) -> affine.Affine:
+    """Get transform of a Polygon or bounding box.
+
+    Parameters
+    ----------
+    geometry : Polygon or tuple of float
+        The geometry or the bounding box, (west, south, east, north).
+    width: int
+        The width of the target raster in pixels.
+    height: int
+        The height of the target raster in pixels.
+
+    Returns
+    -------
+    affin.Affine
+        The affine transform of the geometry.
+    """
+    if isinstance(geometry, Polygon):
+        west, south, east, north = geometry.bounds
+    elif isinstance(geometry, tuple) and len(geometry) == 4:
+        west, south, east, north = geometry
+    else:
+        raise InvalidInputType("geometry", "Polygon or (west, south, east, north)")
+
+    return rio_transform.from_bounds(west, south, east, north, width, height)
 
 
 class MatchCRS:

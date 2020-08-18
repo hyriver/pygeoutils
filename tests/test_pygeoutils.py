@@ -36,10 +36,14 @@ def test_gtiff2array(geometry_nat):
     url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
     wms = WMS(url_wms, layers="0", outformat="image/tiff", crs="epsg:3857",)
     r_dict = wms.getmap_bybox(geometry_nat.bounds, 1e3, box_crs=DEF_CRS,)
-    geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, DEF_CRS)
+    wetlands_box = geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, DEF_CRS)
+    wetlands_msk = geoutils.xarray_geomask(wetlands_box, geometry_nat, DEF_CRS)
     wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat, DEF_CRS)
 
-    assert abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
+    assert (
+        abs(wetlands_msk.isel(band=0).mean().values.item() - 17.208) < 1e-3
+        and abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
+    )
 
 
 @pytest.mark.flaky(max_runs=3)
