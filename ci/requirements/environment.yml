@@ -10,7 +10,7 @@ dependencies:
   - geopandas
   - rasterio
   - shapely
-  - simplejson
+  - orjson
 
   - dask
   - bottleneck

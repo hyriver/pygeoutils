@@ -1,7 +1,7 @@
 geopandas
 netCDF4
+orjson
 rasterio
 setuptools
 shapely
-simplejson
 xarray

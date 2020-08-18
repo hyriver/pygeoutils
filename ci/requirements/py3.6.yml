@@ -10,7 +10,7 @@ dependencies:
   - geopandas
   - rasterio
   - shapely
-  - simplejson
+  - orjson
   - pip:
     - git+https://github.com/cheginit/pygeoogc.git
 
