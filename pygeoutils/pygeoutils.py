@@ -283,7 +283,7 @@ def gtiff2xarray(
     with rio.MemoryFile() as memfile:
         memfile.write(r_dict[next(iter(r_dict.keys()))])
         with memfile.open() as src:
-            r_crs = get_crs(src.crs)
+            r_crs = pyproj.CRS.from_user_input(src.crs)
             if src.nodata is None:
                 try:
                     nodata = np.iinfo(src.dtypes[0]).max
@@ -486,8 +486,3 @@ def geo2polygon(
         return MatchCRS.geometry(geometry, geo_crs, crs)
 
     raise InvalidInputType("geometry", "Polygon or tuple of length 4")
-
-
-def get_crs(crs: str) -> pyproj.crs.crs.CRS:
-    """Get correct CRS from a string (mostly for deprecated +init format)."""
-    return pyproj.CRS.from_user_input(crs)
