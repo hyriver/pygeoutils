@@ -488,6 +488,6 @@ def geo2polygon(
     raise InvalidInputType("geometry", "Polygon or tuple of length 4")
 
 
-def get_crs(crs: str):
+def get_crs(crs: str) -> pyproj.crs.crs.CRS:
     """Get correct CRS from a string (mostly for deprecated +init format)."""
-    return pyproj.CRS.from_epsg(pyproj.CRS(crs).to_epsg(20))
+    return pyproj.CRS.from_user_input(crs)
