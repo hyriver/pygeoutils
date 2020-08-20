@@ -1,7 +1,7 @@
 """Top-level package for PyGeoUtils."""
 from pkg_resources import DistributionNotFound, get_distribution
 
-from .exceptions import InvalidInputType
+from .exceptions import InvalidInputType, InvalidInputValue
 from .print_versions import show_versions
 from .pygeoutils import (
     MatchCRS,

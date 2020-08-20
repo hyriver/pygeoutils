@@ -1,5 +1,5 @@
 """Customized Hydrodata exceptions."""
-from typing import Optional
+from typing import Generator, List, Optional, Union
 
 
 class InvalidInputType(Exception):
@@ -19,6 +19,29 @@ class InvalidInputType(Exception):
         self.message = f"The {arg} argument should be of type {valid_type}"
         if example is not None:
             self.message += f":\n{example}"
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class InvalidInputValue(Exception):
+    """Exception raised for invalid input.
+
+    Parameters
+    ----------
+    inp : str
+        Name of the input parameter
+    valid_inputs : tuple
+        List of valid inputs
+    """
+
+    def __init__(
+        self, inp: str, valid_inputs: Union[List[str], Generator[str, None, None]]
+    ) -> None:
+        self.message = f"Given {inp} is invalid. Valid {inp}s are:\n" + ", ".join(
+            str(i) for i in valid_inputs
+        )
         super().__init__(self.message)
 
     def __str__(self) -> str:

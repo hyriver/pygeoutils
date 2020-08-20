@@ -16,7 +16,7 @@ import xarray as xr
 from shapely import ops
 from shapely.geometry import LineString, Point, Polygon, box
 
-from .exceptions import InvalidInputType
+from .exceptions import InvalidInputType, InvalidInputValue
 
 DEF_CRS = "epsg:4326"
 
@@ -274,6 +274,9 @@ def gtiff2xarray(
     xarray.Dataset or xarray.DataAraay
         The dataset or data array based on the number of variables.
     """
+    if not isinstance(r_dict, dict):
+        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')
+
     key1 = next(iter(r_dict.keys()))
     if len(r_dict) == 1 and "dd" not in key1:
         r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
@@ -291,6 +294,11 @@ def gtiff2xarray(
                     nodata = np.nan
             else:
                 nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+
+            ds = xr.open_rasterio(src)
+            valid_dims = list(ds.sizes)
+            if any(d not in valid_dims for d in ds_dims):
+                raise InvalidInputValue("ds_dims", valid_dims)
 
     _geometry = geo2polygon(geometry, geo_crs, r_crs)
 
