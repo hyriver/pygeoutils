@@ -2,12 +2,18 @@
 History
 =======
 
+0.1.11 (unreleased)
+-------------------
+
+- Added checking the validity of input arguments in ``gtiff2xarray`` function and provide
+  useful messages for debugging.
+
 0.1.10 (2020-08-18)
 -------------------
 
 - Fixed the ``gtiff2xarray`` issue with high resolution requests and improved robustness
   of the function.
-- Replaces ``simplejson`` with ``orjson`` to speed up json operations.
+- Replaced ``simplejson`` with ``orjson`` to speed up json operations.
 
 
 0.1.9 (2020-08-11)
