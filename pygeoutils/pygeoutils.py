@@ -1,4 +1,4 @@
-"""Some utilities for Hydrodata."""
+"""Some utilities for manipulating GeoSpatial data."""
 import numbers
 from typing import Any, Dict, List, Optional, Tuple, Union
 from warnings import warn
@@ -22,7 +22,9 @@ DEF_CRS = "epsg:4326"
 
 
 def json2geodf(
-    content: Union[List[Dict[str, Any]], Dict[str, Any]], in_crs: str = DEF_CRS, crs: str = DEF_CRS,
+    content: Union[List[Dict[str, Any]], Dict[str, Any]],
+    in_crs: str = DEF_CRS,
+    crs: str = DEF_CRS,
 ) -> gpd.GeoDataFrame:
     """Create GeoDataFrame from (Geo)JSON.
 
@@ -421,7 +423,7 @@ def get_transform(
 
 
 class MatchCRS:
-    """Match CRS of a input geometry (Polygon, bbox, coord) with the output CRS.
+    """Match CRS of an input geometry (Polygon, bbox, coord) with the output CRS.
 
     Parameters
     ----------
@@ -435,6 +437,7 @@ class MatchCRS:
 
     @staticmethod
     def geometry(geom: Polygon, in_crs: str, out_crs: str) -> Polygon:
+        """Transform a Polygon."""
         if not isinstance(geom, Polygon):
             raise InvalidInputType("geom", "Polygon")
 
@@ -445,6 +448,7 @@ class MatchCRS:
     def bounds(
         geom: Tuple[float, float, float, float], in_crs: str, out_crs: str
     ) -> Tuple[float, float, float, float]:
+        """Transform a bounding box ``(west, south, east, north)``."""
         if not isinstance(geom, tuple) and len(geom) != 4:
             raise InvalidInputType("geom", "tuple of length 4", "(west, south, east, north)")
 
@@ -455,6 +459,7 @@ class MatchCRS:
     def coords(
         geom: Tuple[Tuple[float, ...], Tuple[float, ...]], in_crs: str, out_crs: str
     ) -> Tuple[Any, ...]:
+        """Transform a set of coordinates in form of ((xs), (ys))."""
         if not isinstance(geom, tuple) and len(geom) != 2:
             raise InvalidInputType("geom", "tuple of length 2", "((xs), (ys))")
 
