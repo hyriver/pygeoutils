@@ -61,10 +61,6 @@ PyGeoUtils: Manipulate (Geo)JSON and (Geo)TIFF data
     :target: https://codecov.io/gh/cheginit/pygeoutils
     :alt: CodeCov
 
-.. image:: https://github.com/cheginit/pygeoutils/workflows/build/badge.svg
-    :target: https://github.com/cheginit/pygeoutils/workflows/build
-    :alt: Github Actions
-
 .. image:: https://mybinder.org/badge_logo.svg
     :target: https://mybinder.org/v2/gh/cheginit/hydrodata/master?filepath=docs%2Fexamples
     :alt: Binder
