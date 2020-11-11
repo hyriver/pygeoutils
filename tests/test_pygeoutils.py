@@ -71,7 +71,7 @@ def test_json2geodf(geometry_urb):
     flood = geoutils.json2geodf([r.json(), r.json()], "epsg:4269", DEF_CRS)
     flood = flood.drop_duplicates()
 
-    assert abs(flood["ELEV"].sum() - 630417.6) < 1e-1
+    assert abs(flood["ELEV"].sum() - 631366.6) < 1e-1
 
 
 def test_ring():
