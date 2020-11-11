@@ -396,7 +396,9 @@ def xarray_geomask(
 
 
 def get_transform(
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]], width: int, height: int
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
+    width: int,
+    height: int,
 ) -> affine.Affine:
     """Get transform of a Polygon or bounding box.
 
@@ -474,8 +476,11 @@ def check_bbox(bbox: Tuple[float, float, float, float]) -> None:
     if not isinstance(bbox, tuple) or len(bbox) != 4:
         raise InvalidInputType("bbox", "tuple", "(west, south, east, north)")
 
+
 def geo2polygon(
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]], geo_crs: str, crs: str
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
+    geo_crs: str,
+    crs: str,
 ) -> Polygon:
     """Convert a geometry to a Shapely's Polygon and transform to any CRS.
 
