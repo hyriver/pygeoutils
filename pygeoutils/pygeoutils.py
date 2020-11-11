@@ -14,7 +14,7 @@ import rasterio.mask as rio_mask
 import rasterio.transform as rio_transform
 import xarray as xr
 from shapely import ops
-from shapely.geometry import LineString, Point, Polygon, box
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 
 from .exceptions import InvalidInputType, InvalidInputValue
 
@@ -253,7 +253,7 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
 
 def gtiff2xarray(
     r_dict: Dict[str, bytes],
-    geometry: Union[Polygon, Tuple[float, float, float, float]],
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
     ds_dims: Tuple[str, str] = ("y", "x"),
 ) -> Union[xr.DataArray, xr.Dataset]:
@@ -263,7 +263,7 @@ def gtiff2xarray(
     ----------
     r_dict : dict
         The output of ``wms_bybox`` function.
-    geometry : Polygon or tuple
+    geometry : Polygon, MultiPolygon, or tuple
         The geometry to mask the data that should be in the same CRS as the r_dict.
     geo_crs : str
         The spatial reference of the input geometry.
@@ -303,6 +303,8 @@ def gtiff2xarray(
                 raise InvalidInputValue("ds_dims", valid_dims)
 
     _geometry = geo2polygon(geometry, geo_crs, r_crs)
+    if not _geometry.is_valid:
+        _geometry = _geometry.buffer(0.0)
 
     def to_dataset(lyr: str) -> xr.DataArray:
         with rio.MemoryFile() as memfile:
@@ -333,12 +335,12 @@ def gtiff2xarray(
                     coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
                     msk_da = xr.DataArray(msk, coords, dims=ds_dims)
                     ds = ds.where(msk_da, drop=True)
-                    ds.attrs["crs"] = r_crs
+                    ds.attrs["crs"] = r_crs.to_string()
                     ds.name = var_name[lyr]
                     return ds
 
     ds = xr.merge(to_dataset(lyr) for lyr in r_dict.keys())
-    ds.attrs["crs"] = r_crs
+    ds.attrs["crs"] = r_crs.to_string()
     ds.attrs["transform"] = get_transform(_geometry, ds.sizes[ds_dims[0]], ds.sizes[ds_dims[1]])
 
     if len(ds.variables) - len(ds.dims) == 1:
@@ -348,7 +350,7 @@ def gtiff2xarray(
 
 def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
-    geometry: Union[Polygon, Tuple[float, float, float, float]],
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
     ds_dims: Tuple[str, str] = ("y", "x"),
 ):
@@ -358,7 +360,7 @@ def xarray_geomask(
     ----------
     ds : xarray.Dataset or xarray.DataArray
         The dataset(array) to be masked
-    geometry : Polygon or tuple of length 4
+    geometry : Polygon, MultiPolygon, or tuple of length 4
         The geometry or bounding box to mask the data
     geo_crs : str
         The spatial reference of the input geometry
@@ -394,13 +396,13 @@ def xarray_geomask(
 
 
 def get_transform(
-    geometry: Union[Polygon, Tuple[float, float, float, float]], width: int, height: int
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]], width: int, height: int
 ) -> affine.Affine:
     """Get transform of a Polygon or bounding box.
 
     Parameters
     ----------
-    geometry : Polygon or tuple of float
+    geometry : Polygon, MultiPolygon, or tuple of float
         The geometry or the bounding box, (west, south, east, north).
     width: int
         The width of the target raster in pixels.
@@ -412,12 +414,12 @@ def get_transform(
     affin.Affine
         The affine transform of the geometry.
     """
-    if isinstance(geometry, Polygon):
+    if isinstance(geometry, (Polygon, MultiPolygon)):
         west, south, east, north = geometry.bounds
     elif isinstance(geometry, tuple) and len(geometry) == 4:
         west, south, east, north = geometry
     else:
-        raise InvalidInputType("geometry", "Polygon or (west, south, east, north)")
+        raise InvalidInputType("geometry", "Polygon, MultiPolygon, or (west, south, east, north)")
 
     return rio_transform.from_bounds(west, south, east, north, width, height)
 
@@ -438,8 +440,8 @@ class MatchCRS:
     @staticmethod
     def geometry(geom: Polygon, in_crs: str, out_crs: str) -> Polygon:
         """Transform a Polygon."""
-        if not isinstance(geom, Polygon):
-            raise InvalidInputType("geom", "Polygon")
+        if not isinstance(geom, (Polygon, MultiPolygon)):
+            raise InvalidInputType("geom", "Polygon or MultiPolygon")
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
         return ops.transform(project, geom)
@@ -472,9 +474,8 @@ def check_bbox(bbox: Tuple[float, float, float, float]) -> None:
     if not isinstance(bbox, tuple) or len(bbox) != 4:
         raise InvalidInputType("bbox", "tuple", "(west, south, east, north)")
 
-
 def geo2polygon(
-    geometry: Union[Polygon, Tuple[float, float, float, float]], geo_crs: str, crs: str
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]], geo_crs: str, crs: str
 ) -> Polygon:
     """Convert a geometry to a Shapely's Polygon and transform to any CRS.
 
@@ -495,7 +496,7 @@ def geo2polygon(
     if isinstance(geometry, tuple):
         return box(*MatchCRS.bounds(geometry, geo_crs, crs))  # type: ignore
 
-    if isinstance(geometry, Polygon):
+    if isinstance(geometry, (Polygon, MultiPolygon)):
         return MatchCRS.geometry(geometry, geo_crs, crs)
 
-    raise InvalidInputType("geometry", "Polygon or tuple of length 4")
+    raise InvalidInputType("geometry", "Polygon, MultiPolygon, or tuple of length 4")
