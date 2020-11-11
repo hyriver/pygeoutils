@@ -7,6 +7,8 @@ History
 
 - Added checking the validity of input arguments in ``gtiff2xarray`` function and provide
   useful messages for debugging.
+- Add support for multipolygon.
+- Remove the ``fill_hole`` argument.
 
 0.1.10 (2020-08-18)
 -------------------
