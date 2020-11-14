@@ -256,6 +256,7 @@ def gtiff2xarray(
     geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
     ds_dims: Tuple[str, str] = ("y", "x"),
+    driver: str = "GTiff",
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert responses from ``pygeoogc.wms_bybox`` to ``xarray.Dataset``.
 
@@ -270,6 +271,9 @@ def gtiff2xarray(
     ds_dims : tuple of str, optional
         The names of the vertical and horizontal dimensions (in that order)
         of the target dataset, default to ("y", "x").
+    driver : str, optional
+        A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
+        can be found here: https://gdal.org/drivers/raster/index.html
 
     Returns
     -------
@@ -287,7 +291,7 @@ def gtiff2xarray(
 
     with rio.MemoryFile() as memfile:
         memfile.write(r_dict[next(iter(r_dict.keys()))])
-        with memfile.open() as src:
+        with memfile.open(driver=driver) as src:
             r_crs = pyproj.CRS.from_user_input(src.crs)
             if src.nodata is None:
                 try:
@@ -309,7 +313,7 @@ def gtiff2xarray(
     def to_dataset(lyr: str) -> xr.DataArray:
         with rio.MemoryFile() as memfile:
             memfile.write(r_dict[lyr])
-            with memfile.open() as src:
+            with memfile.open(driver=driver) as src:
                 geom = [_geometry.intersection(box(*src.bounds))]
                 if geom[0].is_empty:
                     msk, transform, _ = rio_mask.raster_geometry_mask(src, [_geometry], invert=True)
