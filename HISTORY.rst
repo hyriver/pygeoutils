@@ -9,6 +9,7 @@ History
   useful messages for debugging.
 - Add support for multipolygon.
 - Remove the ``fill_hole`` argument.
+- Fixed a bug in ``xarray_geomask`` for getting the transform.
 
 0.1.10 (2020-08-18)
 -------------------

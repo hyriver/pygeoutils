@@ -50,7 +50,7 @@ def test_gtiff2array(geometry_nat):
     wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat, DEF_CRS)
 
     assert (
-        abs(wetlands_msk.isel(band=0).mean().values.item() - 17.208) < 1e-3
+        abs(wetlands_msk.isel(band=0).mean().values.item() - 16.542) < 1e-3
         and abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
     )
 

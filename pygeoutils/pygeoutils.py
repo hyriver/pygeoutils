@@ -385,7 +385,7 @@ def xarray_geomask(
 
     _geometry = geo2polygon(geometry, geo_crs, ds.crs)
     height, width = ds.sizes[ds_dims[0]], ds.sizes[ds_dims[1]]
-    transform = get_transform(_geometry, height, width)
+    transform = get_transform(_geometry, width, height)
 
     _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
 
@@ -417,7 +417,7 @@ def get_transform(
 
     Returns
     -------
-    affin.Affine
+    affine.Affine
         The affine transform of the geometry.
     """
     if isinstance(geometry, (Polygon, MultiPolygon)):
