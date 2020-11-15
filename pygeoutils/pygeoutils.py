@@ -16,7 +16,7 @@ import xarray as xr
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 
-from .exceptions import InvalidInputType, InvalidInputValue
+from .exceptions import InvalidInputType, InvalidInputValue, MissingAttribute
 
 DEF_CRS = "epsg:4326"
 
@@ -345,7 +345,6 @@ def gtiff2xarray(
 
     ds = xr.merge(to_dataset(lyr) for lyr in r_dict.keys())
     ds.attrs["crs"] = r_crs.to_string()
-    ds.attrs["transform"] = get_transform(_geometry, ds.sizes[ds_dims[0]], ds.sizes[ds_dims[1]])
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
@@ -377,15 +376,8 @@ def xarray_geomask(
     xarray.Dataset or xarray.DataArray
         The input dataset with a mask applied (np.nan)
     """
-    if not isinstance(ds_dims, tuple) or len(ds_dims) != 2:
-        raise InvalidInputType("ds_dims", "tuple of length 2", '("y", "x")')
-
-    if "crs" not in ds.attrs:
-        raise ValueError("The input dataset is missing the crs attribute.")
-
+    transform, width, height = get_transform(ds, ds_dims)
     _geometry = geo2polygon(geometry, geo_crs, ds.crs)
-    height, width = ds.sizes[ds_dims[0]], ds.sizes[ds_dims[1]]
-    transform = get_transform(_geometry, width, height)
 
     _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
 
@@ -400,34 +392,46 @@ def xarray_geomask(
 
 
 def get_transform(
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
-    width: int,
-    height: int,
-) -> affine.Affine:
+    ds: Union[xr.Dataset, xr.DataArray],
+    ds_dims: Tuple[str, str] = ("y", "x"),
+) -> Tuple[affine.Affine, int, int]:
     """Get transform of a Polygon or bounding box.
 
     Parameters
     ----------
-    geometry : Polygon, MultiPolygon, or tuple of float
-        The geometry or the bounding box, (west, south, east, north).
-    width: int
-        The width of the target raster in pixels.
-    height: int
-        The height of the target raster in pixels.
+    ds : xarray.Dataset or xarray.DataArray
+        The dataset(array) to be masked
 
     Returns
     -------
-    affine.Affine
-        The affine transform of the geometry.
+    affine.Affine, int, int
+        The affine transform, width, and height
     """
-    if isinstance(geometry, (Polygon, MultiPolygon)):
-        west, south, east, north = geometry.bounds
-    elif isinstance(geometry, tuple) and len(geometry) == 4:
-        west, south, east, north = geometry
-    else:
-        raise InvalidInputType("geometry", "Polygon, MultiPolygon, or (west, south, east, north)")
+    if "crs" not in ds.attrs:
+        raise MissingAttribute("crs", ds.attrs.keys())
 
-    return rio_transform.from_bounds(west, south, east, north, width, height)
+    if not isinstance(ds_dims, tuple) or len(ds_dims) != 2:
+        raise InvalidInputType("ds_dims", "tuple of length 2", '("y", "x")')
+
+    ydim, xdim = ds_dims
+    if ydim not in ds.sizes or xdim not in ds.sizes:
+        raise MissingAttribute("input dims", ds.sizes)
+
+    height, width = ds.sizes[ydim], ds.sizes[xdim]
+
+    left, right = ds[xdim].min().item(), ds[xdim].max().item()
+    bottom, top = ds[ydim].min().item(), ds[ydim].max().item()
+
+    x_res = abs(left - right) / (width - 1)
+    y_res = abs(top - bottom) / (height - 1)
+
+    left -= x_res * 0.5
+    right += x_res * 0.5
+    top += y_res * 0.5
+    bottom -= y_res * 0.5
+
+    transform = rio_transform.from_bounds(left, bottom, right, top, width, height)
+    return transform, width, height
 
 
 class MatchCRS:
