@@ -3,14 +3,23 @@ channels:
   - conda-forge
 dependencies:
   - python=3.8
-  - setuptools
   - pip
+  - setuptools
+  - owslib
+  - pyproj
+  - shapely
+  - orjson
+  - defusedxml
+  - requests
+  - aiohttp
+  - chardet
+  - aiodns
+  - brotlipy
+  - nest-asyncio
   - xarray
   - netCDF4
   - geopandas
   - rasterio
-  - shapely
-  - orjson
   - pip:
     - git+https://github.com/cheginit/pygeoogc.git
 
