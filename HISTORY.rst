@@ -2,7 +2,7 @@
 History
 =======
 
-0.1.11 (2020-12-06)
+0.2.0 (2020-12-06)
 -------------------
 
 - Added checking the validity of input arguments in ``gtiff2xarray`` function and provide
