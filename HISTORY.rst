@@ -2,6 +2,12 @@
 History
 =======
 
+0.2.1 (unreleased)
+------------------
+
+- Add ``gtiff2file`` for saving raster responses as ``geotiff`` file(s).
+
+
 0.2.0 (2020-12-06)
 -------------------
 

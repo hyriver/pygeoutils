@@ -1,7 +1,10 @@
 """Tests for PyGeoUtils"""
 import io
+import shutil
+from pathlib import Path
 
 import pytest
+import rasterio
 from pygeoogc import WFS, WMS
 from shapely.geometry import Polygon
 
@@ -53,6 +56,28 @@ def test_gtiff2array(geometry_nat):
         abs(wetlands_msk.isel(band=0).mean().values.item() - 16.542) < 1e-3
         and abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
     )
+
+
+@pytest.mark.flaky(max_runs=3)
+def test_gtiff2file(geometry_nat):
+    url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
+    wms = WMS(
+        url_wms,
+        layers="0",
+        outformat="image/tiff",
+        crs="epsg:3857",
+    )
+    r_dict = wms.getmap_bybox(
+        geometry_nat.bounds,
+        1e3,
+        box_crs=DEF_CRS,
+    )
+    geoutils.gtiff2file(r_dict, geometry_nat, DEF_CRS, "raster")
+    with rasterio.open("raster/0_dd_0_0.gtiff") as f:
+        mean = f.read().mean()
+
+    shutil.rmtree("raster")
+    assert abs(mean - 45.225) < 1e-3
 
 
 @pytest.mark.flaky(max_runs=3)

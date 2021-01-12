@@ -8,6 +8,7 @@ from .pygeoutils import (
     arcgis2geojson,
     check_bbox,
     geo2polygon,
+    gtiff2file,
     gtiff2xarray,
     json2geodf,
     xarray_geomask,

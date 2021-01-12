@@ -1,5 +1,7 @@
 """Some utilities for manipulating GeoSpatial data."""
 import numbers
+import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 from warnings import warn
 
@@ -310,9 +312,9 @@ def gtiff2xarray(
     if not _geometry.is_valid:
         _geometry = _geometry.buffer(0.0)
 
-    def to_dataset(lyr: str) -> xr.DataArray:
+    def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
         with rio.MemoryFile() as memfile:
-            memfile.write(r_dict[lyr])
+            memfile.write(resp)
             with memfile.open(driver=driver) as src:
                 geom = [_geometry.intersection(box(*src.bounds))]
                 if geom[0].is_empty:
@@ -343,13 +345,87 @@ def gtiff2xarray(
                     ds.name = var_name[lyr]
                     return ds
 
-    ds = xr.merge(to_dataset(lyr) for lyr in r_dict.keys())
+    ds = xr.merge(to_dataset(lyr, resp) for lyr, resp in r_dict.items())
     ds.attrs["crs"] = r_crs.to_string()
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
     return ds
 
+
+def gtiff2file(
+    r_dict: Dict[str, bytes],
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
+    geo_crs: str,
+    output: Union[str, Path] = ".",
+    driver: str = "GTiff",
+) -> None:
+    """Save responses from ``pygeoogc.wms_bybox`` to raster file(s).
+
+    Parameters
+    ----------
+    r_dict : dict
+        The output of ``wms_bybox`` function.
+    geometry : Polygon, MultiPolygon, or tuple
+        The geometry to mask the data that should be in the same CRS as the r_dict.
+    geo_crs : str
+        The spatial reference of the input geometry.
+    output : str
+        Path to a folder saving files. File names are keys of the input dictionary, so
+        each layer becomes one file. Defaults to current directory.
+    driver : str, optional
+        A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
+        can be found here: https://gdal.org/drivers/raster/index.html
+    """
+    os.makedirs(output, exist_ok=True)
+
+    if not isinstance(r_dict, dict):
+        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')
+
+    key1 = next(iter(r_dict.keys()))
+    if len(r_dict) == 1 and "dd" not in key1:
+        r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
+
+    with rio.MemoryFile() as memfile:
+        memfile.write(r_dict[next(iter(r_dict.keys()))])
+        with memfile.open(driver=driver) as src:
+            r_crs = pyproj.CRS.from_user_input(src.crs)
+            if src.nodata is None:
+                try:
+                    nodata = np.iinfo(src.dtypes[0]).max
+                except ValueError:
+                    nodata = np.nan
+            else:
+                nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+
+    _geometry = geo2polygon(geometry, geo_crs, r_crs)
+    if not _geometry.is_valid:
+        _geometry = _geometry.buffer(0.0)
+
+    for lyr, resp in r_dict.items():
+        with rio.MemoryFile() as memfile:
+            memfile.write(resp)
+            with memfile.open(driver=driver) as src:
+                geom = [_geometry.intersection(box(*src.bounds))]
+                if geom[0].is_empty:
+                    data, transform = rio_mask.mask(src, [_geometry], crop=True)
+                else:
+                    data, transform = rio_mask.mask(src, geom, crop=True)
+                meta = src.meta
+                meta.update(
+                    {
+                        "driver": "GTiff",
+                        "height": data.shape[1],
+                        "width": data.shape[2],
+                        "transform": transform,
+                        "nodata": nodata,
+                    }
+                )
+
+                with rio.open(Path(output, f"{lyr}.gtiff"), "w", **meta) as dest:
+                    dest.write(data)
+
+    layers = [lyr.split("_dd_")[0] for lyr in r_dict]
 
 def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
