@@ -1,4 +1,5 @@
 """Some utilities for manipulating GeoSpatial data."""
+import contextlib
 import numbers
 import os
 from pathlib import Path
@@ -83,9 +84,9 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
         A GeoJSON file readable by GeoPandas
     """
 
-    def convert(arcgis, id_attr=None):
+    def convert(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dict[str, Any]:
         """Convert an ArcGIS JSON object to a GeoJSON object."""
-        geojson = {}
+        geojson: Dict[str, Any] = {}
 
         if "features" in arcgis and arcgis["features"]:
             geojson["type"] = "FeatureCollection"
@@ -166,7 +167,7 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
 
         return geojson
 
-    def rings2geojson(rings):
+    def rings2geojson(rings: List[List[List[float]]]) -> Dict[str, Any]:
         """Check for holes in the ring and fill them."""
         outer_rings = []
         holes = []
@@ -334,10 +335,9 @@ def gtiff2xarray(
 
                 with rio.vrt.WarpedVRT(src, **meta) as vrt:
                     ds = xr.open_rasterio(vrt)
-                    try:
+                    with contextlib.suppress(ValueError):
                         ds = ds.squeeze("band", drop=True)
-                    except ValueError:
-                        pass
+
                     coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
                     msk_da = xr.DataArray(msk, coords, dims=ds_dims)
                     ds = ds.where(msk_da, drop=True)
@@ -425,14 +425,13 @@ def gtiff2file(
                 with rio.open(Path(output, f"{lyr}.gtiff"), "w", **meta) as dest:
                     dest.write(data)
 
-    layers = [lyr.split("_dd_")[0] for lyr in r_dict]
 
 def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
     geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
     ds_dims: Tuple[str, str] = ("y", "x"),
-):
+) -> Union[xr.Dataset, xr.DataArray]:
     """Mask a ``xarray.Dataset`` based on a geometry.
 
     Parameters
@@ -541,7 +540,7 @@ class MatchCRS:
             raise InvalidInputType("geom", "tuple of length 4", "(west, south, east, north)")
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        return ops.transform(project, box(*geom)).bounds
+        return ops.transform(project, box(*geom)).bounds  # type: ignore
 
     @staticmethod
     def coords(
