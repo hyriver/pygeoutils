@@ -1,7 +1,6 @@
 """Tests for PyGeoUtils"""
 import io
 import shutil
-from pathlib import Path
 
 import pytest
 import rasterio
@@ -36,36 +35,36 @@ def geometry_urb():
 
 @pytest.mark.flaky(max_runs=3)
 def test_gtiff2array(geometry_nat):
-    url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
+    url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
     wms = WMS(
         url_wms,
-        layers="0",
-        outformat="image/tiff",
-        crs="epsg:3857",
+        layers="NLCD_Land_Cover_Change_Index_Science_product_L48",
+        outformat="image/geotiff",
+        crs="epsg:4326",
     )
     r_dict = wms.getmap_bybox(
         geometry_nat.bounds,
         1e3,
         box_crs=DEF_CRS,
     )
-    wetlands_box = geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, DEF_CRS)
-    wetlands_msk = geoutils.xarray_geomask(wetlands_box, geometry_nat, DEF_CRS)
-    wetlands = geoutils.gtiff2xarray(r_dict, geometry_nat, DEF_CRS)
+    cover_box = geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, DEF_CRS)
+    cover_msk = geoutils.xarray_geomask(cover_box, geometry_nat, DEF_CRS)
+    cover = geoutils.gtiff2xarray(r_dict, geometry_nat, DEF_CRS)
 
     assert (
-        abs(wetlands_msk.isel(band=0).mean().values.item() - 16.542) < 1e-3
-        and abs(wetlands.isel(band=0).mean().values.item() - 16.542) < 1e-3
+        abs(cover_msk.mean().values.item() - 2.444) < 1e-3
+        and abs(cover.mean().values.item() - 2.444) < 1e-3
     )
 
 
 @pytest.mark.flaky(max_runs=3)
 def test_gtiff2file(geometry_nat):
-    url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
+    url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
     wms = WMS(
         url_wms,
-        layers="0",
-        outformat="image/tiff",
-        crs="epsg:3857",
+        layers="NLCD_Land_Cover_Change_Index_Science_product_L48",
+        outformat="image/geotiff",
+        crs="epsg:4326",
     )
     r_dict = wms.getmap_bybox(
         geometry_nat.bounds,
@@ -73,11 +72,11 @@ def test_gtiff2file(geometry_nat):
         box_crs=DEF_CRS,
     )
     geoutils.gtiff2file(r_dict, geometry_nat, DEF_CRS, "raster")
-    with rasterio.open("raster/0_dd_0_0.gtiff") as f:
+    with rasterio.open("raster/NLCD_Land_Cover_Change_Index_Science_product_L48_dd_0_0.gtiff") as f:
         mean = f.read().mean()
 
     shutil.rmtree("raster")
-    assert abs(mean - 45.225) < 1e-3
+    assert abs(mean - 2.444) < 1e-3
 
 
 @pytest.mark.flaky(max_runs=3)
