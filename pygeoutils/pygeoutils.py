@@ -254,6 +254,35 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
     return convert(arcgis, id_attr)
 
 
+def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.crs.CRS]:
+    """Get nodata and crs value of a raster in bytes.
+
+    Parameters
+    ----------
+    resp : bytes
+        Raster response returned from a wed service request such as WMS
+    driver : str
+        A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
+        can be found here: https://gdal.org/drivers/raster/index.html
+
+    Returns
+    -------
+    tuple
+        (NoData, CRS)
+    """
+    with rio.MemoryFile() as memfile:
+        memfile.write(resp)
+        with memfile.open(driver=driver) as src:
+            r_crs = pyproj.CRS.from_user_input(src.crs)
+            if src.nodata is None:
+                try:
+                    nodata = np.iinfo(src.dtypes[0]).max
+                except ValueError:
+                    nodata = np.nan
+            nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+    return nodata, r_crs
+
+
 def gtiff2xarray(
     r_dict: Dict[str, bytes],
     geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
@@ -292,26 +321,9 @@ def gtiff2xarray(
 
     var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
 
-    with rio.MemoryFile() as memfile:
-        memfile.write(r_dict[next(iter(r_dict.keys()))])
-        with memfile.open(driver=driver) as src:
-            r_crs = pyproj.CRS.from_user_input(src.crs)
-            if src.nodata is None:
-                try:
-                    nodata = np.iinfo(src.dtypes[0]).max
-                except ValueError:
-                    nodata = np.nan
-            else:
-                nodata = np.dtype(src.dtypes[0]).type(src.nodata)
-
-            ds = xr.open_rasterio(src)
-            valid_dims = list(ds.sizes)
-            if any(d not in valid_dims for d in ds_dims):
-                raise InvalidInputValue("ds_dims", valid_dims)
+    nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
 
     _geometry = geo2polygon(geometry, geo_crs, r_crs)
-    if not _geometry.is_valid:
-        _geometry = _geometry.buffer(0.0)
 
     def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
         with rio.MemoryFile() as memfile:
@@ -335,6 +347,9 @@ def gtiff2xarray(
 
                 with rio.vrt.WarpedVRT(src, **meta) as vrt:
                     ds = xr.open_rasterio(vrt)
+                    valid_dims = list(ds.sizes)
+                    if any(d not in valid_dims for d in ds_dims):
+                        raise InvalidInputValue("ds_dims", valid_dims)
                     with contextlib.suppress(ValueError):
                         ds = ds.squeeze("band", drop=True)
 
@@ -386,21 +401,9 @@ def gtiff2file(
     if len(r_dict) == 1 and "dd" not in key1:
         r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
 
-    with rio.MemoryFile() as memfile:
-        memfile.write(r_dict[next(iter(r_dict.keys()))])
-        with memfile.open(driver=driver) as src:
-            r_crs = pyproj.CRS.from_user_input(src.crs)
-            if src.nodata is None:
-                try:
-                    nodata = np.iinfo(src.dtypes[0]).max
-                except ValueError:
-                    nodata = np.nan
-            else:
-                nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+    nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
 
     _geometry = geo2polygon(geometry, geo_crs, r_crs)
-    if not _geometry.is_valid:
-        _geometry = _geometry.buffer(0.0)
 
     for lyr, resp in r_dict.items():
         with rio.MemoryFile() as memfile:
@@ -581,10 +584,14 @@ def geo2polygon(
     Polygon
         A Polygon in the target CRS.
     """
+    if not isinstance(geometry, (Polygon, MultiPolygon, tuple)):
+        raise InvalidInputType("geometry", "Polygon, MultiPolygon, or tuple of length 4")
+
     if isinstance(geometry, tuple):
-        return box(*MatchCRS.bounds(geometry, geo_crs, crs))  # type: ignore
+        geom = box(*MatchCRS.bounds(geometry, geo_crs, crs))  # type: ignore
+    elif isinstance(geometry, (Polygon, MultiPolygon)):
+        geom = MatchCRS.geometry(geometry, geo_crs, crs)
 
-    if isinstance(geometry, (Polygon, MultiPolygon)):
-        return MatchCRS.geometry(geometry, geo_crs, crs)
-
-    raise InvalidInputType("geometry", "Polygon, MultiPolygon, or tuple of length 4")
+    if not geom.is_valid:
+        geom = geom.buffer(0.0)
+    return geom

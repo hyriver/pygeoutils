@@ -40,7 +40,7 @@ def test_gtiff2array(geometry_nat):
         url_wms,
         layers="NLCD_Land_Cover_Change_Index_Science_product_L48",
         outformat="image/geotiff",
-        crs="epsg:4326",
+        crs=DEF_CRS,
     )
     r_dict = wms.getmap_bybox(
         geometry_nat.bounds,
@@ -64,7 +64,7 @@ def test_gtiff2file(geometry_nat):
         url_wms,
         layers="NLCD_Land_Cover_Change_Index_Science_product_L48",
         outformat="image/geotiff",
-        crs="epsg:4326",
+        crs=DEF_CRS,
     )
     r_dict = wms.getmap_bybox(
         geometry_nat.bounds,
