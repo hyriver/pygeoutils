@@ -23,4 +23,3 @@ dependencies:
   - rasterio
   - pip:
     - git+https://github.com/cheginit/pygeoogc.git
-
