@@ -318,6 +318,7 @@ def gtiff2xarray(
     key1 = next(iter(r_dict.keys()))
     if len(r_dict) == 1 and "dd" not in key1:
         r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
+        key1 = f"{key1}_dd_0_0"
 
     var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
 
@@ -400,6 +401,7 @@ def gtiff2file(
     key1 = next(iter(r_dict.keys()))
     if len(r_dict) == 1 and "dd" not in key1:
         r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
+        key1 = f"{key1}_dd_0_0"
 
     nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
 
