@@ -279,7 +279,8 @@ def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.cr
                     nodata = np.iinfo(src.dtypes[0]).max
                 except ValueError:
                     nodata = np.nan
-            nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+            else:
+                nodata = np.dtype(src.dtypes[0]).type(src.nodata)
     return nodata, r_crs
 
 
