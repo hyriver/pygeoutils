@@ -198,9 +198,9 @@ def test_matchcrs(geometry_urb):
     bbox = MatchCRS.bounds(geometry_urb.bounds, DEF_CRS, crs)
     coords = MatchCRS.coords(points, DEF_CRS, crs)
     assert (
-        abs(geom.area - 2475726907.644) < 1e-3
-        and abs(bbox[0] - (-3654031.190)) < 1e-3
-        and abs(coords[0][-1] == (-2877067.244)) < 1e-3
+        abs(geom.area - 2475725967.465) < 1e-3
+        and abs(bbox[0] - (-3654030.292)) < 1e-3
+        and abs(coords[0][-1] == (-3588088.81)) < 1e-3
     )
 
 
