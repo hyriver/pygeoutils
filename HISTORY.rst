@@ -8,6 +8,8 @@ History
 - Add ``gtiff2file`` for saving raster responses as ``geotiff`` file(s).
 - Fix an error in ``_get_nodata_crs`` for handling nodata value when its value in the source
   is None.
+- Fix the warning during the ``GeoDataFrame`` generation in ``json2geodf`` when there is
+  no geometry column in the input json.
 
 0.2.0 (2020-12-06)
 -------------------

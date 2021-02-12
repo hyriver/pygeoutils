@@ -51,14 +51,23 @@ def json2geodf(
     content = content if isinstance(content, list) else [content]
     try:
         geodf = gpd.GeoDataFrame.from_features(content[0], crs=in_crs)
+    except AttributeError:
+        geodf = gpd.GeoDataFrame.from_features(content[0])
     except TypeError:
         content = [arcgis2geojson(c) for c in content]
-        geodf = gpd.GeoDataFrame.from_features(content[0], crs=in_crs)
+        try:
+            geodf = gpd.GeoDataFrame.from_features(content[0], crs=in_crs)
+        except AttributeError:
+            geodf = gpd.GeoDataFrame.from_features(content[0])
 
     if len(content) > 1:
-        geodf = geodf.append([gpd.GeoDataFrame.from_features(c, crs=in_crs) for c in content[1:]])
+        for c in content[1:]:
+            try:
+                geodf = geodf.append(gpd.GeoDataFrame.from_features(c, crs=in_crs))
+            except AttributeError:
+                geodf = gpd.GeoDataFrame.from_features(c)
 
-    if in_crs != crs:
+    if in_crs != crs and geodf.crs:
         geodf = geodf.to_crs(crs)
 
     return geodf
