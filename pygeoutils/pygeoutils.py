@@ -67,7 +67,7 @@ def json2geodf(
             except AttributeError:
                 geodf = gpd.GeoDataFrame.from_features(c)
 
-    if in_crs != crs and geodf.crs:
+    if in_crs != crs and "geometry" in geodf:
         geodf = geodf.to_crs(crs)
 
     return geodf
