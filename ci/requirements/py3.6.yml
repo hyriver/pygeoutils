@@ -9,6 +9,7 @@ dependencies:
   - pyproj
   - shapely
   - orjson
+  - simplejson
   - defusedxml
   - requests
   - dataclasses
