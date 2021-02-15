@@ -81,8 +81,6 @@ PyGeoUtils: Manipulate (Geo)JSON and (Geo)TIFF data
 
 |
 
-🚨 **This package is under heavy development and breaking changes are likely to happen.** 🚨
-
 Features
 --------
 
@@ -93,10 +91,16 @@ PyGeoUtils is a part of Hydrodata software stack and provides utilities for mani
 - ``arcgis2geojson``: For converting ESRIGeoJSON objects to standard GeoJSON format.
 - ``gtiff2xarray``: For converting (Geo)TIFF objects to `xarray <https://xarray.pydata.org/>`__
   datasets.
+- ``gtiff2file``: For saving (Geo)TIFF objects to a raster file.
 - ``xarray_geomask``: For masking a ``xarray.Dataset`` or ``xarray.DataArray`` using a polygon.
 
-All these function handle all necessary CRS transformations. Moreover, requests for additional
-functionalities can be submitted via
+All these functions handle all necessary CRS transformations.
+
+Please note that since Hydrodata is in early development stages, while the provided
+functionaities should be stable, changes in APIs are possible in new releases. But we
+appreciate it if you give this project a try and provide feedback. Contributions are most welcome.
+
+Moreover, requests for additional functionalities can be submitted via
 `issue tracker <https://github.com/cheginit/pygeoutils/issues>`__.
 
 Installation
@@ -123,7 +127,7 @@ To demonstrate capabilities of PyGeoUtils lets use
 `PyGeoOGC <https://github.com/cheginit/pygeoogc>`__ to access
 `National Wetlands Inventory <https://www.fws.gov/wetlands/>`__ from WMS, and
 `FEMA National Flood Hazard <https://www.fema.gov/national-flood-hazard-layer-nfhl>`__
-via WFS, then convert the output to ``GeoDataFrame`` and ``xarray.Dataset`` using PyGeoUtils.
+via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, respectively.
 
 .. code-block:: python
 
@@ -165,6 +169,12 @@ via WFS, then convert the output to ``GeoDataFrame`` and ``xarray.Dataset`` usin
     )
     r = wfs.getfeature_bybox(geometry.bounds, box_crs="epsg:4326")
     flood = geoutils.json2geodf(r.json(), "epsg:4269", "epsg:4326")
+
+We can also save WMS outpus as raster file using ``gtiff2file``:
+
+.. code-block:: python
+
+    geoutils.gtiff2file(r_dict, geometry, "epsg:4326", "raster")
 
 Contributing
 ------------
