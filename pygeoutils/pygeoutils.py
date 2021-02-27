@@ -185,7 +185,7 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
         hole = None  # current hole being evaluated
 
         for ring in rings:
-            if not all(np.isclose(ring[0], ring[-1])):
+            if not np.all(np.isclose(ring[0], ring[-1])):
                 ring.append(ring[0])
 
             if len(ring) < 4:
@@ -257,8 +257,8 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
 
         return {"type": "MultiPolygon", "coordinates": outer_rings}
 
-    if isinstance(arcgis, str):
-        return json.dumps(convert(json.loads(arcgis), id_attr))
+    if isinstance(arcgis, str):  # type: ignore
+        return json.dumps(convert(json.loads(arcgis), id_attr))  # type: ignore
 
     return convert(arcgis, id_attr)
 
@@ -323,7 +323,7 @@ def gtiff2xarray(
         The dataset or data array based on the number of variables.
     """
     if not isinstance(r_dict, dict):
-        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')
+        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')  # noqa: FS003
 
     key1 = next(iter(r_dict.keys()))
     if len(r_dict) == 1 and "dd" not in key1:
@@ -406,7 +406,7 @@ def gtiff2file(
     os.makedirs(output, exist_ok=True)
 
     if not isinstance(r_dict, dict):
-        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')
+        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')  # noqa: FS003
 
     key1 = next(iter(r_dict.keys()))
     if len(r_dict) == 1 and "dd" not in key1:
@@ -551,18 +551,18 @@ class MatchCRS:
         geom: Tuple[float, float, float, float], in_crs: str, out_crs: str
     ) -> Tuple[float, float, float, float]:
         """Transform a bounding box ``(west, south, east, north)``."""
-        if not isinstance(geom, tuple) and len(geom) != 4:
+        if not (isinstance(geom, tuple) and len(geom) == 4):
             raise InvalidInputType("geom", "tuple of length 4", "(west, south, east, north)")
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        return ops.transform(project, box(*geom)).bounds  # type: ignore
+        return ops.transform(project, box(*geom)).bounds
 
     @staticmethod
     def coords(
         geom: Tuple[Tuple[float, ...], Tuple[float, ...]], in_crs: str, out_crs: str
     ) -> Tuple[Any, ...]:
         """Transform a set of coordinates in form of ((xs), (ys))."""
-        if not isinstance(geom, tuple) and len(geom) != 2:
+        if not (isinstance(geom, tuple) and len(geom) == 2):
             raise InvalidInputType("geom", "tuple of length 2", "((xs), (ys))")
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
