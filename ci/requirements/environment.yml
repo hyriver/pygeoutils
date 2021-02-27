@@ -1,27 +1,25 @@
-name: pygeoutils-dev
+name: pygeoutils-tests
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
-  - python>=3.8
-  - setuptools
   - pip
+  - setuptools
+  - owslib
+  - pyproj
+  - shapely
+  - orjson
+  - simplejson
+  - defusedxml
+  - requests
+  - aiohttp
+  - chardet
+  - aiodns
+  - brotlipy
+  - nest-asyncio
   - xarray
   - netCDF4
   - geopandas
   - rasterio
-  - shapely
-  - orjson
-  - simplejson
-
-  - dask
-  - bottleneck
-
-  - setuptools_scm
-  - pytest-cov
-  - pytest-xdist
-  - pre-commit
-  - codecov
-  - coverage
   - pip:
-    - numbagg
     - git+https://github.com/cheginit/pygeoogc.git
