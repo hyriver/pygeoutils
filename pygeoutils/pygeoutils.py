@@ -376,6 +376,12 @@ def gtiff2xarray(
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
+
+    valid_ycoords = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
+    y_coord = set(ds.coords).intersection(valid_ycoords)
+    if len(y_coord) == 1:
+        ds = ds.sortby(next(iter(y_coord)), ascending=False)
+
     return ds
 
 
