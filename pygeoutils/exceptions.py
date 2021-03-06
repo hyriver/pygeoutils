@@ -1,4 +1,4 @@
-"""Customized Hydrodata exceptions."""
+"""Customized PyGeoUtils exceptions."""
 from typing import Generator, List, Optional, Union
 
 

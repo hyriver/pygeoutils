@@ -1,11 +1,11 @@
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/pygeoutils_logo.png
-    :target: https://github.com/cheginit/pygeoutils
-    :align: center
+.. .. image:: https://raw.githubusercontent.com/cheginit/pygeohydro/master/docs/_static/pygeoutils_logo.png
+..     :target: https://github.com/cheginit/pygeoutils
+..     :align: center
 
-|
+.. |
 
-.. |hydrodata| image:: https://github.com/cheginit/hydrodata/actions/workflows/test.yml/badge.svg
-    :target: https://github.com/cheginit/hydrodata/actions?query=workflow%3Apytest
+.. |pygeohydro| image:: https://github.com/cheginit/pygeohydro/actions/workflows/test.yml/badge.svg
+    :target: https://github.com/cheginit/pygeohydro/actions?query=workflow%3Apytest
     :alt: Github Actions
 
 .. |pygeoogc| image:: https://github.com/cheginit/pygeoogc/actions/workflows/test.yml/badge.svg
@@ -31,7 +31,7 @@
 =========== ==================================================================== ============
 Package     Description                                                          Status
 =========== ==================================================================== ============
-Hydrodata_  Access NWIS, NID, HCDN 2009, NLCD, and SSEBop databases              |hydrodata|
+PyGeoHydro_ Access NWIS, NID, HCDN 2009, NLCD, and SSEBop databases              |pygeohydro|
 PyGeoOGC_   Send queries to any ArcGIS RESTful-, WMS-, and WFS-based services    |pygeoogc|
 PyGeoUtils_ Convert responses from PyGeoOGC's supported web services to datasets |pygeoutils|
 PyNHD_      Navigate and subset NHDPlus (MR and HR) using web services           |pynhd|
@@ -39,15 +39,15 @@ Py3DEP_     Access topographic data through National Map's 3DEP web service     
 PyDaymet_   Access Daymet for daily climate data both single pixel and gridded   |pydaymet|
 =========== ==================================================================== ============
 
-.. _Hydrodata: https://github.com/cheginit/hydrodata
+.. _pygeohydro: https://github.com/cheginit/pygeohydro
 .. _PyGeoOGC: https://github.com/cheginit/pygeoogc
 .. _PyGeoUtils: https://github.com/cheginit/pygeoutils
 .. _PyNHD: https://github.com/cheginit/pynhd
 .. _Py3DEP: https://github.com/cheginit/py3dep
 .. _PyDaymet: https://github.com/cheginit/pydaymet
 
-PyGeoUtils: Manipulate (Geo)JSON and (Geo)TIFF data
----------------------------------------------------
+PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
+------------------------------------------------------------
 
 .. image:: https://img.shields.io/pypi/v/pygeoutils.svg
     :target: https://pypi.python.org/pypi/pygeoutils
@@ -62,7 +62,7 @@ PyGeoUtils: Manipulate (Geo)JSON and (Geo)TIFF data
     :alt: CodeCov
 
 .. image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/cheginit/hydrodata/master?filepath=docs%2Fexamples
+    :target: https://mybinder.org/v2/gh/cheginit/pygeohydro/master?filepath=docs%2Fexamples
     :alt: Binder
 
 |
@@ -84,8 +84,9 @@ PyGeoUtils: Manipulate (Geo)JSON and (Geo)TIFF data
 Features
 --------
 
-PyGeoUtils is a part of Hydrodata software stack and provides utilities for manipulating
-(Geo)JSON and (Geo)TIFF data. These utilities are:
+PyGeoUtils is a part of a software stack for retrieving and processing hydrology and climatology
+dataset. This package provides utilities for manipulating (Geo)JSON and (Geo)TIFF responses
+from web services. These utilities are:
 
 - ``json2geodf``: For converting (Geo)JSON objects to GroPandas dataframe.
 - ``arcgis2geojson``: For converting ESRIGeoJSON objects to standard GeoJSON format.
@@ -96,7 +97,7 @@ PyGeoUtils is a part of Hydrodata software stack and provides utilities for mani
 
 All these functions handle all necessary CRS transformations.
 
-Please note that since Hydrodata is in early development stages, while the provided
+Please note that since pygeohydro is in early development stages, while the provided
 functionaities should be stable, changes in APIs are possible in new releases. But we
 appreciate it if you give this project a try and provide feedback. Contributions are most welcome.
 

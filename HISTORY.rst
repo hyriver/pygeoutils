@@ -5,7 +5,7 @@ History
 0.9.0 (2021-02-14)
 ------------------
 
-- Bump version to the same version as Hydrodata.
+- Bump version to the same version as pygeohydro.
 - Add ``gtiff2file`` for saving raster responses as ``geotiff`` file(s).
 - Fix an error in ``_get_nodata_crs`` for handling nodata value when its value in the source
   is None.
