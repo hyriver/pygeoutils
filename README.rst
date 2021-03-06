@@ -39,7 +39,7 @@ Py3DEP_     Access topographic data through National Map's 3DEP web service     
 PyDaymet_   Access Daymet for daily climate data both single pixel and gridded   |pydaymet|
 =========== ==================================================================== ============
 
-.. _pygeohydro: https://github.com/cheginit/pygeohydro
+.. _PyGeoHydro: https://github.com/cheginit/pygeohydro
 .. _PyGeoOGC: https://github.com/cheginit/pygeoogc
 .. _PyGeoUtils: https://github.com/cheginit/pygeoutils
 .. _PyNHD: https://github.com/cheginit/pynhd
@@ -84,7 +84,7 @@ PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
 Features
 --------
 
-PyGeoUtils is a part of a software stack for retrieving and processing hydrology and climatology
+PyGeoUtils is part of a software stack for retrieving and processing hydrology and climatology
 dataset. This package provides utilities for manipulating (Geo)JSON and (Geo)TIFF responses
 from web services. These utilities are:
 
@@ -97,8 +97,10 @@ from web services. These utilities are:
 
 All these functions handle all necessary CRS transformations.
 
-Please note that since pygeohydro is in early development stages, while the provided
-functionaities should be stable, changes in APIs are possible in new releases. But we
+You can find some example notebooks `here <https://github.com/cheginit/geohydrohub-examples>`__.
+
+Please note that since this project is in early development stages, while the provided
+functionalities should be stable, changes in APIs are possible in new releases. But we
 appreciate it if you give this project a try and provide feedback. Contributions are most welcome.
 
 Moreover, requests for additional functionalities can be submitted via
