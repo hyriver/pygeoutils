@@ -126,7 +126,7 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 Quick start
 -----------
 
-To demonstrate capabilities of PyGeoUtils lets use
+To demonstrate capabilities of PyGeoUtils let's use
 `PyGeoOGC <https://github.com/cheginit/pygeoogc>`__ to access
 `National Wetlands Inventory <https://www.fws.gov/wetlands/>`__ from WMS, and
 `FEMA National Flood Hazard <https://www.fema.gov/national-flood-hazard-layer-nfhl>`__
