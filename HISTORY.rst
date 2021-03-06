@@ -2,6 +2,15 @@
 History
 =======
 
+0.10.0 (2021-03-06)
+-------------------
+
+- The first release after renaming hydrodata to pygeohydro.
+- Address cheginit/py3dep#1 by sorting y coordinate after merge.
+- Make ``mypy`` checks more strict and fix all the errors and prevent possible
+  bugs.
+- Speed up CI testing by using ``mamba`` and caching.
+
 0.9.0 (2021-02-14)
 ------------------
 
