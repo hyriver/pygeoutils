@@ -1,8 +1,7 @@
-.. .. image:: https://raw.githubusercontent.com/cheginit/pygeohydro/master/docs/_static/pygeoutils_logo.png
-..     :target: https://github.com/cheginit/pygeoutils
-..     :align: center
+.. image:: https://raw.githubusercontent.com/cheginit/HydRiver-examples/main/notebooks/_static/pygeoutils_logo.png
+    :target: https://github.com/cheginit/pygeoutils
 
-.. |
+|
 
 .. |pygeohydro| image:: https://github.com/cheginit/pygeohydro/actions/workflows/test.yml/badge.svg
     :target: https://github.com/cheginit/pygeohydro/actions?query=workflow%3Apytest
@@ -84,9 +83,10 @@ PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
 Features
 --------
 
-PyGeoUtils is part of a software stack for retrieving and processing hydrology and climatology
-dataset. This package provides utilities for manipulating (Geo)JSON and (Geo)TIFF responses
-from web services. These utilities are:
+PyGeoUtils is a part of `HydRiver <https://github.com/cheginit/HydRiver>`__ software stack that
+is designed to aid in watershed analysis through web services. This package provides
+utilities for manipulating (Geo)JSON and (Geo)TIFF responses from web services.
+These utilities are:
 
 - ``json2geodf``: For converting (Geo)JSON objects to GroPandas dataframe.
 - ``arcgis2geojson``: For converting ESRIGeoJSON objects to standard GeoJSON format.
@@ -97,7 +97,7 @@ from web services. These utilities are:
 
 All these functions handle all necessary CRS transformations.
 
-You can find some example notebooks `here <https://github.com/cheginit/geohydrohub-examples>`__.
+You can find some example notebooks `here <https://github.com/cheginit/HydRiver-examples>`__.
 
 Please note that since this project is in early development stages, while the provided
 functionalities should be stable, changes in APIs are possible in new releases. But we
