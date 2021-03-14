@@ -1,5 +1,5 @@
-.. image:: https://raw.githubusercontent.com/cheginit/HydRiver-examples/main/notebooks/_static/pygeoutils_logo.png
-    :target: https://github.com/cheginit/pygeoutils
+.. image:: https://raw.githubusercontent.com/cheginit/HyRiver-examples/main/notebooks/_static/pygeoutils_logo.png
+    :target: https://github.com/cheginit/HyRiver
 
 |
 
@@ -83,7 +83,7 @@ PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
 Features
 --------
 
-PyGeoUtils is a part of `HydRiver <https://github.com/cheginit/HydRiver>`__ software stack that
+PyGeoUtils is a part of `HyRiver <https://github.com/cheginit/HyRiver>`__ software stack that
 is designed to aid in watershed analysis through web services. This package provides
 utilities for manipulating (Geo)JSON and (Geo)TIFF responses from web services.
 These utilities are:
@@ -97,7 +97,7 @@ These utilities are:
 
 All these functions handle all necessary CRS transformations.
 
-You can find some example notebooks `here <https://github.com/cheginit/HydRiver-examples>`__.
+You can find some example notebooks `here <https://github.com/cheginit/HyRiver-examples>`__.
 
 Please note that since this project is in early development stages, while the provided
 functionalities should be stable, changes in APIs are possible in new releases. But we
