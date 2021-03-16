@@ -56,12 +56,12 @@ PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
     :target: https://anaconda.org/conda-forge/pygeoutils
     :alt: Conda Version
 
-.. image:: https://codecov.io/gh/cheginit/pygeoutils/branch/master/graph/badge.svg
+.. image:: https://codecov.io/gh/cheginit/pygeoutils/branch/main/graph/badge.svg
     :target: https://codecov.io/gh/cheginit/pygeoutils
     :alt: CodeCov
 
 .. image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/cheginit/pygeohydro/master?filepath=docs%2Fexamples
+    :target: https://mybinder.org/v2/gh/cheginit/HyRiver-examples/main?urlpath=lab/tree/notebooks
     :alt: Binder
 
 |
@@ -183,5 +183,5 @@ Contributing
 ------------
 
 Contributions are very welcomed. Please read
-`CONTRIBUTING.rst <https://github.com/cheginit/pygeoogc/blob/master/CONTRIBUTING.rst>`__
+`CONTRIBUTING.rst <https://github.com/cheginit/pygeoogc/blob/main/CONTRIBUTING.rst>`__
 file for instructions.
