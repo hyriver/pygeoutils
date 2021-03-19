@@ -2,6 +2,11 @@
 History
 =======
 
+0.10.1 (unreleased)
+-------------------
+
+- Setting transform of the merged dataset explicitly to address cheginit/py3dep#3
+
 0.10.0 (2021-03-06)
 -------------------
 
