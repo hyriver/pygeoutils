@@ -377,10 +377,32 @@ def gtiff2xarray(
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
 
+    ds.attrs["nodatavals"] = (nodata,)
+
     valid_ycoords = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
-    y_coord = set(ds.coords).intersection(valid_ycoords)
-    if len(y_coord) == 1:
-        ds = ds.sortby(next(iter(y_coord)), ascending=False)
+    valid_xcoords = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
+    ycoord = set(ds.coords).intersection(valid_ycoords)
+    xcoord = set(ds.coords).intersection(valid_xcoords)
+    if len(xcoord) == 1 and len(ycoord) == 1:
+        xdim, ydim = next(iter(xcoord)), next(iter(ycoord))
+        ds = ds.sortby(ydim, ascending=False)
+
+        height, width = ds.sizes[ydim], ds.sizes[xdim]
+
+        left, right = ds[xdim].min().item(), ds[xdim].max().item()
+        bottom, top = ds[ydim].min().item(), ds[ydim].max().item()
+
+        x_res = abs(left - right) / (width - 1)
+        y_res = abs(top - bottom) / (height - 1)
+
+        left -= x_res * 0.5
+        right += x_res * 0.5
+        top += y_res * 0.5
+        bottom -= y_res * 0.5
+
+        ds.attrs["transform"] = rio_transform.from_bounds(left, bottom, right, top, width, height)
+        ds.attrs["res"] = (x_res, y_res)
+        ds.attrs["bounds"] = (left, bottom, right, top)
 
     return ds
 
