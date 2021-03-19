@@ -139,7 +139,7 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
     from shapely.geometry import Polygon
 
 
-    geometry =  Polygon(
+    geometry = Polygon(
         [
             [-118.72, 34.118],
             [-118.31, 34.118],
@@ -149,7 +149,9 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
         ]
     )
 
-    url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
+    url_wms = (
+        "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
+    )
     wms = WMS(
         url_wms,
         layers="0",
