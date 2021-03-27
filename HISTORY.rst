@@ -2,10 +2,12 @@
 History
 =======
 
-0.10.1 (unreleased)
+0.10.1 (2021-03-27)
 -------------------
 
 - Setting transform of the merged dataset explicitly to address cheginit/py3dep#3
+- Add annoucement regarding the new name for the softwate stack, HyRiver.
+- Improve ``pip`` installation and release workflow.
 
 0.10.0 (2021-03-06)
 -------------------
