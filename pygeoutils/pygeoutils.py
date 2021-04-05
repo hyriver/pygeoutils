@@ -519,6 +519,8 @@ def get_transform(
     ----------
     ds : xarray.Dataset or xarray.DataArray
         The dataset(array) to be masked
+    ds_dims : tuple, optional
+        Names of the coordinames in the dataset, defaults to ("y", "x")
 
     Returns
     -------
