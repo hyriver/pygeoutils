@@ -125,7 +125,7 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
                 geojson["coordinates"] = arcgis["paths"]
 
         if "rings" in arcgis:
-            geojson = rings2geojson(arcgis["rings"])
+            geojson = _rings2geojson(arcgis["rings"])
 
         if (
             "xmin" in arcgis
@@ -176,91 +176,90 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
 
         return geojson
 
-    def rings2geojson(rings: List[List[List[float]]]) -> Dict[str, Any]:
-        """Check for holes in the ring and fill them."""
-        outer_rings = []
-        holes = []
-        x = None  # iterable
-        outer_ring = None  # current outer ring being evaluated
-        hole = None  # current hole being evaluated
-
-        for ring in rings:
-            if not np.all(np.isclose(ring[0], ring[-1])):
-                ring.append(ring[0])
-
-            if len(ring) < 4:
-                continue
-
-            total = sum(
-                (pt2[0] - pt1[0]) * (pt2[1] + pt1[1]) for pt1, pt2 in zip(ring[:-1], ring[1:])
-            )
-            # Clock-wise check
-            if total >= 0:
-                outer_rings.append(
-                    [ring[::-1]]
-                )  # wind outer rings counterclockwise for RFC 7946 compliance
-            else:
-                holes.append(ring[::-1])  # wind inner rings clockwise for RFC 7946 compliance
-
-        uncontained_holes = []
-
-        # while there are holes left...
-        while holes:
-            # pop a hole off out stack
-            hole = holes.pop()
-
-            # loop over all outer rings and see if they contain our hole.
-            contained = False
-            x = len(outer_rings) - 1
-            while x >= 0:
-                outer_ring = outer_rings[x][0]
-                l1, l2 = LineString(outer_ring), LineString(hole)
-                p2 = Point(hole[0])
-                intersects = l1.intersects(l2)
-                contains = l1.contains(p2)
-                if not intersects and contains:
-                    # the hole is contained push it into our polygon
-                    outer_rings[x].append(hole)
-                    contained = True
-                    break
-                x = x - 1
-
-            # ring is not contained in any outer ring
-            # sometimes this happens https://github.com/Esri/esri-leaflet/issues/320
-            if not contained:
-                uncontained_holes.append(hole)
-
-        # if we couldn't match any holes using contains we can try intersects...
-        while uncontained_holes:
-            # pop a hole off out stack
-            hole = uncontained_holes.pop()
-
-            # loop over all outer rings and see if any intersect our hole.
-            intersects = False
-            x = len(outer_rings) - 1
-            while x >= 0:
-                outer_ring = outer_rings[x][0]
-                l1, l2 = LineString(outer_ring), LineString(hole)
-                intersects = l1.intersects(l2)
-                if intersects:
-                    # the hole is contained push it into our polygon
-                    outer_rings[x].append(hole)
-                    intersects = True
-                    break
-                x = x - 1
-
-            if not intersects:
-                outer_rings.append([hole[::-1]])
-
-        if len(outer_rings) == 1:
-            return {"type": "Polygon", "coordinates": outer_rings[0]}
-
-        return {"type": "MultiPolygon", "coordinates": outer_rings}
-
     if isinstance(arcgis, str):  # type: ignore
         return json.dumps(convert(json.loads(arcgis), id_attr))  # type: ignore
 
     return convert(arcgis, id_attr)
+
+
+def _rings2geojson(rings: List[List[List[float]]]) -> Dict[str, Any]:
+    """Check for holes in the ring and fill them."""
+    outer_rings = []
+    holes = []
+    x = None  # iterable
+    outer_ring = None  # current outer ring being evaluated
+    hole = None  # current hole being evaluated
+
+    for ring in rings:
+        if not np.all(np.isclose(ring[0], ring[-1])):
+            ring.append(ring[0])
+
+        if len(ring) < 4:
+            continue
+
+        total = sum((pt2[0] - pt1[0]) * (pt2[1] + pt1[1]) for pt1, pt2 in zip(ring[:-1], ring[1:]))
+        # Clock-wise check
+        if total >= 0:
+            outer_rings.append(
+                [ring[::-1]]
+            )  # wind outer rings counterclockwise for RFC 7946 compliance
+        else:
+            holes.append(ring[::-1])  # wind inner rings clockwise for RFC 7946 compliance
+
+    uncontained_holes = []
+
+    # while there are holes left...
+    while holes:
+        # pop a hole off out stack
+        hole = holes.pop()
+
+        # loop over all outer rings and see if they contain our hole.
+        contained = False
+        x = len(outer_rings) - 1
+        while x >= 0:
+            outer_ring = outer_rings[x][0]
+            l1, l2 = LineString(outer_ring), LineString(hole)
+            p2 = Point(hole[0])
+            intersects = l1.intersects(l2)
+            contains = l1.contains(p2)
+            if not intersects and contains:
+                # the hole is contained push it into our polygon
+                outer_rings[x].append(hole)
+                contained = True
+                break
+            x = x - 1
+
+        # ring is not contained in any outer ring
+        # sometimes this happens https://github.com/Esri/esri-leaflet/issues/320
+        if not contained:
+            uncontained_holes.append(hole)
+
+    # if we couldn't match any holes using contains we can try intersects...
+    while uncontained_holes:
+        # pop a hole off out stack
+        hole = uncontained_holes.pop()
+
+        # loop over all outer rings and see if any intersect our hole.
+        intersects = False
+        x = len(outer_rings) - 1
+        while x >= 0:
+            outer_ring = outer_rings[x][0]
+            l1, l2 = LineString(outer_ring), LineString(hole)
+            intersects = l1.intersects(l2)
+            if intersects:
+                # the hole is contained push it into our polygon
+                outer_rings[x].append(hole)
+                intersects = True
+                break
+            x = x - 1
+
+        if not intersects:
+            outer_rings.append([hole[::-1]])
+
+    if len(outer_rings) == 1:
+        return {"type": "Polygon", "coordinates": outer_rings[0]}
+
+    return {"type": "MultiPolygon", "coordinates": outer_rings}
 
 
 def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.crs.CRS]:
