@@ -20,6 +20,7 @@ dependencies:
   - simplejson
 
   # pygeoutils deps
+  # - orjson
   - geopandas
   - netCDF4
   - rasterio
