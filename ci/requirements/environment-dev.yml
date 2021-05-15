@@ -23,6 +23,7 @@ dependencies:
   - pyproj
   - requests
   - requests-cache
+  - setuptools
   - shapely
   - simplejson
 
