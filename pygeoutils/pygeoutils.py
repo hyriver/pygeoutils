@@ -67,7 +67,7 @@ def json2geodf(
             except AttributeError:
                 geodf = gpd.GeoDataFrame.from_features(c)
 
-    if in_crs != crs and "geometry" in geodf:
+    if in_crs != crs and "geometry" in geodf and len(geodf) > 0:
         geodf = geodf.to_crs(crs)
 
     return geodf
@@ -201,13 +201,13 @@ def _rings2geojson(rings: List[List[List[float]]]) -> Dict[str, Any]:
             intersects = l1.intersects(l2)
             if intersects:
                 # the hole is contained push it into our polygon
-                outer_rings[x].append(hole)
+                outer_rings[x].append(hole)  # type: ignore
                 intersects = True
                 break
             x = x - 1
 
         if not intersects:
-            outer_rings.append([hole[::-1]])
+            outer_rings.append([hole[::-1]])  # type: ignore
 
     if len(outer_rings) == 1:
         return {"type": "Polygon", "coordinates": outer_rings[0]}
@@ -234,7 +234,7 @@ def _get_outer_rings(rings: List[List[List[float]]]) -> Tuple[List[List[float]],
             )  # wind outer rings counterclockwise for RFC 7946 compliance
         else:
             holes.append(ring[::-1])  # wind inner rings clockwise for RFC 7946 compliance
-    return outer_rings, holes
+    return outer_rings, holes  # type: ignore
 
 
 def _get_uncontained_holes(
@@ -259,7 +259,7 @@ def _get_uncontained_holes(
             contains = l1.contains(p2)
             if not intersects and contains:
                 # the hole is contained push it into our polygon
-                outer_rings[x].append(hole)
+                outer_rings[x].append(hole)  # type: ignore
                 contained = True
                 break
             x = x - 1
