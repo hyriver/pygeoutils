@@ -2,11 +2,17 @@
 History
 =======
 
+0.11.0 (unreleased)
+-------------------
+
+- Drop support for python 3.6 since many of the dependencies have done so, such as
+  ``xarray`` and ``pandas``.
+
 0.10.1 (2021-03-27)
 -------------------
 
 - Setting transform of the merged dataset explicitly to address cheginit/py3dep#3
-- Add annoucement regarding the new name for the softwate stack, HyRiver.
+- Add announcement regarding the new name for the softwate stack, HyRiver.
 - Improve ``pip`` installation and release workflow.
 
 0.10.0 (2021-03-06)
@@ -79,7 +85,7 @@ History
 ------------------
 
 - Remove duplicate rows before returning the dataframe in the ``json2geodf`` function.
-- Add the missing dependecy
+- Add the missing dependency
 
 0.1.0 (2020-07-21)
 ------------------

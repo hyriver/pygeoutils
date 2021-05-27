@@ -125,14 +125,14 @@ Installation
 
 You can install PyGeoUtils using ``pip`` after installing ``libgdal`` on your system
 (for example, in Ubuntu run ``sudo apt install libgdal-dev``). Moreover, PyGeoUtils has an optional
-dependecy for using persistent caching, ``requests-cache``. We highly recommend to install
-this package as it can significantly speedup send/recieve queries. You don't have to change
+dependency for using persistent caching, ``requests-cache``. We highly recommend to install
+this package as it can significantly speedup send/receive queries. You don't have to change
 anything in your code, since PyGeoUtils under-the-hood looks for ``requests-cache`` and
 if available, it will automatically use persistent caching:
 
 .. code-block:: console
 
-    $ pip install pygeoutils[cache]
+    $ pip install pygeoutils
 
 Alternatively, PyGeoUtils can be installed from the ``conda-forge`` repository
 using `Conda <https://docs.conda.io/en/latest/>`__:
@@ -167,9 +167,7 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
         ]
     )
 
-    url_wms = (
-        "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
-    )
+    url_wms = "https://www.fws.gov/wetlands/arcgis/services/Wetlands_Raster/ImageServer/WMSServer"
     wms = WMS(
         url_wms,
         layers="0",
@@ -193,7 +191,7 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
     r = wfs.getfeature_bybox(geometry.bounds, box_crs="epsg:4326")
     flood = geoutils.json2geodf(r.json(), "epsg:4269", "epsg:4326")
 
-We can also save WMS outpus as raster file using ``gtiff2file``:
+We can also save WMS outputs as raster file using ``gtiff2file``:
 
 .. code-block:: python
 
