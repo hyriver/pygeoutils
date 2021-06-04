@@ -1,7 +1,6 @@
 """Some utilities for manipulating GeoSpatial data."""
 import contextlib
 import numbers
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 from warnings import warn
@@ -17,11 +16,12 @@ import rasterio.mask as rio_mask
 import rasterio.transform as rio_transform
 import xarray as xr
 from shapely import ops
-from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
+from shapely.geometry import LineString, MultiPoint, MultiPolygon, Point, Polygon, box
 
 from .exceptions import InvalidInputType, InvalidInputValue, MissingAttribute
 
 DEF_CRS = "epsg:4326"
+BBX_ORD = "(west, south, east, north)"
 
 
 def json2geodf(
@@ -439,7 +439,7 @@ def gtiff2file(
         A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
         can be found here: https://gdal.org/drivers/raster/index.html
     """
-    os.makedirs(output, exist_ok=True)
+    Path(output).mkdir(parents=True, exist_ok=True)
 
     if not isinstance(r_dict, dict):
         raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')  # noqa: FS003
@@ -563,7 +563,7 @@ def get_transform(
 
 
 class MatchCRS:
-    """Match CRS of an input geometry (Polygon, bbox, coord) with the output CRS.
+    """Match CRS of a input geometry (Polygon, bbox, coord) with the output CRS.
 
     Parameters
     ----------
@@ -576,10 +576,12 @@ class MatchCRS:
     """
 
     @staticmethod
-    def geometry(geom: Polygon, in_crs: str, out_crs: str) -> Polygon:
-        """Transform a Polygon."""
-        if not isinstance(geom, (Polygon, MultiPolygon)):
-            raise InvalidInputType("geom", "Polygon or MultiPolygon")
+    def geometry(
+        geom: Union[Polygon, MultiPolygon, Point, MultiPoint], in_crs: str, out_crs: str
+    ) -> Union[Polygon, MultiPolygon, Point, MultiPoint]:
+        """Reproject a geometry to the specified output CRS."""
+        if not isinstance(geom, (Polygon, MultiPolygon, Point, MultiPoint)):
+            raise InvalidInputType("geom", "Polygon, MultiPolygon, Point, or MultiPoint")
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
         return ops.transform(project, geom)
@@ -588,29 +590,22 @@ class MatchCRS:
     def bounds(
         geom: Tuple[float, float, float, float], in_crs: str, out_crs: str
     ) -> Tuple[float, float, float, float]:
-        """Transform a bounding box ``(west, south, east, north)``."""
+        """Reproject a bounding box to the specified output CRS."""
         if not (isinstance(geom, tuple) and len(geom) == 4):
-            raise InvalidInputType("geom", "tuple of length 4", "(west, south, east, north)")
+            raise InvalidInputType("geom", "tuple", BBX_ORD)
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        return ops.transform(project, box(*geom)).bounds
+        bbox: Tuple[float, float, float, float] = ops.transform(project, box(*geom)).bounds
+        return bbox
 
     @staticmethod
-    def coords(
-        geom: Tuple[Tuple[float, ...], Tuple[float, ...]], in_crs: str, out_crs: str
-    ) -> Tuple[Any, ...]:
-        """Transform a set of coordinates in form of ((xs), (ys))."""
+    def coords(geom: Tuple[List[float], List[float]], in_crs: str, out_crs: str) -> Tuple[Any, ...]:
+        """Reproject a list of coordinates to the specified output CRS."""
         if not (isinstance(geom, tuple) and len(geom) == 2):
             raise InvalidInputType("geom", "tuple of length 2", "((xs), (ys))")
 
         project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        return tuple(zip(*[project(x, y) for x, y in zip(*geom)]))
-
-
-def check_bbox(bbox: Tuple[float, float, float, float]) -> None:
-    """Check if an input inbox is a tuple of length 4."""
-    if not isinstance(bbox, tuple) or len(bbox) != 4:
-        raise InvalidInputType("bbox", "tuple", "(west, south, east, north)")
+        return tuple(zip(*(project(x, y) for x, y in zip(*geom))))
 
 
 def geo2polygon(
@@ -638,8 +633,11 @@ def geo2polygon(
         raise InvalidInputType("geometry", "Polygon, MultiPolygon, or tuple of length 4")
 
     if isinstance(geometry, tuple):
+        if not len(geometry) == 4:
+            raise InvalidInputType("geometry", "tuple", BBX_ORD)
+
         geom = box(*MatchCRS.bounds(geometry, geo_crs, crs))  # type: ignore
-    elif isinstance(geometry, (Polygon, MultiPolygon)):
+    else:
         geom = MatchCRS.geometry(geometry, geo_crs, crs)
 
     if not geom.is_valid:
