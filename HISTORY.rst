@@ -9,6 +9,11 @@ Breaking Changes
 ~~~~~~~~~~~~~~~~
 - Drop support for Python 3.6 since many of the dependencies have done so, such as
   ``xarray`` and ``pandas``.
+- Refactor ``MatchCRS``. Now, it should be instantiated by providing the in and out CRSs like so:
+  ``MatchCRS(in_crs, out_crs)``. Then its methods, namely, ``geometry``, ``bounds`` and ``coords``,
+  can be called. These methods now have only one input, geometry.
+- Change input and output types of ``MatchCRS.coords`` from tuple of lists of coordinates
+  to list of ``(x, y)`` coordinates.
 
 0.10.1 (2021-03-27)
 -------------------
@@ -20,7 +25,7 @@ Breaking Changes
 0.10.0 (2021-03-06)
 -------------------
 
-- The first release after renaming hydrodata to pygeohydro.
+- The first release after renaming ``hydrodata`` to ``pygeohydro``.
 - Address cheginit/py3dep#1 by sorting y coordinate after merge.
 - Make ``mypy`` checks more strict and fix all the errors and prevent possible
   bugs.
