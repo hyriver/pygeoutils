@@ -11,30 +11,24 @@ import pygeoutils as geoutils
 from pygeoutils import MatchCRS
 
 DEF_CRS = "epsg:4326"
+ALT_CRS = "epsg:2149"
+GEO_URB = Polygon(
+    [
+        [-118.72, 34.118],
+        [-118.31, 34.118],
+        [-118.31, 34.518],
+        [-118.72, 34.518],
+        [-118.72, 34.118],
+    ]
+)
 
-
-@pytest.fixture
-def geometry_nat():
-    return Polygon(
-        [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
-    )
-
-
-@pytest.fixture
-def geometry_urb():
-    return Polygon(
-        [
-            [-118.72, 34.118],
-            [-118.31, 34.118],
-            [-118.31, 34.518],
-            [-118.72, 34.518],
-            [-118.72, 34.118],
-        ]
-    )
+GEO_NAT = Polygon(
+    [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
+)
 
 
 @pytest.mark.flaky(max_runs=3)
-def test_gtiff2array(geometry_nat):
+def test_gtiff2array():
     url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
     wms = WMS(
         url_wms,
@@ -43,13 +37,13 @@ def test_gtiff2array(geometry_nat):
         crs=DEF_CRS,
     )
     r_dict = wms.getmap_bybox(
-        geometry_nat.bounds,
+        GEO_NAT.bounds,
         1e3,
         box_crs=DEF_CRS,
     )
-    cover_box = geoutils.gtiff2xarray(r_dict, geometry_nat.bounds, DEF_CRS)
-    cover_msk = geoutils.xarray_geomask(cover_box, geometry_nat, DEF_CRS)
-    cover = geoutils.gtiff2xarray(r_dict, geometry_nat, DEF_CRS)
+    cover_box = geoutils.gtiff2xarray(r_dict, GEO_NAT.bounds, DEF_CRS)
+    cover_msk = geoutils.xarray_geomask(cover_box, GEO_NAT, DEF_CRS)
+    cover = geoutils.gtiff2xarray(r_dict, GEO_NAT, DEF_CRS)
 
     assert (
         abs(cover_msk.mean().values.item() - 2.444) < 1e-3
@@ -58,7 +52,7 @@ def test_gtiff2array(geometry_nat):
 
 
 @pytest.mark.flaky(max_runs=3)
-def test_gtiff2file(geometry_nat):
+def test_gtiff2file():
     url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
     wms = WMS(
         url_wms,
@@ -67,11 +61,11 @@ def test_gtiff2file(geometry_nat):
         crs=DEF_CRS,
     )
     r_dict = wms.getmap_bybox(
-        geometry_nat.bounds,
+        GEO_NAT.bounds,
         1e3,
         box_crs=DEF_CRS,
     )
-    geoutils.gtiff2file(r_dict, geometry_nat, DEF_CRS, "raster")
+    geoutils.gtiff2file(r_dict, GEO_NAT, DEF_CRS, "raster")
     with rasterio.open("raster/NLCD_Land_Cover_Change_Index_Science_product_L48_dd_0_0.gtiff") as f:
         mean = f.read().mean()
 
@@ -80,7 +74,7 @@ def test_gtiff2file(geometry_nat):
 
 
 @pytest.mark.flaky(max_runs=3)
-def test_json2geodf(geometry_urb):
+def test_json2geodf():
     url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
 
     wfs = WFS(
@@ -90,12 +84,12 @@ def test_json2geodf(geometry_urb):
         crs="epsg:4269",
         version="2.0.0",
     )
-    bbox = geometry_urb.bounds
+    bbox = GEO_URB.bounds
     r = wfs.getfeature_bybox(bbox, box_crs=DEF_CRS)
     flood = geoutils.json2geodf([r.json(), r.json()], "epsg:4269", DEF_CRS)
     flood = flood.drop_duplicates()
 
-    assert abs(flood["ELEV"].sum() - 631366.6) < 1e-1
+    assert abs(flood["ELEV"].sum() - 781717.6) < 1e-1
 
 
 def test_ring():
@@ -190,17 +184,17 @@ def test_path():
     assert _path == res
 
 
-def test_matchcrs(geometry_urb):
-    bounds = geometry_urb.bounds
-    crs = "epsg:2149"
-    points = ((bounds[0], bounds[2]), (bounds[1], bounds[3]))
-    geom = MatchCRS.geometry(geometry_urb, DEF_CRS, crs)
-    bbox = MatchCRS.bounds(geometry_urb.bounds, DEF_CRS, crs)
-    coords = MatchCRS.coords(points, DEF_CRS, crs)
+def test_matchcrs():
+    match_crs = MatchCRS(DEF_CRS, ALT_CRS)
+    bounds = GEO_URB.bounds
+    points = [(bounds[0], bounds[1]), (bounds[2], bounds[3])]
+    coords = match_crs.coords(points)
+    bbox = match_crs.bounds(GEO_URB.bounds)
+    geom = match_crs.geometry(GEO_URB)
     assert (
-        abs(geom.area - 2475725967.465) < 1e-3
-        and abs(bbox[0] - (-3654030.292)) < 1e-3
-        and abs(coords[0][-1] == (-3588088.81)) < 1e-3
+        abs(geom.centroid.x * 1e-4 - (-362.099)) < 1e-3
+        and abs(bbox[0] * 1e-4 - (-365.403)) < 1e-3
+        and abs(coords[-1][0] * 1e-4 == (-287.707)) < 1e-3
     )
 
 
