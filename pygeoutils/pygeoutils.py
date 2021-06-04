@@ -21,7 +21,7 @@ from shapely.geometry import LineString, MultiPoint, MultiPolygon, Point, Polygo
 from .exceptions import InvalidInputType, InvalidInputValue, MissingAttribute
 
 DEF_CRS = "epsg:4326"
-BBX_ORD = "(west, south, east, north)"
+BOX_ORD = "(west, south, east, north)"
 
 
 def json2geodf(
@@ -563,49 +563,96 @@ def get_transform(
 
 
 class MatchCRS:
-    """Match CRS of a input geometry (Polygon, bbox, coord) with the output CRS.
+    """Reproject a geometry to another CRS.
 
     Parameters
     ----------
-    geometry : tuple or Polygon
-        The input geometry (Polygon, bbox, coord)
     in_crs : str
-        The spatial reference of the input geometry
+        Spatial reference of the input geometry
     out_crs : str
-        The target spatial reference
+        Target spatial reference
     """
 
-    @staticmethod
+    def __init__(self, in_crs: str, out_crs: str):
+        self.project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
+
     def geometry(
-        geom: Union[Polygon, MultiPolygon, Point, MultiPoint], in_crs: str, out_crs: str
+        self, geom: Union[Polygon, MultiPolygon, Point, MultiPoint]
     ) -> Union[Polygon, MultiPolygon, Point, MultiPoint]:
-        """Reproject a geometry to the specified output CRS."""
+        """Reproject a geometry to the specified output CRS.
+
+        Parameters
+        ----------
+        geometry : Polygon, MultiPolygon, Point, or MultiPoint
+            Input geometry.
+
+        Returns
+        -------
+        Polygon, MultiPolygon, Point, or MultiPoint
+            Input geometry in the specified CRS.
+
+        Examples
+        --------
+        >>> from pygeoutils import MatchCRS
+        >>> from shapely.geometry import Point
+        >>> point = Point(-7766049.665, 5691929.739)
+        >>> MatchCRS("epsg:3857", "epsg:4326").geometry(point).xy
+        (array('d', [-69.7636111130079]), array('d', [45.44549114818127]))
+        """
         if not isinstance(geom, (Polygon, MultiPolygon, Point, MultiPoint)):
             raise InvalidInputType("geom", "Polygon, MultiPolygon, Point, or MultiPoint")
 
-        project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        return ops.transform(project, geom)
+        return ops.transform(self.project, geom)
 
-    @staticmethod
-    def bounds(
-        geom: Tuple[float, float, float, float], in_crs: str, out_crs: str
-    ) -> Tuple[float, float, float, float]:
-        """Reproject a bounding box to the specified output CRS."""
+    def bounds(self, geom: Tuple[float, float, float, float]) -> Tuple[float, float, float, float]:
+        """Reproject a bounding box to the specified output CRS.
+
+        Parameters
+        ----------
+        geometry : tuple
+            Input bounding box (xmin, ymin, xmax, ymax).
+
+        Returns
+        -------
+        tuple
+            Input bounding box in the specified CRS.
+
+        Examples
+        --------
+        >>> from pygeoutils import MatchCRS
+        >>> bbox = (-7766049.665, 5691929.739, -7763049.665, 5696929.739)
+        >>> MatchCRS("epsg:3857", "epsg:4326").bounds(bbox)
+        (-69.7636111130079, 45.44549114818127, -69.73666165448431, 45.47699468552394)
+        """
         if not (isinstance(geom, tuple) and len(geom) == 4):
-            raise InvalidInputType("geom", "tuple", BBX_ORD)
+            raise InvalidInputType("geom", "tuple", BOX_ORD)
 
-        project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        bbox: Tuple[float, float, float, float] = ops.transform(project, box(*geom)).bounds
-        return bbox
+        return ops.transform(self.project, box(*geom)).bounds
 
-    @staticmethod
-    def coords(geom: Tuple[List[float], List[float]], in_crs: str, out_crs: str) -> Tuple[Any, ...]:
-        """Reproject a list of coordinates to the specified output CRS."""
-        if not (isinstance(geom, tuple) and len(geom) == 2):
-            raise InvalidInputType("geom", "tuple of length 2", "((xs), (ys))")
+    def coords(self, geom: List[Tuple[float, float]]) -> List[Tuple[Any, ...]]:
+        """Reproject a list of coordinates to the specified output CRS.
 
-        project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-        return tuple(zip(*(project(x, y) for x, y in zip(*geom))))
+        Parameters
+        ----------
+        geometry : list of tuple
+            Input coords [(x1, y1), ...].
+
+        Returns
+        -------
+        tuple
+            Input list of coords in the specified CRS.
+
+        Examples
+        --------
+        >>> from pygeoutils import MatchCRS
+        >>> coords = [(-7766049.665, 5691929.739)]
+        >>> MatchCRS("epsg:3857", "epsg:4326").coords(coords)
+        [(-69.7636111130079, 45.44549114818127)]
+        """
+        if not (isinstance(geom, list) and all(len(c) == 2 for c in geom)):
+            raise InvalidInputType("geom", "list of tuples", "[(x1, y1), ...]")
+
+        return list(zip(*self.project(*zip(*geom))))
 
 
 def geo2polygon(
@@ -618,11 +665,11 @@ def geo2polygon(
     Parameters
     ----------
     geometry : Polygon or tuple of length 4
-        A Polygon or bounding box (west, south, east, north).
+        Polygon or bounding box (west, south, east, north).
     geo_crs : str
-        THe spatial reference of the input geometry
+        Spatial reference of the input geometry
     crs : str
-        The target spatial reference.
+        Target spatial reference.
 
     Returns
     -------
@@ -632,13 +679,14 @@ def geo2polygon(
     if not isinstance(geometry, (Polygon, MultiPolygon, tuple)):
         raise InvalidInputType("geometry", "Polygon, MultiPolygon, or tuple of length 4")
 
+    match_crs = MatchCRS(geo_crs, crs)
     if isinstance(geometry, tuple):
         if not len(geometry) == 4:
-            raise InvalidInputType("geometry", "tuple", BBX_ORD)
+            raise InvalidInputType("geometry", "tuple", BOX_ORD)
 
-        geom = box(*MatchCRS.bounds(geometry, geo_crs, crs))  # type: ignore
+        geom = box(*match_crs.bounds(geometry))  # type: ignore
     else:
-        geom = MatchCRS.geometry(geometry, geo_crs, crs)
+        geom = match_crs.geometry(geometry)
 
     if not geom.is_valid:
         geom = geom.buffer(0.0)
