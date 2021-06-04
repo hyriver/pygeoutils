@@ -5,7 +5,9 @@ History
 0.11.0 (unreleased)
 -------------------
 
-- Drop support for python 3.6 since many of the dependencies have done so, such as
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Drop support for Python 3.6 since many of the dependencies have done so, such as
   ``xarray`` and ``pandas``.
 
 0.10.1 (2021-03-27)
