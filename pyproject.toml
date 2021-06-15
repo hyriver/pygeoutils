@@ -9,3 +9,13 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 fallback_version = "999"
+
+[tool.pytest.ini_options]
+addopts = '--doctest-modules -n=auto -v --cov=pygeoutils --cov-report xml --durations=5'
+testpaths = [
+    "tests",
+    "pygeoutils",
+]
+markers = [
+    "slow",
+]
