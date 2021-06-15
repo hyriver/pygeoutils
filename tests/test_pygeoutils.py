@@ -27,7 +27,6 @@ GEO_NAT = Polygon(
 )
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_gtiff2array():
     url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
     wms = WMS(
@@ -51,7 +50,6 @@ def test_gtiff2array():
     )
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_gtiff2file():
     url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
     wms = WMS(
@@ -73,7 +71,7 @@ def test_gtiff2file():
     assert abs(mean - 2.444) < 1e-3
 
 
-@pytest.mark.flaky(max_runs=3)
+@pytest.mark.slow
 def test_json2geodf():
     url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
 
