@@ -1,6 +1,7 @@
 """Some utilities for manipulating GeoSpatial data."""
 import contextlib
 import numbers
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 from warnings import warn
@@ -229,11 +230,11 @@ def _get_outer_rings(rings: List[List[List[float]]]) -> Tuple[List[List[float]],
         total = sum((pt2[0] - pt1[0]) * (pt2[1] + pt1[1]) for pt1, pt2 in zip(ring[:-1], ring[1:]))
         # Clock-wise check
         if total >= 0:
-            outer_rings.append(
-                [ring[::-1]]
-            )  # wind outer rings counterclockwise for RFC 7946 compliance
+            # wind outer rings counterclockwise for RFC 7946 compliance
+            outer_rings.append([ring[::-1]])
         else:
-            holes.append(ring[::-1])  # wind inner rings clockwise for RFC 7946 compliance
+            # wind inner rings clockwise for RFC 7946 compliance
+            holes.append(ring[::-1])
     return outer_rings, holes  # type: ignore
 
 
@@ -290,7 +291,7 @@ def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.cr
     with rio.MemoryFile() as memfile:
         memfile.write(resp)
         with memfile.open(driver=driver) as src:
-            r_crs = pyproj.CRS.from_user_input(src.crs)
+            r_crs = pyproj.CRS(src.crs)
             if src.nodata is None:
                 try:
                     nodata = np.iinfo(src.dtypes[0]).max
@@ -344,6 +345,8 @@ def gtiff2xarray(
 
     _geometry = geo2polygon(geometry, geo_crs, r_crs)
 
+    tmp_dir = tempfile.gettempdir()
+
     def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
         with rio.MemoryFile() as memfile:
             memfile.write(resp)
@@ -356,7 +359,7 @@ def gtiff2xarray(
                 meta = src.meta
                 meta.update(
                     {
-                        "driver": "GTiff",
+                        "driver": driver,
                         "height": msk.shape[0],
                         "width": msk.shape[1],
                         "transform": transform,
@@ -372,15 +375,20 @@ def gtiff2xarray(
                     with contextlib.suppress(ValueError):
                         ds = ds.squeeze("band", drop=True)
 
-                    coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
+                    coords = {
+                        ds_dims[0]: ds.coords[ds_dims[0]],
+                        ds_dims[1]: ds.coords[ds_dims[1]],
+                    }
                     msk_da = xr.DataArray(msk, coords, dims=ds_dims)
                     ds = ds.where(msk_da, drop=True)
                     ds.attrs["crs"] = r_crs.to_string()
                     ds.name = var_name[lyr]
-                    return ds
+                    fpath = Path(tmp_dir, f"{lyr.replace(':', '_')}.nc")
+                    fpath.unlink(missing_ok=False)
+                    ds.to_netcdf(fpath)
+                    return fpath
 
-    ds = xr.merge(to_dataset(lyr, resp) for lyr, resp in r_dict.items())
-    ds.attrs["crs"] = r_crs.to_string()
+    ds = xr.open_mfdataset((to_dataset(lyr, resp) for lyr, resp in r_dict.items()), parallel=True)
 
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
