@@ -372,8 +372,11 @@ def gtiff2xarray(
                     valid_dims = list(ds.sizes)
                     if any(d not in valid_dims for d in ds_dims):
                         raise InvalidInputValue("ds_dims", valid_dims)
-                    with contextlib.suppress(ValueError):
+
+                    fpath = Path(tmp_dir, f"{lyr.replace(':', '_')}.nc")
+                    with contextlib.suppress(ValueError, FileNotFoundError):
                         ds = ds.squeeze("band", drop=True)
+                        fpath.unlink()
 
                     coords = {
                         ds_dims[0]: ds.coords[ds_dims[0]],
@@ -383,8 +386,6 @@ def gtiff2xarray(
                     ds = ds.where(msk_da, drop=True)
                     ds.attrs["crs"] = r_crs.to_string()
                     ds.name = var_name[lyr]
-                    fpath = Path(tmp_dir, f"{lyr.replace(':', '_')}.nc")
-                    fpath.unlink(missing_ok=False)
                     ds.to_netcdf(fpath)
                     return fpath
 
