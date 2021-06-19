@@ -46,26 +46,3 @@ class InvalidInputValue(Exception):
 
     def __str__(self) -> str:
         return self.message
-
-
-class MissingAttribute(Exception):
-    """Exception raised for missing attribute.
-
-    Parameters
-    ----------
-    attr : str
-        Name of the input attribute
-    avail_attrs : tuple
-        List of valid inputs
-    """
-
-    def __init__(
-        self, attr: str, avail_attrs: Union[List[str], Generator[str, None, None]]
-    ) -> None:
-        self.message = f"Given {attr} does not exist. Available attributes are:\n" + ", ".join(
-            str(i) for i in avail_attrs
-        )
-        super().__init__(self.message)
-
-    def __str__(self) -> str:
-        return self.message
