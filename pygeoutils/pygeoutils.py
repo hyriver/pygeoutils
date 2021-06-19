@@ -1,10 +1,12 @@
 """Some utilities for manipulating GeoSpatial data."""
 import contextlib
+import hashlib
+import logging
 import numbers
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
-from warnings import warn
 
 import affine
 import geopandas as gpd
@@ -12,14 +14,21 @@ import numpy as np
 import orjson as json
 import pyproj
 import rasterio as rio
-import rasterio.features as rio_features
 import rasterio.mask as rio_mask
 import rasterio.transform as rio_transform
+import shapely.geometry as sgeom
 import xarray as xr
 from shapely import ops
-from shapely.geometry import LineString, MultiPoint, MultiPolygon, Point, Polygon, box
+from shapely.geometry import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon
 
-from .exceptions import InvalidInputType, InvalidInputValue, MissingAttribute
+from .exceptions import InvalidInputType, InvalidInputValue
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter(""))
+logger.handlers = [handler]
+logger.propagate = False
 
 DEF_CRS = "epsg:4326"
 BOX_ORD = "(west, south, east, north)"
@@ -51,35 +60,32 @@ def json2geodf(
 
     content = content if isinstance(content, list) else [content]
     try:
-        geodf = gpd.GeoDataFrame.from_features(content[0], crs=in_crs)
-    except AttributeError:
-        geodf = gpd.GeoDataFrame.from_features(content[0])
+        geodf = gpd.GeoDataFrame.from_features(next(iter(content)))
     except TypeError:
         content = [arcgis2geojson(c) for c in content]
-        try:
-            geodf = gpd.GeoDataFrame.from_features(content[0], crs=in_crs)
-        except AttributeError:
-            geodf = gpd.GeoDataFrame.from_features(content[0])
+        geodf = gpd.GeoDataFrame.from_features(content[0])
+    except StopIteration:
+        raise StopIteration("Resnpose is empty.")
 
     if len(content) > 1:
-        for c in content[1:]:
-            try:
-                geodf = geodf.append(gpd.GeoDataFrame.from_features(c, crs=in_crs))
-            except AttributeError:
-                geodf = gpd.GeoDataFrame.from_features(c)
+        geodf = geodf.append([gpd.GeoDataFrame.from_features(c) for c in content[1:]])
 
-    if in_crs != crs and "geometry" in geodf and len(geodf) > 0:
-        geodf = geodf.to_crs(crs)
+    if "geometry" in geodf and len(geodf) > 0:
+        geodf = geodf.set_crs(in_crs)
+        if in_crs != crs:
+            geodf = geodf.to_crs(crs)
 
     return geodf
 
 
-def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dict[str, Any]:
+def arcgis2geojson(
+    arcgis: Union[str, Dict[str, Any]], id_attr: Optional[str] = None
+) -> Dict[str, Any]:
     """Convert ESRIGeoJSON format to GeoJSON.
 
     Notes
     -----
-    Based on https://github.com/chris48s/arcgis2geojson
+    Based on `arcgis2geojson <https://github.com/chris48s/arcgis2geojson>`__.
 
     Parameters
     ----------
@@ -91,33 +97,30 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
     Returns
     -------
     dict
-        A GeoJSON file readable by GeoPandas
+        A GeoJSON file readable by GeoPandas.
     """
 
     def convert(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dict[str, Any]:
         """Convert an ArcGIS JSON object to a GeoJSON object."""
         geojson: Dict[str, Any] = {}
 
-        if "features" in arcgis and arcgis["features"]:
+        if arcgis.get("features") is not None:
             geojson["type"] = "FeatureCollection"
-            geojson["features"] = [convert(feature, id_attr) for feature in arcgis["features"]]
+            geojson["features"] = [convert(f, id_attr) for f in arcgis["features"]]
 
-        if (
-            "x" in arcgis
-            and isinstance(arcgis["x"], numbers.Number)
-            and "y" in arcgis
-            and isinstance(arcgis["y"], numbers.Number)
+        if isinstance(arcgis.get("x"), numbers.Number) and isinstance(
+            arcgis.get("y"), numbers.Number
         ):
             geojson["type"] = "Point"
             geojson["coordinates"] = [arcgis["x"], arcgis["y"]]
-            if "z" in arcgis and isinstance(arcgis["z"], numbers.Number):
+            if isinstance(arcgis.get("z"), numbers.Number):
                 geojson["coordinates"].append(arcgis["z"])
 
-        if "points" in arcgis:
+        if arcgis.get("points") is not None:
             geojson["type"] = "MultiPoint"
             geojson["coordinates"] = arcgis["points"]
 
-        if "paths" in arcgis:
+        if arcgis.get("paths") is not None:
             if len(arcgis["paths"]) == 1:
                 geojson["type"] = "LineString"
                 geojson["coordinates"] = arcgis["paths"][0]
@@ -125,19 +128,11 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
                 geojson["type"] = "MultiLineString"
                 geojson["coordinates"] = arcgis["paths"]
 
-        if "rings" in arcgis:
+        if arcgis.get("rings") is not None:
             geojson = _rings2geojson(arcgis["rings"])
 
-        if (
-            "xmin" in arcgis
-            and isinstance(arcgis["xmin"], numbers.Number)
-            and "ymin" in arcgis
-            and isinstance(arcgis["ymin"], numbers.Number)
-            and "xmax" in arcgis
-            and isinstance(arcgis["xmax"], numbers.Number)
-            and "ymax" in arcgis
-            and isinstance(arcgis["ymax"], numbers.Number)
-        ):
+        coords = ("xmin", "xmax", "ymin", "ymax")
+        if all(isinstance(arcgis.get(c), numbers.Number) for c in coords):
             geojson["type"] = "Polygon"
             geojson["coordinates"] = [
                 [
@@ -149,36 +144,32 @@ def arcgis2geojson(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dic
                 ]
             ]
 
-        if "geometry" in arcgis or "attributes" in arcgis:
+        if arcgis.get("geometry") is not None or arcgis.get("attributes") is not None:
             geojson["type"] = "Feature"
-            if "geometry" in arcgis:
+            if arcgis.get("geometry") is not None:
                 geojson["geometry"] = convert(arcgis["geometry"])
             else:
                 geojson["geometry"] = None
 
-            if "attributes" in arcgis:
+            if arcgis.get("attributes") is not None:
                 geojson["properties"] = arcgis["attributes"]
-                try:
-                    attributes = arcgis["attributes"]
-                    keys = [id_attr, "OBJECTID", "FID"] if id_attr else ["OBJECTID", "FID"]
-                    for key in keys:
-                        if key in attributes and (
-                            isinstance(attributes[key], (numbers.Number, str))
-                        ):
-                            geojson["id"] = attributes[key]
-                            break
-                except KeyError:
-                    warn("No valid id attribute found.")
+                keys = [id_attr, "OBJECTID", "FID"] if id_attr else ["OBJECTID", "FID"]
+                for key in keys:
+                    if isinstance(arcgis["attributes"].get(key), (numbers.Number, str)):
+                        geojson["id"] = arcgis["attributes"][key]
+                        break
+                if "id" not in geojson:
+                    logger.warning("No valid id attribute found.")
             else:
                 geojson["properties"] = None
 
-        if "geometry" in geojson and not geojson["geometry"]:
+        if json.dumps(geojson.get("geometry")) == json.dumps({}):
             geojson["geometry"] = None
 
         return geojson
 
-    if isinstance(arcgis, str):  # type: ignore
-        return json.dumps(convert(json.loads(arcgis), id_attr))  # type: ignore
+    if isinstance(arcgis, str):
+        return convert(json.loads(arcgis), id_attr)
 
     return convert(arcgis, id_attr)
 
@@ -272,6 +263,117 @@ def _get_uncontained_holes(
     return uncontained_holes
 
 
+def gtiff2xarray(
+    r_dict: Dict[str, bytes],
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
+    geo_crs: str,
+    ds_dims: Tuple[str, str] = ("y", "x"),
+    driver: str = "GTiff",
+) -> Union[xr.DataArray, xr.Dataset]:
+    """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
+
+    Parameters
+    ----------
+    r_dict : dict
+        Dictionary of (Geo)Tiff byte responses where keys are some names that are used
+        for naming each responses, and values are bytes.
+    geometry : Polygon, MultiPolygon, or tuple
+        The geometry to mask the data that should be in the same CRS as the r_dict.
+    geo_crs : str
+        The spatial reference of the input geometry.
+    ds_dims : tuple of str, optional
+        The names of the vertical and horizontal dimensions (in that order)
+        of the target dataset, default to ("y", "x").
+    driver : str, optional
+        A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
+        can be found here: https://gdal.org/drivers/raster/index.html
+
+    Returns
+    -------
+    xarray.Dataset or xarray.DataAraay
+        Parallel (with dask) dataset or dataarray.
+    """
+    if not isinstance(r_dict, dict):
+        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')  # noqa: FS003
+
+    try:
+        key1 = next(iter(r_dict.keys()))
+    except StopIteration:
+        raise StopIteration("Resnpose dict is empty.")
+
+    if "_dd_" in key1:
+        var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
+    else:
+        var_name = dict(zip(r_dict, r_dict))
+
+    nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
+
+    _geometry = _geo2polygon(geometry, geo_crs, r_crs)
+
+    tmp_dir = tempfile.gettempdir()
+
+    def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
+        with rio.MemoryFile() as memfile:
+            memfile.write(resp)
+            with memfile.open(driver=driver) as src:
+                geom = [_geometry.intersection(sgeom.box(*src.bounds))]
+                if geom[0].is_empty:
+                    msk, transform, _ = rio_mask.raster_geometry_mask(src, [_geometry], invert=True)
+                else:
+                    msk, transform, _ = rio_mask.raster_geometry_mask(src, geom, invert=True)
+                meta = src.meta
+                meta.update(
+                    {
+                        "driver": driver,
+                        "height": msk.shape[0],
+                        "width": msk.shape[1],
+                        "transform": transform,
+                        "nodata": nodata,
+                    }
+                )
+
+                with rio.vrt.WarpedVRT(src, **meta) as vrt:
+                    ds = xr.open_rasterio(vrt)
+                    valid_dims = list(ds.sizes)
+                    if any(d not in valid_dims for d in ds_dims):
+                        raise InvalidInputValue("ds_dims", valid_dims)
+
+                    fpath = Path(tmp_dir, f"{hashlib.sha1(lyr.encode('utf-8')).hexdigest()}.nc")
+                    with contextlib.suppress(ValueError, FileNotFoundError):
+                        ds = ds.squeeze("band", drop=True)
+                        fpath.unlink()
+
+                    coords = {
+                        ds_dims[0]: ds.coords[ds_dims[0]],
+                        ds_dims[1]: ds.coords[ds_dims[1]],
+                    }
+                    msk_da = xr.DataArray(msk, coords, dims=ds_dims)
+                    ds = ds.where(msk_da, drop=True)
+                    ds.attrs["crs"] = r_crs.to_string()
+                    ds.name = var_name[lyr]
+                    ds.to_netcdf(fpath)
+                    return fpath
+
+    ds = xr.open_mfdataset((to_dataset(lyr, resp) for lyr, resp in r_dict.items()), parallel=True)
+
+    if len(ds.variables) - len(ds.dims) == 1:
+        ds = ds[list(ds.keys())[0]]
+
+    ds.attrs["nodatavals"] = (nodata,)
+
+    valid_ycoords = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
+    valid_xcoords = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
+    ycoord = list(set(ds.coords).intersection(valid_ycoords))
+    xcoord = list(set(ds.coords).intersection(valid_xcoords))
+    if len(xcoord) == 1 and len(ycoord) == 1:
+        transform, _, _ = _get_transform(ds, ds_dims)
+        ds = ds.sortby(ycoord[0], ascending=False)
+        ds.attrs["transform"] = transform
+        ds.attrs["res"] = (transform.a, transform.e)
+
+    return ds
+
+
 def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.crs.CRS]:
     """Get nodata and crs value of a raster in bytes.
 
@@ -302,258 +404,25 @@ def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.cr
     return nodata, r_crs
 
 
-def gtiff2xarray(
-    r_dict: Dict[str, bytes],
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
-    geo_crs: str,
-    ds_dims: Tuple[str, str] = ("y", "x"),
-    driver: str = "GTiff",
-) -> Union[xr.DataArray, xr.Dataset]:
-    """Convert responses from ``pygeoogc.wms_bybox`` to ``xarray.Dataset``.
-
-    Parameters
-    ----------
-    r_dict : dict
-        The output of ``wms_bybox`` function.
-    geometry : Polygon, MultiPolygon, or tuple
-        The geometry to mask the data that should be in the same CRS as the r_dict.
-    geo_crs : str
-        The spatial reference of the input geometry.
-    ds_dims : tuple of str, optional
-        The names of the vertical and horizontal dimensions (in that order)
-        of the target dataset, default to ("y", "x").
-    driver : str, optional
-        A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
-        can be found here: https://gdal.org/drivers/raster/index.html
-
-    Returns
-    -------
-    xarray.Dataset or xarray.DataAraay
-        The dataset or data array based on the number of variables.
-    """
-    if not isinstance(r_dict, dict):
-        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')  # noqa: FS003
-
-    key1 = next(iter(r_dict.keys()))
-    if len(r_dict) == 1 and "dd" not in key1:
-        r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
-        key1 = f"{key1}_dd_0_0"
-
-    var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
-
-    nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
-
-    _geometry = geo2polygon(geometry, geo_crs, r_crs)
-
-    tmp_dir = tempfile.gettempdir()
-
-    def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
-        with rio.MemoryFile() as memfile:
-            memfile.write(resp)
-            with memfile.open(driver=driver) as src:
-                geom = [_geometry.intersection(box(*src.bounds))]
-                if geom[0].is_empty:
-                    msk, transform, _ = rio_mask.raster_geometry_mask(src, [_geometry], invert=True)
-                else:
-                    msk, transform, _ = rio_mask.raster_geometry_mask(src, geom, invert=True)
-                meta = src.meta
-                meta.update(
-                    {
-                        "driver": driver,
-                        "height": msk.shape[0],
-                        "width": msk.shape[1],
-                        "transform": transform,
-                        "nodata": nodata,
-                    }
-                )
-
-                with rio.vrt.WarpedVRT(src, **meta) as vrt:
-                    ds = xr.open_rasterio(vrt)
-                    valid_dims = list(ds.sizes)
-                    if any(d not in valid_dims for d in ds_dims):
-                        raise InvalidInputValue("ds_dims", valid_dims)
-
-                    fpath = Path(tmp_dir, f"{lyr.replace(':', '_')}.nc")
-                    with contextlib.suppress(ValueError, FileNotFoundError):
-                        ds = ds.squeeze("band", drop=True)
-                        fpath.unlink()
-
-                    coords = {
-                        ds_dims[0]: ds.coords[ds_dims[0]],
-                        ds_dims[1]: ds.coords[ds_dims[1]],
-                    }
-                    msk_da = xr.DataArray(msk, coords, dims=ds_dims)
-                    ds = ds.where(msk_da, drop=True)
-                    ds.attrs["crs"] = r_crs.to_string()
-                    ds.name = var_name[lyr]
-                    ds.to_netcdf(fpath)
-                    return fpath
-
-    ds = xr.open_mfdataset((to_dataset(lyr, resp) for lyr, resp in r_dict.items()), parallel=True)
-
-    if len(ds.variables) - len(ds.dims) == 1:
-        ds = ds[list(ds.keys())[0]]
-
-    ds.attrs["nodatavals"] = (nodata,)
-
-    valid_ycoords = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
-    valid_xcoords = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
-    ycoord = set(ds.coords).intersection(valid_ycoords)
-    xcoord = set(ds.coords).intersection(valid_xcoords)
-    if len(xcoord) == 1 and len(ycoord) == 1:
-        xdim, ydim = next(iter(xcoord)), next(iter(ycoord))
-        ds = ds.sortby(ydim, ascending=False)
-
-        height, width = ds.sizes[ydim], ds.sizes[xdim]
-
-        left, right = ds[xdim].min().item(), ds[xdim].max().item()
-        bottom, top = ds[ydim].min().item(), ds[ydim].max().item()
-
-        x_res = abs(left - right) / (width - 1)
-        y_res = abs(top - bottom) / (height - 1)
-
-        left -= x_res * 0.5
-        right += x_res * 0.5
-        top += y_res * 0.5
-        bottom -= y_res * 0.5
-
-        ds.attrs["transform"] = rio_transform.from_bounds(left, bottom, right, top, width, height)
-        ds.attrs["res"] = (x_res, y_res)
-        ds.attrs["bounds"] = (left, bottom, right, top)
-
-    return ds
-
-
-def gtiff2file(
-    r_dict: Dict[str, bytes],
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
-    geo_crs: str,
-    output: Union[str, Path] = ".",
-    driver: str = "GTiff",
-) -> None:
-    """Save responses from ``pygeoogc.wms_bybox`` to raster file(s).
-
-    Parameters
-    ----------
-    r_dict : dict
-        The output of ``wms_bybox`` function.
-    geometry : Polygon, MultiPolygon, or tuple
-        The geometry to mask the data that should be in the same CRS as the r_dict.
-    geo_crs : str
-        The spatial reference of the input geometry.
-    output : str
-        Path to a folder saving files. File names are keys of the input dictionary, so
-        each layer becomes one file. Defaults to current directory.
-    driver : str, optional
-        A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
-        can be found here: https://gdal.org/drivers/raster/index.html
-    """
-    Path(output).mkdir(parents=True, exist_ok=True)
-
-    if not isinstance(r_dict, dict):
-        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')  # noqa: FS003
-
-    key1 = next(iter(r_dict.keys()))
-    if len(r_dict) == 1 and "dd" not in key1:
-        r_dict = {f"{key1}_dd_0_0": r_dict[key1]}
-        key1 = f"{key1}_dd_0_0"
-
-    nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
-
-    _geometry = geo2polygon(geometry, geo_crs, r_crs)
-
-    for lyr, resp in r_dict.items():
-        with rio.MemoryFile() as memfile:
-            memfile.write(resp)
-            with memfile.open(driver=driver) as src:
-                geom = [_geometry.intersection(box(*src.bounds))]
-                if geom[0].is_empty:
-                    data, transform = rio_mask.mask(src, [_geometry], crop=True)
-                else:
-                    data, transform = rio_mask.mask(src, geom, crop=True)
-                meta = src.meta
-                meta.update(
-                    {
-                        "driver": "GTiff",
-                        "height": data.shape[1],
-                        "width": data.shape[2],
-                        "transform": transform,
-                        "nodata": nodata,
-                    }
-                )
-
-                with rio.open(Path(output, f"{lyr}.gtiff"), "w", **meta) as dest:
-                    dest.write(data)
-
-
-def xarray_geomask(
-    ds: Union[xr.Dataset, xr.DataArray],
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
-    geo_crs: str,
-    ds_dims: Tuple[str, str] = ("y", "x"),
-) -> Union[xr.Dataset, xr.DataArray]:
-    """Mask a ``xarray.Dataset`` based on a geometry.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset or xarray.DataArray
-        The dataset(array) to be masked
-    geometry : Polygon, MultiPolygon, or tuple of length 4
-        The geometry or bounding box to mask the data
-    geo_crs : str
-        The spatial reference of the input geometry
-    ds_dims : tuple of str, optional
-        The names of the vertical and horizontal dimensions (in that order)
-        of the dataset, default to ("y", "x").
-
-    Returns
-    -------
-    xarray.Dataset or xarray.DataArray
-        The input dataset with a mask applied (np.nan)
-    """
-    transform, width, height = get_transform(ds, ds_dims)
-    _geometry = geo2polygon(geometry, geo_crs, ds.crs)
-
-    _mask = rio_features.geometry_mask([_geometry], (height, width), transform, invert=True)
-
-    coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
-    mask = xr.DataArray(_mask, coords, dims=ds_dims)
-
-    ds_masked = ds.where(mask, drop=True)
-    ds_masked.attrs["transform"] = transform
-    ds_masked.attrs["bounds"] = _geometry.bounds
-
-    return ds_masked
-
-
-def get_transform(
+def _get_transform(
     ds: Union[xr.Dataset, xr.DataArray],
     ds_dims: Tuple[str, str] = ("y", "x"),
 ) -> Tuple[affine.Affine, int, int]:
-    """Get transform of a Polygon or bounding box.
+    """Get transform of a ``xarray.Dataset`` or ``xarray.DataArray``.
 
     Parameters
     ----------
     ds : xarray.Dataset or xarray.DataArray
         The dataset(array) to be masked
     ds_dims : tuple, optional
-        Names of the coordinames in the dataset, defaults to ("y", "x")
+        Names of the coordinames in the dataset, defaults to ``("y", "x")``.
 
     Returns
     -------
     affine.Affine, int, int
         The affine transform, width, and height
     """
-    if "crs" not in ds.attrs:
-        raise MissingAttribute("crs", ds.attrs.keys())
-
-    if not isinstance(ds_dims, tuple) or len(ds_dims) != 2:
-        raise InvalidInputType("ds_dims", "tuple of length 2", '("y", "x")')
-
     ydim, xdim = ds_dims
-    if ydim not in ds.sizes or xdim not in ds.sizes:
-        raise MissingAttribute("input dims", ds.sizes)
-
     height, width = ds.sizes[ydim], ds.sizes[xdim]
 
     left, right = ds[xdim].min().item(), ds[xdim].max().item()
@@ -571,100 +440,7 @@ def get_transform(
     return transform, width, height
 
 
-class MatchCRS:
-    """Reproject a geometry to another CRS.
-
-    Parameters
-    ----------
-    in_crs : str
-        Spatial reference of the input geometry
-    out_crs : str
-        Target spatial reference
-    """
-
-    def __init__(self, in_crs: str, out_crs: str):
-        self.project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-
-    def geometry(
-        self, geom: Union[Polygon, MultiPolygon, Point, MultiPoint]
-    ) -> Union[Polygon, MultiPolygon, Point, MultiPoint]:
-        """Reproject a geometry to the specified output CRS.
-
-        Parameters
-        ----------
-        geometry : Polygon, MultiPolygon, Point, or MultiPoint
-            Input geometry.
-
-        Returns
-        -------
-        Polygon, MultiPolygon, Point, or MultiPoint
-            Input geometry in the specified CRS.
-
-        Examples
-        --------
-        >>> from pygeoutils import MatchCRS
-        >>> from shapely.geometry import Point
-        >>> point = Point(-7766049.665, 5691929.739)
-        >>> MatchCRS("epsg:3857", "epsg:4326").geometry(point).xy
-        (array('d', [-69.7636111130079]), array('d', [45.44549114818127]))
-        """
-        if not isinstance(geom, (Polygon, MultiPolygon, Point, MultiPoint)):
-            raise InvalidInputType("geom", "Polygon, MultiPolygon, Point, or MultiPoint")
-
-        return ops.transform(self.project, geom)
-
-    def bounds(self, geom: Tuple[float, float, float, float]) -> Tuple[float, float, float, float]:
-        """Reproject a bounding box to the specified output CRS.
-
-        Parameters
-        ----------
-        geometry : tuple
-            Input bounding box (xmin, ymin, xmax, ymax).
-
-        Returns
-        -------
-        tuple
-            Input bounding box in the specified CRS.
-
-        Examples
-        --------
-        >>> from pygeoutils import MatchCRS
-        >>> bbox = (-7766049.665, 5691929.739, -7763049.665, 5696929.739)
-        >>> MatchCRS("epsg:3857", "epsg:4326").bounds(bbox)
-        (-69.7636111130079, 45.44549114818127, -69.73666165448431, 45.47699468552394)
-        """
-        if not (isinstance(geom, tuple) and len(geom) == 4):
-            raise InvalidInputType("geom", "tuple", BOX_ORD)
-
-        return ops.transform(self.project, box(*geom)).bounds
-
-    def coords(self, geom: List[Tuple[float, float]]) -> List[Tuple[Any, ...]]:
-        """Reproject a list of coordinates to the specified output CRS.
-
-        Parameters
-        ----------
-        geometry : list of tuple
-            Input coords [(x1, y1), ...].
-
-        Returns
-        -------
-        tuple
-            Input list of coords in the specified CRS.
-
-        Examples
-        --------
-        >>> from pygeoutils import MatchCRS
-        >>> coords = [(-7766049.665, 5691929.739)]
-        >>> MatchCRS("epsg:3857", "epsg:4326").coords(coords)
-        [(-69.7636111130079, 45.44549114818127)]
-        """
-        if not (isinstance(geom, list) and all(len(c) == 2 for c in geom)):
-            raise InvalidInputType("geom", "list of tuples", "[(x1, y1), ...]")
-
-        return list(zip(*self.project(*zip(*geom))))
-
-
-def geo2polygon(
+def _geo2polygon(
     geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
     crs: str,
@@ -685,18 +461,106 @@ def geo2polygon(
     Polygon
         A Polygon in the target CRS.
     """
-    if not isinstance(geometry, (Polygon, MultiPolygon, tuple)):
-        raise InvalidInputType("geometry", "Polygon, MultiPolygon, or tuple of length 4")
-
     match_crs = MatchCRS(geo_crs, crs)
-    if isinstance(geometry, tuple):
-        if not len(geometry) == 4:
-            raise InvalidInputType("geometry", "tuple", BOX_ORD)
-
-        geom = box(*match_crs.bounds(geometry))  # type: ignore
-    else:
-        geom = match_crs.geometry(geometry)
+    geom = sgeom.box(*geometry) if isinstance(geometry, tuple) else geometry
+    geom = match_crs.geometry(geom)
 
     if not geom.is_valid:
         geom = geom.buffer(0.0)
     return geom
+
+
+class MatchCRS:
+    """Reproject a geometry to another CRS.
+
+    Parameters
+    ----------
+    in_crs : str
+        Spatial reference of the input geometry
+    out_crs : str
+        Target spatial reference
+    """
+
+    def __init__(self, in_crs: str, out_crs: str):
+        self.project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
+
+    def geometry(
+        self, geom: Union[Polygon, LineString, MultiLineString, MultiPolygon, Point, MultiPoint]
+    ) -> Union[Polygon, LineString, MultiLineString, MultiPolygon, Point, MultiPoint]:
+        """Reproject a geometry to the specified output CRS.
+
+        Parameters
+        ----------
+        geom : LineString, MultiLineString, Polygon, MultiPolygon, Point, or MultiPoint
+            Input geometry.
+
+        Returns
+        -------
+        LineString, MultiLineString, Polygon, MultiPolygon, Point, or MultiPoint
+            Input geometry in the specified CRS.
+
+        Examples
+        --------
+        >>> from pygeoogc import MatchCRS
+        >>> from shapely.geometry import Point
+        >>> point = Point(-7766049.665, 5691929.739)
+        >>> MatchCRS("epsg:3857", "epsg:4326").geometry(point).xy
+        (array('d', [-69.7636111130079]), array('d', [45.44549114818127]))
+        """
+        if not isinstance(
+            geom, (Polygon, LineString, MultiLineString, MultiPolygon, Point, MultiPoint)
+        ):
+            types = "LineString, MultiLineString, Polygon, MultiPolygon, Point, or MultiPoint"
+            raise InvalidInputType("geom", types)
+
+        return ops.transform(self.project, geom)
+
+    def bounds(self, geom: Tuple[float, float, float, float]) -> Tuple[float, float, float, float]:
+        """Reproject a bounding box to the specified output CRS.
+
+        Parameters
+        ----------
+        geom : tuple
+            Input bounding box (xmin, ymin, xmax, ymax).
+
+        Returns
+        -------
+        tuple
+            Input bounding box in the specified CRS.
+
+        Examples
+        --------
+        >>> from pygeoogc import MatchCRS
+        >>> bbox = (-7766049.665, 5691929.739, -7763049.665, 5696929.739)
+        >>> MatchCRS("epsg:3857", "epsg:4326").bounds(bbox)
+        (-69.7636111130079, 45.44549114818127, -69.73666165448431, 45.47699468552394)
+        """
+        if not (isinstance(geom, tuple) and len(geom) == 4):
+            raise InvalidInputType("geom", "tuple", BOX_ORD)
+
+        return ops.transform(self.project, sgeom.box(*geom)).bounds
+
+    def coords(self, geom: List[Tuple[float, float]]) -> List[Tuple[Any, ...]]:
+        """Reproject a list of coordinates to the specified output CRS.
+
+        Parameters
+        ----------
+        geom : list of tuple
+            Input coords [(x1, y1), ...].
+
+        Returns
+        -------
+        tuple
+            Input list of coords in the specified CRS.
+
+        Examples
+        --------
+        >>> from pygeoogc import MatchCRS
+        >>> coords = [(-7766049.665, 5691929.739)]
+        >>> MatchCRS("epsg:3857", "epsg:4326").coords(coords)
+        [(-69.7636111130079, 45.44549114818127)]
+        """
+        if not (isinstance(geom, list) and all(len(c) == 2 for c in geom)):
+            raise InvalidInputType("geom", "list of tuples", "[(x1, y1), ...]")
+
+        return list(zip(*self.project(*zip(*geom))))
