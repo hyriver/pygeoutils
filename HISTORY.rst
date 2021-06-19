@@ -2,6 +2,14 @@
 History
 =======
 
+0.11.1 (2021-06-19)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- In some edge cases the y-coordinates of a response might not be monotonically sorted so
+  ``dask`` fails. This release sorts them to addresse this issue.
+
 0.11.0 (2021-06-19)
 -------------------
 
