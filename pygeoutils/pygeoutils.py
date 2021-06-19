@@ -338,7 +338,7 @@ def gtiff2xarray(
                     if any(d not in valid_dims for d in ds_dims):
                         raise InvalidInputValue("ds_dims", valid_dims)
 
-                    fpath = Path(tmp_dir, f"{hashlib.sha1(lyr.encode('utf-8')).hexdigest()}.nc")
+                    fpath = Path(tmp_dir, f"{hashlib.sha256(lyr.encode('utf-8')).hexdigest()}.nc")
                     with contextlib.suppress(ValueError, FileNotFoundError):
                         ds = ds.squeeze("band", drop=True)
                         fpath.unlink()
