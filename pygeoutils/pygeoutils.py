@@ -312,6 +312,9 @@ def gtiff2xarray(
 
     tmp_dir = tempfile.gettempdir()
 
+    valid_ycoords = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
+    valid_xcoords = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
+
     def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
         with rio.MemoryFile() as memfile:
             memfile.write(resp)
@@ -346,6 +349,8 @@ def gtiff2xarray(
                     }
                     msk_da = xr.DataArray(msk, coords, dims=ds_dims)
                     ds = ds.where(msk_da, drop=True)
+                    ycoord = list(set(ds.coords).intersection(valid_ycoords))[0]
+                    ds = ds.sortby(ycoord[0], ascending=False)
                     ds.attrs["crs"] = r_crs.to_string()
                     ds.name = var_name[lyr]
                     fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
@@ -359,8 +364,6 @@ def gtiff2xarray(
 
     ds.attrs["nodatavals"] = (nodata,)
 
-    valid_ycoords = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
-    valid_xcoords = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
     ycoord = list(set(ds.coords).intersection(valid_ycoords))
     xcoord = list(set(ds.coords).intersection(valid_xcoords))
     if len(xcoord) == 1 and len(ycoord) == 1:
