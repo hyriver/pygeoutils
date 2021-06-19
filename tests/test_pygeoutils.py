@@ -2,7 +2,6 @@
 import io
 import shutil
 
-import pytest
 import rasterio
 from pygeoogc import WFS, WMS
 from shapely.geometry import Polygon
@@ -27,51 +26,6 @@ GEO_NAT = Polygon(
 )
 
 
-def test_gtiff2array():
-    url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
-    wms = WMS(
-        url_wms,
-        layers="NLCD_Land_Cover_Change_Index_Science_product_L48",
-        outformat="image/geotiff",
-        crs=DEF_CRS,
-    )
-    r_dict = wms.getmap_bybox(
-        GEO_NAT.bounds,
-        1e3,
-        box_crs=DEF_CRS,
-    )
-    cover_box = geoutils.gtiff2xarray(r_dict, GEO_NAT.bounds, DEF_CRS)
-    cover_msk = geoutils.xarray_geomask(cover_box, GEO_NAT, DEF_CRS)
-    cover = geoutils.gtiff2xarray(r_dict, GEO_NAT, DEF_CRS)
-
-    assert (
-        abs(cover_msk.mean().values.item() - 2.444) < 1e-3
-        and abs(cover.mean().values.item() - 2.444) < 1e-3
-    )
-
-
-def test_gtiff2file():
-    url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
-    wms = WMS(
-        url_wms,
-        layers="NLCD_Land_Cover_Change_Index_Science_product_L48",
-        outformat="image/geotiff",
-        crs=DEF_CRS,
-    )
-    r_dict = wms.getmap_bybox(
-        GEO_NAT.bounds,
-        1e3,
-        box_crs=DEF_CRS,
-    )
-    geoutils.gtiff2file(r_dict, GEO_NAT, DEF_CRS, "raster")
-    with rasterio.open("raster/NLCD_Land_Cover_Change_Index_Science_product_L48_dd_0_0.gtiff") as f:
-        mean = f.read().mean()
-
-    shutil.rmtree("raster")
-    assert abs(mean - 2.444) < 1e-3
-
-
-@pytest.mark.slow
 def test_json2geodf():
     url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
 
@@ -88,6 +42,98 @@ def test_json2geodf():
     flood = flood.drop_duplicates()
 
     assert abs(flood["ELEV"].sum() - 781717.6) < 1e-1
+
+
+def test_gtiff2array():
+    url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
+    wms = WMS(
+        url_wms,
+        layers="NLCD_Land_Cover_Change_Index_Science_product_L48",
+        outformat="image/geotiff",
+        crs=DEF_CRS,
+    )
+    r_dict = wms.getmap_bybox(
+        GEO_NAT.bounds,
+        1e3,
+        box_crs=DEF_CRS,
+    )
+    cover_box = geoutils.gtiff2xarray(r_dict, GEO_NAT.bounds, DEF_CRS)
+    cover = geoutils.gtiff2xarray(r_dict, GEO_NAT, DEF_CRS)
+
+    assert (
+        abs(cover_box.mean().values.item() - 2.444) < 1e-3
+        and abs(cover.mean().values.item() - 2.444) < 1e-3
+    )
+
+
+def test_envelope():
+    resp = """
+    {
+      "attributes": {"OBJECTID": 5141},
+      "geometry": {
+      "xmin" : -109.55, "ymin" : 25.76, "xmax" : -86.39, "ymax" : 49.94,
+      "zmin" : -12.0, "zmax" : 13.3,
+      "spatialReference" : {"wkid" : 4326}}
+    }"""
+
+    expected = {
+        "type": "Feature",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [-86.39, 49.94],
+                    [-109.55, 49.94],
+                    [-109.55, 25.76],
+                    [-86.39, 25.76],
+                    [-86.39, 49.94],
+                ]
+            ],
+        },
+        "properties": {"OBJECTID": 5141},
+        "id": 5141,
+    }
+
+    assert geoutils.arcgis2geojson(resp) == expected
+
+
+def test_attr_none():
+    resp = """
+    {
+      "geometry": {
+      "xmin" : -109.55, "ymin" : 25.76, "xmax" : -86.39, "ymax" : 49.94,
+      "zmin" : -12.0, "zmax" : 13.3,
+      "spatialReference" : {"wkid" : 4326}}
+    }"""
+    expected = {
+        "type": "Feature",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [-86.39, 49.94],
+                    [-109.55, 49.94],
+                    [-109.55, 25.76],
+                    [-86.39, 25.76],
+                    [-86.39, 49.94],
+                ]
+            ],
+        },
+        "properties": None,
+    }
+    assert geoutils.arcgis2geojson(resp) == expected
+
+
+def test_geometry_none():
+    resp = '{"attributes": {"OBJECTID": 5141}}'
+    expected = {"type": "Feature", "geometry": None, "properties": {"OBJECTID": 5141}, "id": 5141}
+    assert geoutils.arcgis2geojson(resp) == expected
+
+
+def test_no_id():
+    resp = '{"attributes": {"OBJECTIDs": 5141}}'
+    expected = {"type": "Feature", "geometry": None, "properties": {"OBJECTIDs": 5141}}
+    assert geoutils.arcgis2geojson(resp) == expected
 
 
 def test_ring():

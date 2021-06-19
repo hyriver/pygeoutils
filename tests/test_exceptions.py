@@ -1,21 +1,30 @@
 import pytest
 
+import pygeoutils as utils
 from pygeoutils import InvalidInputType, InvalidInputValue
 
-
-def invalid_type():
-    raise InvalidInputType("coords", "tuple", "(lon, lat)")
+DEF_CRS = "epsg:4326"
 
 
-def test_invalid_type():
-    with pytest.raises(InvalidInputType):
-        invalid_type()
+def test_invalid_json2geodf_type():
+    with pytest.raises(InvalidInputType) as ex:
+        _ = utils.json2geodf("")
+    assert "content" in str(ex.value)
 
 
-def invalid_value():
-    raise InvalidInputValue("outFormat", ["json", "geojson"])
+def test_json2geodf_empty():
+    with pytest.raises(StopIteration) as ex:
+        _ = utils.json2geodf([])
+    assert "Resnpose is empty." in str(ex.value)
 
 
-def test_invalid_value():
-    with pytest.raises(InvalidInputValue):
-        invalid_value()
+def test_gtiff2xarray_type():
+    with pytest.raises(InvalidInputType) as ex:
+        _ = utils.gtiff2xarray([], (0, 0, 0, 0), DEF_CRS)
+    assert "Response.content" in str(ex.value)
+
+
+def test_gtiff2xarray_empty():
+    with pytest.raises(StopIteration) as ex:
+        _ = utils.gtiff2xarray({}, (0, 0, 0, 0), DEF_CRS)
+    assert "Resnpose dict is empty." in str(ex.value)
