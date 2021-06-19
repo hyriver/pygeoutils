@@ -1,10 +1,10 @@
 """Some utilities for manipulating GeoSpatial data."""
 import contextlib
-import hashlib
 import logging
 import numbers
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -337,11 +337,8 @@ def gtiff2xarray(
                     valid_dims = list(ds.sizes)
                     if any(d not in valid_dims for d in ds_dims):
                         raise InvalidInputValue("ds_dims", valid_dims)
-
-                    fpath = Path(tmp_dir, f"{hashlib.sha256(lyr.encode('utf-8')).hexdigest()}.nc")
-                    with contextlib.suppress(ValueError, FileNotFoundError):
+                    with contextlib.suppress(ValueError):
                         ds = ds.squeeze("band", drop=True)
-                        fpath.unlink()
 
                     coords = {
                         ds_dims[0]: ds.coords[ds_dims[0]],
@@ -351,6 +348,7 @@ def gtiff2xarray(
                     ds = ds.where(msk_da, drop=True)
                     ds.attrs["crs"] = r_crs.to_string()
                     ds.name = var_name[lyr]
+                    fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
                     ds.to_netcdf(fpath)
                     return fpath
 

@@ -106,8 +106,6 @@ These utilities are:
 - ``arcgis2geojson``: For converting ESRIGeoJSON objects to standard GeoJSON format.
 - ``gtiff2xarray``: For converting (Geo)TIFF objects to `xarray <https://xarray.pydata.org/>`__
   datasets.
-- ``gtiff2file``: For saving (Geo)TIFF objects to a raster file.
-- ``xarray_geomask``: For masking a ``xarray.Dataset`` or ``xarray.DataArray`` using a polygon.
 
 All these functions handle all necessary CRS transformations.
 
@@ -190,12 +188,6 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
     )
     r = wfs.getfeature_bybox(geometry.bounds, box_crs="epsg:4326")
     flood = geoutils.json2geodf(r.json(), "epsg:4269", "epsg:4326")
-
-We can also save WMS outputs as raster file using ``gtiff2file``:
-
-.. code-block:: python
-
-    geoutils.gtiff2file(r_dict, geometry, "epsg:4326", "raster")
 
 Contributing
 ------------
