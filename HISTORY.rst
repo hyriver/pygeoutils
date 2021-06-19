@@ -2,23 +2,35 @@
 History
 =======
 
-0.11.0 (unreleased)
+0.11.0 (2021-06-18)
 -------------------
+
+New Features
+~~~~~~~~~~~~
+- Function ``gtiff2xarray`` returns a parallelized ``xarray.Dataset`` or ``xarray.DataAraay``
+  that can handle large responses much more efficiently. This is achieved using ``dask``.
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
-- Drop support for Python 3.6 since many of the dependencies have done so, such as
-  ``xarray`` and ``pandas``.
+- Drop support for Python 3.6 since many of the dependencies such as ``xarray`` and ``pandas``
+  have done so.
 - Refactor ``MatchCRS``. Now, it should be instantiated by providing the in and out CRSs like so:
   ``MatchCRS(in_crs, out_crs)``. Then its methods, namely, ``geometry``, ``bounds`` and ``coords``,
   can be called. These methods now have only one input, geometry.
 - Change input and output types of ``MatchCRS.coords`` from tuple of lists of coordinates
   to list of ``(x, y)`` coordinates.
+- Remove ``xarray_mask`` and ``gtiff2file`` since ``rioxarray`` is more general and suitable.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Remove unnecessary type checks for private functions.
+- Refactor ``json2geodf`` to improve robustness. Use ``get`` method of ``dict`` for checking
+  key availability.
 
 0.10.1 (2021-03-27)
 -------------------
 
-- Setting transform of the merged dataset explicitly to address cheginit/py3dep#3
+- Setting transform of the merged dataset explicitly (:issue_3dep:`3`).
 - Add announcement regarding the new name for the softwate stack, HyRiver.
 - Improve ``pip`` installation and release workflow.
 
