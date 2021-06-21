@@ -308,7 +308,7 @@ def gtiff2xarray(
 
     nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
 
-    _geometry = _geo2polygon(geometry, geo_crs, r_crs)
+    _geometry = geo2polygon(geometry, geo_crs, r_crs)
 
     tmp_dir = tempfile.gettempdir()
 
@@ -441,7 +441,7 @@ def _get_transform(
     return transform, width, height
 
 
-def _geo2polygon(
+def geo2polygon(
     geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
     crs: str,

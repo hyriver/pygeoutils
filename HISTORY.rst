@@ -2,6 +2,13 @@
 History
 =======
 
+0.11.2 (unreleased)
+-------------------
+
+Internal Change
+~~~~~~~~~~~~~~~
+- Make ``geo2polygon`` function public since other packages use it.
+
 0.11.1 (2021-06-19)
 -------------------
 

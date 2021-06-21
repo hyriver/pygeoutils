@@ -3,7 +3,7 @@ from pkg_resources import DistributionNotFound, get_distribution
 
 from .exceptions import InvalidInputType, InvalidInputValue
 from .print_versions import show_versions
-from .pygeoutils import MatchCRS, arcgis2geojson, gtiff2xarray, json2geodf
+from .pygeoutils import MatchCRS, arcgis2geojson, gtiff2xarray, json2geodf, geo2polygon
 
 try:
     __version__ = get_distribution(__name__).version
