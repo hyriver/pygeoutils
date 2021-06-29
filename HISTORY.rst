@@ -7,7 +7,8 @@ History
 
 Internal Change
 ~~~~~~~~~~~~~~~
-- Make ``geo2polygon`` function public since other packages use it.
+- Make ``geo2polygon`` a public function since other packages use it.
+- Make ``xarray_mask`` a public function and simplify ``gtiff2xarray``.
 
 0.11.1 (2021-06-19)
 -------------------
