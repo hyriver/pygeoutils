@@ -14,14 +14,14 @@ import numpy as np
 import orjson as json
 import pyproj
 import rasterio as rio
-import rasterio.mask as rio_mask
+import rasterio.features as rio_features
 import rasterio.transform as rio_transform
 import shapely.geometry as sgeom
 import xarray as xr
 from shapely import ops
 from shapely.geometry import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon
 
-from .exceptions import InvalidInputType, InvalidInputValue
+from .exceptions import InvalidInputType, InvalidInputValue, MissingAttribute
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -269,6 +269,7 @@ def gtiff2xarray(
     geo_crs: str,
     ds_dims: Tuple[str, str] = ("y", "x"),
     driver: str = "GTiff",
+    all_touched: bool = False,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
 
@@ -287,6 +288,10 @@ def gtiff2xarray(
     driver : str, optional
         A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
         can be found here: https://gdal.org/drivers/raster/index.html
+    all_touched : bool, optional
+        Include a pixel in the mask if it touches any of the shapes.
+        If False (default), include a pixel only if its center is within one
+        of the shapes, or if it is selected by Bresenham’s line algorithm.
 
     Returns
     -------
@@ -308,8 +313,6 @@ def gtiff2xarray(
 
     nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
 
-    _geometry = geo2polygon(geometry, geo_crs, r_crs)
-
     tmp_dir = tempfile.gettempdir()
 
     valid_ycoords = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
@@ -318,52 +321,27 @@ def gtiff2xarray(
     def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
         with rio.MemoryFile() as memfile:
             memfile.write(resp)
-            with memfile.open(driver=driver) as src:
-                geom = [_geometry.intersection(sgeom.box(*src.bounds))]
-                if geom[0].is_empty:
-                    msk, transform, _ = rio_mask.raster_geometry_mask(src, [_geometry], invert=True)
-                else:
-                    msk, transform, _ = rio_mask.raster_geometry_mask(src, geom, invert=True)
-                meta = src.meta
-                meta.update(
-                    {
-                        "driver": driver,
-                        "height": msk.shape[0],
-                        "width": msk.shape[1],
-                        "transform": transform,
-                        "nodata": nodata,
-                    }
-                )
-
-                with rio.vrt.WarpedVRT(src, **meta) as vrt:
-                    ds = xr.open_rasterio(vrt)
-                    valid_dims = list(ds.sizes)
-                    if any(d not in valid_dims for d in ds_dims):
-                        raise InvalidInputValue("ds_dims", valid_dims)
-                    with contextlib.suppress(ValueError):
-                        ds = ds.squeeze("band", drop=True)
-
-                    coords = {
-                        ds_dims[0]: ds.coords[ds_dims[0]],
-                        ds_dims[1]: ds.coords[ds_dims[1]],
-                    }
-                    msk_da = xr.DataArray(msk, coords, dims=ds_dims)
-                    ds = ds.where(msk_da, drop=True)
-                    ycoord = list(set(ds.coords).intersection(valid_ycoords))[0]
-                    ds = ds.sortby(ycoord[0], ascending=False)
-                    ds.attrs["crs"] = r_crs.to_string()
-                    ds.name = var_name[lyr]
-                    fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
-                    ds.to_netcdf(fpath)
-                    return fpath
+            with memfile.open(driver=driver) as vrt:
+                #             with rio.vrt.WarpedVRT(src, **src.meta) as vrt:
+                ds = xr.open_rasterio(vrt)
+                valid_dims = list(ds.sizes)
+                if any(d not in valid_dims for d in ds_dims):
+                    raise InvalidInputValue("ds_dims", valid_dims)
+                with contextlib.suppress(ValueError):
+                    ds = ds.squeeze("band", drop=True)
+                ycoord = list(set(ds.coords).intersection(valid_ycoords))[0]
+                ds = ds.sortby(ycoord[0], ascending=False)
+                ds.attrs["crs"] = r_crs.to_string()
+                ds.name = var_name[lyr]
+                fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
+                ds.to_netcdf(fpath)
+                return fpath
 
     ds = xr.open_mfdataset((to_dataset(lyr, resp) for lyr, resp in r_dict.items()), parallel=True)
-
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
 
     ds.attrs["nodatavals"] = (nodata,)
-
     ycoord = list(set(ds.coords).intersection(valid_ycoords))
     xcoord = list(set(ds.coords).intersection(valid_xcoords))
     if len(xcoord) == 1 and len(ycoord) == 1:
@@ -372,7 +350,61 @@ def gtiff2xarray(
         ds.attrs["transform"] = transform
         ds.attrs["res"] = (transform.a, transform.e)
 
-    return ds
+    return xarray_geomask(ds, geometry, geo_crs)
+
+
+def xarray_geomask(
+    ds: Union[xr.Dataset, xr.DataArray],
+    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
+    geo_crs: str,
+    ds_dims: Tuple[str, str] = ("y", "x"),
+    all_touched: bool = False,
+) -> Union[xr.Dataset, xr.DataArray]:
+    """Mask a ``xarray.Dataset`` based on a geometry.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset or xarray.DataArray
+        The dataset(array) to be masked
+    geometry : Polygon, MultiPolygon, or tuple of length 4
+        The geometry or bounding box to mask the data
+    geo_crs : str
+        The spatial reference of the input geometry
+    ds_dims : tuple of str, optional
+        The names of the vertical and horizontal dimensions (in that order)
+        of the dataset, default to ("y", "x").
+    all_touched : bool, optional
+        Include a pixel in the mask if it touches any of the shapes.
+        If False (default), include a pixel only if its center is within one
+        of the shapes, or if it is selected by Bresenham’s line algorithm.
+
+    Returns
+    -------
+    xarray.Dataset or xarray.DataArray
+        The input dataset with a mask applied (np.nan)
+    """
+    if "crs" not in ds.attrs:
+        raise MissingAttribute("crs", list(ds.attrs.keys()))
+
+    valid_dims = list(ds.sizes)
+    if any(d not in valid_dims for d in ds_dims):
+        raise MissingAttribute("ds_dims", valid_dims)
+
+    transform, width, height = _get_transform(ds, ds_dims)
+    _geometry = geo2polygon(geometry, geo_crs, ds.crs)
+
+    _mask = rio_features.geometry_mask(
+        [_geometry], (height, width), transform, invert=True, all_touched=all_touched
+    )
+
+    coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
+    mask = xr.DataArray(_mask, coords, dims=ds_dims)
+
+    ds_masked = ds.where(mask, drop=True)
+    ds_masked.attrs["transform"] = transform
+    ds_masked.attrs["bounds"] = _geometry.bounds
+
+    return ds_masked
 
 
 def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.crs.CRS]:
