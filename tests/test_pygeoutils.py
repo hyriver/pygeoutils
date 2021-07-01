@@ -7,7 +7,6 @@ from pygeoogc import WFS, WMS
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
-from pygeoutils import MatchCRS
 
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:2149"
@@ -226,20 +225,6 @@ def test_path():
         ],
     }
     assert _path == res
-
-
-def test_matchcrs():
-    match_crs = MatchCRS(DEF_CRS, ALT_CRS)
-    bounds = GEO_URB.bounds
-    points = [(bounds[0], bounds[1]), (bounds[2], bounds[3])]
-    coords = match_crs.coords(points)
-    bbox = match_crs.bounds(GEO_URB.bounds)
-    geom = match_crs.geometry(GEO_URB)
-    assert (
-        abs(geom.centroid.x * 1e-4 - (-362.099)) < 1e-3
-        and abs(bbox[0] * 1e-4 - (-365.403)) < 1e-3
-        and abs(coords[-1][0] * 1e-4 == (-287.707)) < 1e-3
-    )
 
 
 def test_show_versions():
