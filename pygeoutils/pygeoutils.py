@@ -19,7 +19,7 @@ import rasterio.transform as rio_transform
 import shapely.geometry as sgeom
 import xarray as xr
 from shapely import ops
-from shapely.geometry import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 
 from .exceptions import InvalidInputType, InvalidInputValue, MissingAttribute
 
@@ -494,106 +494,15 @@ def geo2polygon(
     Polygon
         A Polygon in the target CRS.
     """
-    match_crs = MatchCRS(geo_crs, crs)
-    geom = sgeom.box(*geometry) if isinstance(geometry, tuple) else geometry
-    geom = match_crs.geometry(geom)
+    if not isinstance(geometry, (Polygon, MultiPolygon, tuple)):
+        raise InvalidInputType("geometry", "Polygon or tuple of length 4")
 
+    if isinstance(geometry, tuple) and len(geometry) != 4:
+        raise InvalidInputType("geometry", "tuple of length 4")
+
+    geom = sgeom.box(*geometry) if isinstance(geometry, tuple) else geometry
+    project = pyproj.Transformer.from_crs(geo_crs, crs, always_xy=True).transform
+    geom = ops.transform(project, geom)
     if not geom.is_valid:
         geom = geom.buffer(0.0)
     return geom
-
-
-class MatchCRS:
-    """Reproject a geometry to another CRS.
-
-    Parameters
-    ----------
-    in_crs : str
-        Spatial reference of the input geometry
-    out_crs : str
-        Target spatial reference
-    """
-
-    def __init__(self, in_crs: str, out_crs: str):
-        self.project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-
-    def geometry(
-        self, geom: Union[Polygon, LineString, MultiLineString, MultiPolygon, Point, MultiPoint]
-    ) -> Union[Polygon, LineString, MultiLineString, MultiPolygon, Point, MultiPoint]:
-        """Reproject a geometry to the specified output CRS.
-
-        Parameters
-        ----------
-        geom : LineString, MultiLineString, Polygon, MultiPolygon, Point, or MultiPoint
-            Input geometry.
-
-        Returns
-        -------
-        LineString, MultiLineString, Polygon, MultiPolygon, Point, or MultiPoint
-            Input geometry in the specified CRS.
-
-        Examples
-        --------
-        >>> from pygeoogc import MatchCRS
-        >>> from shapely.geometry import Point
-        >>> point = Point(-7766049.665, 5691929.739)
-        >>> MatchCRS("epsg:3857", "epsg:4326").geometry(point).xy
-        (array('d', [-69.7636111130079]), array('d', [45.44549114818127]))
-        """
-        if not isinstance(
-            geom, (Polygon, LineString, MultiLineString, MultiPolygon, Point, MultiPoint)
-        ):
-            types = "LineString, MultiLineString, Polygon, MultiPolygon, Point, or MultiPoint"
-            raise InvalidInputType("geom", types)
-
-        return ops.transform(self.project, geom)
-
-    def bounds(self, geom: Tuple[float, float, float, float]) -> Tuple[float, float, float, float]:
-        """Reproject a bounding box to the specified output CRS.
-
-        Parameters
-        ----------
-        geom : tuple
-            Input bounding box (xmin, ymin, xmax, ymax).
-
-        Returns
-        -------
-        tuple
-            Input bounding box in the specified CRS.
-
-        Examples
-        --------
-        >>> from pygeoogc import MatchCRS
-        >>> bbox = (-7766049.665, 5691929.739, -7763049.665, 5696929.739)
-        >>> MatchCRS("epsg:3857", "epsg:4326").bounds(bbox)
-        (-69.7636111130079, 45.44549114818127, -69.73666165448431, 45.47699468552394)
-        """
-        if not (isinstance(geom, tuple) and len(geom) == 4):
-            raise InvalidInputType("geom", "tuple", BOX_ORD)
-
-        return ops.transform(self.project, sgeom.box(*geom)).bounds
-
-    def coords(self, geom: List[Tuple[float, float]]) -> List[Tuple[Any, ...]]:
-        """Reproject a list of coordinates to the specified output CRS.
-
-        Parameters
-        ----------
-        geom : list of tuple
-            Input coords [(x1, y1), ...].
-
-        Returns
-        -------
-        tuple
-            Input list of coords in the specified CRS.
-
-        Examples
-        --------
-        >>> from pygeoogc import MatchCRS
-        >>> coords = [(-7766049.665, 5691929.739)]
-        >>> MatchCRS("epsg:3857", "epsg:4326").coords(coords)
-        [(-69.7636111130079, 45.44549114818127)]
-        """
-        if not (isinstance(geom, list) and all(len(c) == 2 for c in geom)):
-            raise InvalidInputType("geom", "list of tuples", "[(x1, y1), ...]")
-
-        return list(zip(*self.project(*zip(*geom))))
