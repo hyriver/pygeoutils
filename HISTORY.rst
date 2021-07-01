@@ -9,6 +9,8 @@ Internal Change
 ~~~~~~~~~~~~~~~
 - Make ``geo2polygon`` a public function since other packages use it.
 - Make ``xarray_mask`` a public function and simplify ``gtiff2xarray``.
+- Remove ``MatchCRS`` since it's already available in ``pygeoogc``.
+- Validate input geometry in ``geo2polygon``.
 
 0.11.1 (2021-06-19)
 -------------------
