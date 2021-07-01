@@ -3,7 +3,7 @@ import io
 import shutil
 
 import rasterio
-from pygeoogc import WFS, WMS
+from pygeoogc import WFS, WMS, ServiceURL
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
@@ -23,7 +23,7 @@ GEO_URB = Polygon(
 GEO_NAT = Polygon(
     [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
 )
-
+SMALL = 1e-3
 
 def test_json2geodf():
     url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
@@ -44,10 +44,9 @@ def test_json2geodf():
 
 
 def test_gtiff2array():
-    url_wms = "https://www.mrlc.gov/geoserver/mrlc_download/wms"
     wms = WMS(
-        url_wms,
-        layers="NLCD_Land_Cover_Change_Index_Science_product_L48",
+        ServiceURL().wms.mrlc,
+        layers="NLCD_2011_Tree_Canopy_L48",
         outformat="image/geotiff",
         crs=DEF_CRS,
     )
@@ -56,12 +55,12 @@ def test_gtiff2array():
         1e3,
         box_crs=DEF_CRS,
     )
-    cover_box = geoutils.gtiff2xarray(r_dict, GEO_NAT.bounds, DEF_CRS)
-    cover = geoutils.gtiff2xarray(r_dict, GEO_NAT, DEF_CRS)
-
+    canopy_box = geoutils.gtiff2xarray(r_dict, GEO_NAT.bounds, DEF_CRS)
+    canopy = geoutils.gtiff2xarray(r_dict, GEO_NAT, DEF_CRS)
+    expected = 72.223
     assert (
-        abs(cover_box.mean().values.item() - 2.444) < 1e-3
-        and abs(cover.mean().values.item() - 2.444) < 1e-3
+        abs(canopy_box.mean().values.item() - expected) < SMALL
+        and abs(canopy.mean().values.item() - expected) < SMALL
     )
 
 
