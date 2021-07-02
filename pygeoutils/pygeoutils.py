@@ -322,7 +322,6 @@ def gtiff2xarray(
         with rio.MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
-                #             with rio.vrt.WarpedVRT(src, **src.meta) as vrt:
                 ds = xr.open_rasterio(vrt)
                 valid_dims = list(ds.sizes)
                 if any(d not in valid_dims for d in ds_dims):
@@ -337,7 +336,9 @@ def gtiff2xarray(
                 ds.to_netcdf(fpath)
                 return fpath
 
-    ds = xr.open_mfdataset((to_dataset(lyr, resp) for lyr, resp in r_dict.items()), parallel=True)
+    ds = xr.open_mfdataset(
+        (to_dataset(lyr, resp) for lyr, resp in r_dict.items()), parallel=True,
+    )
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
 
