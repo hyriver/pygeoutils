@@ -341,7 +341,7 @@ def gtiff2xarray(
     )
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
-
+    ds.attrs["crs"] = r_crs.to_string()
     ds.attrs["nodatavals"] = (nodata,)
     ycoord = list(set(ds.coords).intersection(valid_ycoords))
     xcoord = list(set(ds.coords).intersection(valid_xcoords))
