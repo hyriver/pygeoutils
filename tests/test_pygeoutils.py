@@ -1,8 +1,6 @@
 """Tests for PyGeoUtils"""
 import io
-import shutil
 
-import rasterio
 from pygeoogc import WFS, WMS, ServiceURL
 from shapely.geometry import Polygon
 
