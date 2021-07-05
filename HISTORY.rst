@@ -7,7 +7,8 @@ History
 
 Internal Change
 ~~~~~~~~~~~~~~~
-- Make ``geo2polygon`` a public function since other packages use it.
+- Make ``geo2polygon`` and ``get_transform`` public functions since other packages
+  use it.
 - Make ``xarray_mask`` a public function and simplify ``gtiff2xarray``.
 - Remove ``MatchCRS`` since it's already available in ``pygeoogc``.
 - Validate input geometry in ``geo2polygon``.
