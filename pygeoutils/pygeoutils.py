@@ -311,7 +311,7 @@ def gtiff2xarray(
     else:
         var_name = dict(zip(r_dict, r_dict))
 
-    nodata, r_crs = _get_nodata_crs(r_dict[key1], driver)
+    nodata, r_crs = get_nodata_crs(r_dict[key1], driver)
 
     tmp_dir = tempfile.gettempdir()
 
@@ -409,7 +409,7 @@ def xarray_geomask(
     return ds_masked
 
 
-def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.crs.CRS]:
+def get_nodata_crs(resp: bytes, driver: str = "GTiff") -> Tuple[np.float64, pyproj.crs.crs.CRS]:
     """Get nodata and crs value of a raster in bytes.
 
     Parameters
