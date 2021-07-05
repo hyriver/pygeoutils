@@ -337,7 +337,8 @@ def gtiff2xarray(
                 return fpath
 
     ds = xr.open_mfdataset(
-        (to_dataset(lyr, resp) for lyr, resp in r_dict.items()), parallel=True,
+        (to_dataset(lyr, resp) for lyr, resp in r_dict.items()),
+        parallel=True,
     )
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
@@ -346,7 +347,7 @@ def gtiff2xarray(
     ycoord = list(set(ds.coords).intersection(valid_ycoords))
     xcoord = list(set(ds.coords).intersection(valid_xcoords))
     if len(xcoord) == 1 and len(ycoord) == 1:
-        transform, _, _ = _get_transform(ds, ds_dims)
+        transform, _, _ = get_transform(ds, ds_dims)
         ds = ds.sortby(ycoord[0], ascending=False)
         ds.attrs["transform"] = transform
         ds.attrs["res"] = (transform.a, transform.e)
@@ -391,7 +392,7 @@ def xarray_geomask(
     if any(d not in valid_dims for d in ds_dims):
         raise MissingAttribute("ds_dims", valid_dims)
 
-    transform, width, height = _get_transform(ds, ds_dims)
+    transform, width, height = get_transform(ds, ds_dims)
     _geometry = geo2polygon(geometry, geo_crs, ds.crs)
 
     _mask = rio_features.geometry_mask(
@@ -438,7 +439,7 @@ def _get_nodata_crs(resp: bytes, driver: str) -> Tuple[np.float64, pyproj.crs.cr
     return nodata, r_crs
 
 
-def _get_transform(
+def get_transform(
     ds: Union[xr.Dataset, xr.DataArray],
     ds_dims: Tuple[str, str] = ("y", "x"),
 ) -> Tuple[affine.Affine, int, int]:
