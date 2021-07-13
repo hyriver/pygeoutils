@@ -1,7 +1,7 @@
 """Top-level package for PyGeoUtils."""
 from pkg_resources import DistributionNotFound, get_distribution
 
-from .exceptions import InvalidInputType, InvalidInputValue, MissingAttribute
+from .exceptions import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
 from .print_versions import show_versions
 from .pygeoutils import (
     arcgis2geojson,
@@ -16,5 +16,19 @@ from .pygeoutils import (
 try:
     __version__ = get_distribution(__name__).version
 except DistributionNotFound:
-    # package is not installed
-    pass
+    __version__ = "999"
+
+__all__ = [
+    "arcgis2geojson",
+    "geo2polygon",
+    "get_nodata_crs",
+    "get_transform",
+    "gtiff2xarray",
+    "json2geodf",
+    "xarray_geomask",
+    "InvalidInputType",
+    "InvalidInputValue",
+    "MissingAttribute",
+    "EmptyResponse",
+    "show_versions",
+]
