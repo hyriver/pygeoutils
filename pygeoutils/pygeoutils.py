@@ -21,7 +21,7 @@ import xarray as xr
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 
-from .exceptions import InvalidInputType, InvalidInputValue, MissingAttribute
+from .exceptions import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -64,8 +64,8 @@ def json2geodf(
     except TypeError:
         content = [arcgis2geojson(c) for c in content]
         geodf = gpd.GeoDataFrame.from_features(content[0])
-    except StopIteration:
-        raise StopIteration("Resnpose is empty.")
+    except StopIteration as ex:
+        raise EmptyResponse from ex
 
     if len(content) > 1:
         geodf = geodf.append([gpd.GeoDataFrame.from_features(c) for c in content[1:]])
@@ -303,8 +303,8 @@ def gtiff2xarray(
 
     try:
         key1 = next(iter(r_dict.keys()))
-    except StopIteration:
-        raise StopIteration("Resnpose dict is empty.")
+    except StopIteration as ex:
+        raise EmptyResponse from ex
 
     if "_dd_" in key1:
         var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
@@ -352,7 +352,7 @@ def gtiff2xarray(
         ds.attrs["transform"] = transform
         ds.attrs["res"] = (transform.a, transform.e)
 
-    return xarray_geomask(ds, geometry, geo_crs)
+    return xarray_geomask(ds, geometry, geo_crs, ds_dims, all_touched)
 
 
 def xarray_geomask(

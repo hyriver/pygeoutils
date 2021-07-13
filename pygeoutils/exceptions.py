@@ -2,6 +2,17 @@
 from typing import Generator, List, Optional, Union
 
 
+class EmptyResponse(Exception):
+    """Exception raised when the input response is empty."""
+
+    def __init__(self) -> None:
+        self.message = "The input response is empty."
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class InvalidInputType(Exception):
     """Exception raised when a function argument type is invalid.
 
