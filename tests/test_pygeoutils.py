@@ -1,13 +1,13 @@
 """Tests for PyGeoUtils"""
 import io
 
-from pygeoogc import WFS, WMS, ServiceURL
+from pygeoogc import WMS, ArcGISRESTful, ServiceURL
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
 
 DEF_CRS = "epsg:4326"
-ALT_CRS = "epsg:2149"
+ALT_CRS = "epsg:4269"
 GEO_URB = Polygon(
     [
         [-118.72, 34.118],
@@ -25,21 +25,21 @@ SMALL = 1e-3
 
 
 def test_json2geodf():
-    url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
+    geom = [
+        (-97.06138, 32.837),
+        (-97.06133, 32.836),
+        (-97.06124, 32.834),
+        (-97.06127, 32.832),
+    ]
 
-    wfs = WFS(
-        url_wfs,
-        layer="public_NFHL:Base_Flood_Elevations",
-        outformat="esrigeojson",
-        crs="epsg:4269",
-        version="2.0.0",
+    service = ArcGISRESTful(ServiceURL().restful.nhdplus_epa, 2, outformat="json", crs=ALT_CRS)
+    service.oids_bygeom(
+        geom, geo_crs=ALT_CRS, sql_clause="FTYPE NOT IN (420,428,566)", distance=1500
     )
-    bbox = GEO_URB.bounds
-    rjosn = wfs.getfeature_bybox(bbox, box_crs=DEF_CRS)
-    flood = geoutils.json2geodf([rjosn, rjosn], "epsg:4269", DEF_CRS)
-    flood = flood.drop_duplicates()
+    rjosn = service.get_features(return_m=True)
+    flw = geoutils.json2geodf(rjosn * 2, ALT_CRS, DEF_CRS)
 
-    assert abs(flood["ELEV"].sum() - 781717.6) < 1e-1
+    assert abs(flw.LENGTHKM.sum() - 8.917 * 2) < SMALL
 
 
 def test_gtiff2array():
