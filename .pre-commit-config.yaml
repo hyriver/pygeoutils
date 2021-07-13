@@ -75,6 +75,12 @@ repos:
       name: Upgrade synax to python 3.7+ with pyupgrade
       args: [--py37-plus]
 
+  - repo: https://github.com/guilatrova/tryceratops
+    rev: v0.2.3
+    hooks:
+      - id: tryceratops
+        name: Check try-exceptions blocks with tryceratops
+
   - repo: https://github.com/PyCQA/flake8
     rev: 3.9.2
     hooks:
