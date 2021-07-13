@@ -15,7 +15,7 @@ Internal Changes
 
 Bug Fixes
 ~~~~~~~~~
-- Add the missing ``all_touched`` argument for masking the data in ``gtiff2xarray``.
+- Add the missing arguments for masking the data in ``gtiff2xarray``.
 
 0.11.1 (2021-06-19)
 -------------------
