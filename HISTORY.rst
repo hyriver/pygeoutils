@@ -5,13 +5,17 @@ History
 0.11.2 (unreleased)
 -------------------
 
-Internal Change
-~~~~~~~~~~~~~~~
+Internal Changes
+~~~~~~~~~~~~~~~~
 - Make ``geo2polygon``, ``get_transform``, and ``get_nodata_crs`` public functions
   since other packages use it.
 - Make ``xarray_mask`` a public function and simplify ``gtiff2xarray``.
 - Remove ``MatchCRS`` since it's already available in ``pygeoogc``.
 - Validate input geometry in ``geo2polygon``.
+
+Bug Fixes
+~~~~~~~~~
+- Add the missing ``all_touched`` argument for masking the data in ``gtiff2xarray``.
 
 0.11.1 (2021-06-19)
 -------------------
