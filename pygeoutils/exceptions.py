@@ -80,3 +80,17 @@ class MissingAttribute(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class UndeterminedDims(Exception):
+    """Exception raised for dimensions cannot be determined."""
+
+    def __init__(self) -> None:
+        self.message = (
+            "Dimensions cannot be determined from the dataset,"
+            + "they must be provided via ds_dims argument."
+        )
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message

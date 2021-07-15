@@ -6,7 +6,7 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import affine
 import geopandas as gpd
@@ -21,7 +21,7 @@ import xarray as xr
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 
-from .exceptions import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
+from .exceptions import EmptyResponse, InvalidInputType, MissingAttribute
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -32,6 +32,16 @@ logger.propagate = False
 
 DEF_CRS = "epsg:4326"
 BOX_ORD = "(west, south, east, north)"
+
+
+__all__ = [
+    "json2geodf",
+    "arcgis2geojson",
+    "geo2polygon",
+    "get_transform",
+    "xarray_geomask",
+    "gtiff2xarray",
+]
 
 
 def json2geodf(
@@ -267,7 +277,7 @@ def gtiff2xarray(
     r_dict: Dict[str, bytes],
     geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
-    ds_dims: Tuple[str, str] = ("y", "x"),
+    ds_dims: Optional[Tuple[str, str]] = None,
     driver: str = "GTiff",
     all_touched: bool = False,
 ) -> Union[xr.DataArray, xr.Dataset]:
@@ -284,7 +294,8 @@ def gtiff2xarray(
         The spatial reference of the input geometry.
     ds_dims : tuple of str, optional
         The names of the vertical and horizontal dimensions (in that order)
-        of the target dataset, default to ("y", "x").
+        of the target dataset, default to None. If None, dimension names are determined
+        from a list of common names.
     driver : str, optional
         A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
         can be found here: https://gdal.org/drivers/raster/index.html
@@ -299,7 +310,7 @@ def gtiff2xarray(
         Parallel (with dask) dataset or dataarray.
     """
     if not isinstance(r_dict, dict):
-        raise InvalidInputType("r_dict", "dict", '{"name": Response.content}')  # noqa: FS003
+        raise InvalidInputType("r_dict", "dict", '{"name": bytes}')  # noqa: FS003
 
     try:
         key1 = next(iter(r_dict.keys()))
@@ -311,26 +322,19 @@ def gtiff2xarray(
     else:
         var_name = dict(zip(r_dict, r_dict))
 
-    nodata, r_crs = get_nodata_crs(r_dict[key1], driver)
+    attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver)
 
     tmp_dir = tempfile.gettempdir()
-
-    valid_ycoords = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
-    valid_xcoords = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
 
     def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
         with rio.MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
                 ds = xr.open_rasterio(vrt)
-                valid_dims = list(ds.sizes)
-                if any(d not in valid_dims for d in ds_dims):
-                    raise InvalidInputValue("ds_dims", valid_dims)
                 with contextlib.suppress(ValueError):
                     ds = ds.squeeze("band", drop=True)
-                ycoord = list(set(ds.coords).intersection(valid_ycoords))[0]
-                ds = ds.sortby(ycoord[0], ascending=False)
-                ds.attrs["crs"] = r_crs.to_string()
+                ds = ds.sortby(attrs.dims[0], ascending=False)
+                ds.attrs["crs"] = attrs.crs.to_string()
                 ds.name = var_name[lyr]
                 fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
                 ds.to_netcdf(fpath)
@@ -342,24 +346,21 @@ def gtiff2xarray(
     )
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
-    ds.attrs["crs"] = r_crs.to_string()
-    ds.attrs["nodatavals"] = (nodata,)
-    ycoord = list(set(ds.coords).intersection(valid_ycoords))
-    xcoord = list(set(ds.coords).intersection(valid_xcoords))
-    if len(xcoord) == 1 and len(ycoord) == 1:
-        transform, _, _ = get_transform(ds, ds_dims)
-        ds = ds.sortby(ycoord[0], ascending=False)
-        ds.attrs["transform"] = transform
-        ds.attrs["res"] = (transform.a, transform.e)
+    ds.attrs["crs"] = attrs.crs.to_string()
+    ds.attrs["nodatavals"] = (attrs.nodata,)
+    transform, _, _ = get_transform(ds, attrs.dims)
+    ds = ds.sortby(attrs.dims[0], ascending=False)
+    ds.attrs["transform"] = transform
+    ds.attrs["res"] = (transform.a, transform.e)
 
-    return xarray_geomask(ds, geometry, geo_crs, ds_dims, all_touched)
+    return xarray_geomask(ds, geometry, geo_crs, attrs.dims, all_touched)
 
 
 def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
     geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
-    ds_dims: Tuple[str, str] = ("y", "x"),
+    ds_dims: Optional[Tuple[str, str]] = None,
     all_touched: bool = False,
 ) -> Union[xr.Dataset, xr.DataArray]:
     """Mask a ``xarray.Dataset`` based on a geometry.
@@ -374,7 +375,8 @@ def xarray_geomask(
         The spatial reference of the input geometry
     ds_dims : tuple of str, optional
         The names of the vertical and horizontal dimensions (in that order)
-        of the dataset, default to ("y", "x").
+        of the target dataset, default to None. If None, dimension names are determined
+        from a list of common names.
     all_touched : bool, optional
         Include a pixel in the mask if it touches any of the shapes.
         If False (default), include a pixel only if its center is within one
@@ -388,8 +390,11 @@ def xarray_geomask(
     if "crs" not in ds.attrs:
         raise MissingAttribute("crs", list(ds.attrs.keys()))
 
+    if ds_dims is None:
+        ds_dims = _get_dim_names(ds)
+
     valid_dims = list(ds.sizes)
-    if any(d not in valid_dims for d in ds_dims):
+    if ds_dims is None or any(d not in valid_dims for d in ds_dims):
         raise MissingAttribute("ds_dims", valid_dims)
 
     transform, width, height = get_transform(ds, ds_dims)
@@ -409,21 +414,36 @@ def xarray_geomask(
     return ds_masked
 
 
-def get_nodata_crs(resp: bytes, driver: str = "GTiff") -> Tuple[np.float64, pyproj.crs.crs.CRS]:
-    """Get nodata and crs value of a raster in bytes.
+class Attrs(NamedTuple):
+    """Attributes of a GTiff byte response."""
+
+    nodata: np.float64
+    crs: pyproj.crs.crs.CRS
+    dims: Tuple[str, str]
+
+
+def get_gtiff_attrs(
+    resp: bytes, ds_dims: Optional[Tuple[str, str]] = None, driver: str = "GTiff"
+) -> Attrs:
+    """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
 
     Parameters
     ----------
     resp : bytes
         Raster response returned from a wed service request such as WMS
+    ds_dims : tuple of str, optional
+        The names of the vertical and horizontal dimensions (in that order)
+        of the target dataset, default to None. If None, dimension names are determined
+        from a list of common names.
     driver : str
         A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
         can be found here: https://gdal.org/drivers/raster/index.html
 
     Returns
     -------
-    tuple
-        (NoData, CRS)
+    dict
+        No data, CRS, and dimension names for vertical and horizontal directions or
+        a list of the existing dimensions if they are not in a list of common names.
     """
     with rio.MemoryFile() as memfile:
         memfile.write(resp)
@@ -436,7 +456,28 @@ def get_nodata_crs(resp: bytes, driver: str = "GTiff") -> Tuple[np.float64, pypr
                     nodata = np.nan
             else:
                 nodata = np.dtype(src.dtypes[0]).type(src.nodata)
-    return nodata, r_crs
+
+            ds = xr.open_rasterio(src)
+            if ds_dims is None:
+                ds_dims = _get_dim_names(ds)
+
+            valid_dims = list(ds.sizes)
+            if ds_dims is None or any(d not in valid_dims for d in ds_dims):
+                raise MissingAttribute("ds_dims", valid_dims)
+    return Attrs(nodata, r_crs, ds_dims)
+
+
+def _get_dim_names(ds: Union[xr.DataArray, xr.Dataset]) -> Optional[Tuple[str, str]]:
+    """Get vertical and horizontal dimension names."""
+    y_dims = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
+    x_dims = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
+    try:
+        y_dim = list(set(ds.coords).intersection(y_dims))[0]
+        x_dim = list(set(ds.coords).intersection(x_dims))[0]
+    except IndexError:
+        return None
+    else:
+        return (y_dim, x_dim)
 
 
 def get_transform(
