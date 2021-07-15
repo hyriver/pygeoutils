@@ -12,6 +12,9 @@ Internal Changes
 - Make ``xarray_mask`` a public function and simplify ``gtiff2xarray``.
 - Remove ``MatchCRS`` since it's already available in ``pygeoogc``.
 - Validate input geometry in ``geo2polygon``.
+- Refactor ``gtiff2xarray`` to check for the ``ds_dims`` outside the main loops to
+  improve the performance. Also, the function tries to detect the dimension names
+  automatically if ``ds_dims`` is not provided by the user, explicitly.
 
 Bug Fixes
 ~~~~~~~~~
