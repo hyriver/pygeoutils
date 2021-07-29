@@ -40,7 +40,6 @@ dependencies:
   - bottleneck
 
   # test deps
-  - nox
   - pytest
   - pytest-clarity
   - pytest-cov

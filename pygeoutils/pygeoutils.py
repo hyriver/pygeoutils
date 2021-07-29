@@ -12,6 +12,7 @@ import affine
 import geopandas as gpd
 import numpy as np
 import orjson as json
+import pandas as pd
 import pyproj
 import rasterio as rio
 import rasterio.features as rio_features
@@ -78,7 +79,7 @@ def json2geodf(
         raise EmptyResponse from ex
 
     if len(content) > 1:
-        geodf = geodf.append([gpd.GeoDataFrame.from_features(c) for c in content[1:]])
+        geodf = gpd.GeoDataFrame(pd.concat(gpd.GeoDataFrame.from_features(c) for c in content))
 
     if "geometry" in geodf and len(geodf) > 0:
         geodf = geodf.set_crs(in_crs)
