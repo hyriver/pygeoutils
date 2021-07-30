@@ -279,7 +279,7 @@ def gtiff2xarray(
     geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
     geo_crs: str,
     ds_dims: Optional[Tuple[str, str]] = None,
-    driver: str = "GTiff",
+    driver: Optional[str] = None,
     all_touched: bool = False,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
@@ -298,8 +298,8 @@ def gtiff2xarray(
         of the target dataset, default to None. If None, dimension names are determined
         from a list of common names.
     driver : str, optional
-        A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
-        can be found here: https://gdal.org/drivers/raster/index.html
+        A GDAL driver for reading the content, defaults to automatic detection. A list of
+        the drivers can be found here: https://gdal.org/drivers/raster/index.html
     all_touched : bool, optional
         Include a pixel in the mask if it touches any of the shapes.
         If False (default), include a pixel only if its center is within one
@@ -424,7 +424,7 @@ class Attrs(NamedTuple):
 
 
 def get_gtiff_attrs(
-    resp: bytes, ds_dims: Optional[Tuple[str, str]] = None, driver: str = "GTiff"
+    resp: bytes, ds_dims: Optional[Tuple[str, str]] = None, driver: Optional[str] = None
 ) -> Attrs:
     """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
 
@@ -436,9 +436,9 @@ def get_gtiff_attrs(
         The names of the vertical and horizontal dimensions (in that order)
         of the target dataset, default to None. If None, dimension names are determined
         from a list of common names.
-    driver : str
-        A GDAL driver for reading the content, defaults to GTiff. A list of the drivers
-        can be found here: https://gdal.org/drivers/raster/index.html
+    driver : str, optional
+        A GDAL driver for reading the content, defaults to automatic detection. A list of
+        the drivers can be found here: https://gdal.org/drivers/raster/index.html
 
     Returns
     -------

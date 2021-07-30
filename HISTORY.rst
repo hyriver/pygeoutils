@@ -5,6 +5,11 @@ History
 0.11.2 (unreleased)
 -------------------
 
+New Features
+~~~~~~~~~~~~
+- Automatic detection of the driver by default in ``gtiff2xarray`` as opposed to it being
+  ``GTiff``.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Make ``geo2polygon``, ``get_transform``, and ``get_nodata_crs`` public functions
