@@ -56,7 +56,7 @@ def test_gtiff2array():
     )
     canopy_box = geoutils.gtiff2xarray(r_dict, GEO_NAT.bounds, DEF_CRS)
     canopy = geoutils.gtiff2xarray(r_dict, GEO_NAT, DEF_CRS)
-    expected = 72.223
+    expected = 72.042
     assert (
         abs(canopy_box.mean().values.item() - expected) < SMALL
         and abs(canopy.mean().values.item() - expected) < SMALL
