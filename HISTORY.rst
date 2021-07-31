@@ -2,8 +2,8 @@
 History
 =======
 
-0.11.2 (31-07-21)
------------------
+0.11.2 (2021-07-31)
+-------------------
 
 The highlight of this release is performance improvement in ``gtiff2xarray`` for
 handling large responses.
