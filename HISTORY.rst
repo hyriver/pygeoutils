@@ -2,8 +2,11 @@
 History
 =======
 
-0.11.2 (unreleased)
--------------------
+0.11.2 (31-07-21)
+-----------------
+
+The highlight of this release is performance improvement in ``gtiff2xarray`` for
+handling large responses.
 
 New Features
 ~~~~~~~~~~~~
@@ -20,6 +23,8 @@ Internal Changes
 - Refactor ``gtiff2xarray`` to check for the ``ds_dims`` outside the main loops to
   improve the performance. Also, the function tries to detect the dimension names
   automatically if ``ds_dims`` is not provided by the user, explicitly.
+- Improve performance of ``json2geodf`` by using list comprehension and performing
+  checks outside the main loop.
 
 Bug Fixes
 ~~~~~~~~~
