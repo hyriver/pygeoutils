@@ -336,6 +336,7 @@ def gtiff2xarray(
                     ds = ds.squeeze("band", drop=True)
                 ds = ds.sortby(attrs.dims[0], ascending=False)
                 ds.attrs["crs"] = attrs.crs.to_string()
+                ds.attrs["transform"] = attrs.transform.to_gdal()
                 ds.name = var_name[lyr]
                 fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
                 ds.to_netcdf(fpath)
@@ -388,8 +389,9 @@ def xarray_geomask(
     xarray.Dataset or xarray.DataArray
         The input dataset with a mask applied (np.nan)
     """
-    if "crs" not in ds.attrs:
-        raise MissingAttribute("crs", list(ds.attrs.keys()))
+    attrs = ds.attrs
+    if "crs" not in attrs:
+        raise MissingAttribute("crs", list(attrs.keys()))
 
     if ds_dims is None:
         ds_dims = _get_dim_names(ds)
@@ -409,6 +411,7 @@ def xarray_geomask(
     mask = xr.DataArray(_mask, coords, dims=ds_dims)
 
     ds_masked = ds.where(mask, drop=True)
+    ds_masked.attrs = attrs
     ds_masked.attrs["transform"] = transform
     ds_masked.attrs["bounds"] = _geometry.bounds
 
@@ -421,6 +424,7 @@ class Attrs(NamedTuple):
     nodata: np.float64
     crs: pyproj.crs.crs.CRS
     dims: Tuple[str, str]
+    transform: affine.Affine
 
 
 def get_gtiff_attrs(
@@ -465,7 +469,11 @@ def get_gtiff_attrs(
             valid_dims = list(ds.sizes)
             if ds_dims is None or any(d not in valid_dims for d in ds_dims):
                 raise MissingAttribute("ds_dims", valid_dims)
-    return Attrs(nodata, r_crs, ds_dims)
+            if isinstance(src.transform, affine.Affine):
+                transform = src.transform
+            else:
+                transform = affine.Affine(*src.transform)
+    return Attrs(nodata, r_crs, ds_dims, transform)
 
 
 def _get_dim_names(ds: Union[xr.DataArray, xr.Dataset]) -> Optional[Tuple[str, str]]:
