@@ -2,6 +2,12 @@
 History
 =======
 
+0.11.3 (2021-08-19)
+-------------------
+
+- Fix an issue in ``geotiff2xarray`` related to saving an ``xarray`` object to netcdf when its
+  transform attribute has ``Affine`` type rather than a tuple.
+
 0.11.2 (2021-07-31)
 -------------------
 
