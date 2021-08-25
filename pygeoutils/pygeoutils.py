@@ -412,8 +412,9 @@ def xarray_geomask(
 
     ds_masked = ds.where(mask, drop=True)
     ds_masked.attrs = attrs
-    ds_masked.attrs["transform"] = transform
+    ds_masked.attrs["transform"] = transform.to_gdal()
     ds_masked.attrs["bounds"] = _geometry.bounds
+    ds_masked.attrs["res"] = (transform.a, transform.e)
 
     return ds_masked
 
