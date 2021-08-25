@@ -352,7 +352,7 @@ def gtiff2xarray(
     ds.attrs["nodatavals"] = (attrs.nodata,)
     transform, _, _ = get_transform(ds, attrs.dims)
     ds = ds.sortby(attrs.dims[0], ascending=False)
-    ds.attrs["transform"] = transform
+    ds.attrs["transform"] = transform.to_gdal()
     ds.attrs["res"] = (transform.a, transform.e)
 
     return xarray_geomask(ds, geometry, geo_crs, attrs.dims, all_touched)
