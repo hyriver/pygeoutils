@@ -2,6 +2,16 @@
 History
 =======
 
+0.11.4 (2021-08-26)
+------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Use ``ujson`` for JSON parsing instead of ``orjson`` since ``orjson`` only serializes to
+  ``bytes`` which is not compatible with ``aiohttp``.
+- Convert the transform attribute data type from ``Affine`` to ``tuple`` since saving an data
+  array to ``netcdf`` cannot handle the ``Affine`` type.
+
 0.11.3 (2021-08-19)
 -------------------
 
