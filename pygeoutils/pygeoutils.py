@@ -11,7 +11,7 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 import affine
 import geopandas as gpd
 import numpy as np
-import orjson as json
+import ujson as json
 import pandas as pd
 import pyproj
 import rasterio as rio
