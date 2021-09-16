@@ -8,7 +8,6 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 
-import affine
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -336,7 +335,7 @@ def gtiff2xarray(
                     ds = ds.squeeze("band", drop=True)
                 ds = ds.sortby(attrs.dims[0], ascending=False)
                 ds.attrs["crs"] = attrs.crs.to_string()
-                ds.attrs["transform"] = attrs.transform.to_gdal()
+                ds.attrs["transform"] = attrs.transform
                 ds.name = var_name[lyr]
                 fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
                 ds.to_netcdf(fpath)
@@ -350,10 +349,14 @@ def gtiff2xarray(
         ds = ds[list(ds.keys())[0]]
     ds.attrs["crs"] = attrs.crs.to_string()
     ds.attrs["nodatavals"] = (attrs.nodata,)
-    transform, _, _ = get_transform(ds, attrs.dims)
+    transform = transform2tuple(get_transform(ds, attrs.dims)[0])
     ds = ds.sortby(attrs.dims[0], ascending=False)
-    ds.attrs["transform"] = transform.to_gdal()
-    ds.attrs["res"] = (transform.a, transform.e)
+    ds.attrs["transform"] = transform
+    ds.attrs["res"] = (transform[0], transform[-2])
+
+    for attr in ("scales", "offsets"):
+        if attr in ds.attrs and not isinstance(ds.attrs[attr], tuple):
+            ds.attrs[attr] = (ds.attrs[attr],)
 
     return xarray_geomask(ds, geometry, geo_crs, attrs.dims, all_touched)
 
@@ -412,7 +415,7 @@ def xarray_geomask(
 
     ds_masked = ds.where(mask, drop=True)
     ds_masked.attrs = attrs
-    ds_masked.attrs["transform"] = transform.to_gdal()
+    ds_masked.attrs["transform"] = transform2tuple(transform)
     ds_masked.attrs["bounds"] = _geometry.bounds
     ds_masked.attrs["res"] = (transform.a, transform.e)
 
@@ -425,7 +428,7 @@ class Attrs(NamedTuple):
     nodata: np.float64
     crs: pyproj.crs.crs.CRS
     dims: Tuple[str, str]
-    transform: affine.Affine
+    transform: Tuple[float, float, float, float, float, float]
 
 
 def get_gtiff_attrs(
@@ -470,10 +473,10 @@ def get_gtiff_attrs(
             valid_dims = list(ds.sizes)
             if ds_dims is None or any(d not in valid_dims for d in ds_dims):
                 raise MissingAttribute("ds_dims", valid_dims)
-            if isinstance(src.transform, affine.Affine):
-                transform = src.transform
+            if not isinstance(src.transform, tuple):
+                transform = transform2tuple(src.transform)
             else:
-                transform = affine.Affine(*src.transform)
+                transform = src.transform  # type: ignore
     return Attrs(nodata, r_crs, ds_dims, transform)
 
 
@@ -493,7 +496,7 @@ def _get_dim_names(ds: Union[xr.DataArray, xr.Dataset]) -> Optional[Tuple[str, s
 def get_transform(
     ds: Union[xr.Dataset, xr.DataArray],
     ds_dims: Tuple[str, str] = ("y", "x"),
-) -> Tuple[affine.Affine, int, int]:
+) -> Tuple[rio.Affine, int, int]:
     """Get transform of a ``xarray.Dataset`` or ``xarray.DataArray``.
 
     Parameters
@@ -505,7 +508,7 @@ def get_transform(
 
     Returns
     -------
-    affine.Affine, int, int
+    rio.Affine, int, int
         The affine transform, width, and height
     """
     ydim, xdim = ds_dims
@@ -524,6 +527,22 @@ def get_transform(
 
     transform = rio_transform.from_bounds(left, bottom, right, top, width, height)
     return transform, width, height
+
+
+def transform2tuple(transform: rio.Affine) -> Tuple[float, float, float, float, float, float]:
+    """Convert an affine transform to a tuple.
+
+    Parameters
+    ----------
+    transform : rio.Affine
+        The affine transform to be converted
+
+    Returns
+    -------
+    tuple
+        The affine transform as a tuple (a, b, c, d, e, f)
+    """
+    return tuple(getattr(transform, c) for c in ["a", "b", "c", "d", "e", "f"])  # type: ignore
 
 
 def geo2polygon(
