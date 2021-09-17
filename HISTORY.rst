@@ -2,6 +2,20 @@
 History
 =======
 
+0.11.5 (2021-06-16)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- Fix an issue with ``gtiff2xarray`` where the ``scales`` and ``offsets``
+  attributes of the output ``DataArray`` were floats rather than tuples (:issue_3dep:`30`).
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Add a new function, ``transform2tuple``, for converting ``Affine`` transforms to a tuple.
+  Previously, the ``Affine`` transform was converted to a tuple using ``to_gdal()`` method
+  of ``rasterio.Affine`` which was not compatible with ``rioxarray``.
+
 0.11.4 (2021-08-26)
 -------------------
 
