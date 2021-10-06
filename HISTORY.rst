@@ -2,6 +2,14 @@
 History
 =======
 
+0.11.6 (2021-10-06)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a new function, ``xarray2geodf``, to convert an ``xarray.DataArray`` to a
+  ``geopandas.GeoDataFrame``.
+
 0.11.5 (2021-06-16)
 -------------------
 
