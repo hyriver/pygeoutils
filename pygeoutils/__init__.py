@@ -1,7 +1,7 @@
 """Top-level package for PyGeoUtils."""
 from pkg_resources import DistributionNotFound, get_distribution
 
-from .exceptions import EmptyResponse, InvalidInputType, MissingAttribute
+from .exceptions import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
 from .print_versions import show_versions
 from .pygeoutils import (
     arcgis2geojson,
@@ -10,6 +10,7 @@ from .pygeoutils import (
     get_transform,
     gtiff2xarray,
     json2geodf,
+    xarray2geodf,
     xarray_geomask,
 )
 
@@ -24,9 +25,11 @@ __all__ = [
     "get_gtiff_attrs",
     "get_transform",
     "gtiff2xarray",
+    "xarray2geodf",
     "json2geodf",
     "xarray_geomask",
     "InvalidInputType",
+    "InvalidInputValue",
     "MissingAttribute",
     "EmptyResponse",
     "show_versions",
