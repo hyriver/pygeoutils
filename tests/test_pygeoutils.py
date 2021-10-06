@@ -1,7 +1,7 @@
 """Tests for PyGeoUtils"""
 import io
 
-from pygeoogc import WMS, ArcGISRESTful, ServiceURL
+from pygeoogc import ArcGISRESTful, ServiceURL
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
@@ -42,26 +42,20 @@ def test_json2geodf():
     assert abs(flw.LENGTHKM.sum() - 8.917 * 2) < SMALL
 
 
-def test_gtiff2array():
-    wms = WMS(
-        ServiceURL().wms.mrlc,
-        layers="NLCD_2011_Tree_Canopy_L48",
-        outformat="image/geotiff",
-        crs=DEF_CRS,
-    )
-    r_dict = wms.getmap_bybox(
-        GEO_NAT.bounds,
-        1e3,
-        box_crs=DEF_CRS,
-    )
-    canopy_box = geoutils.gtiff2xarray(r_dict, GEO_NAT.bounds, DEF_CRS)
-    canopy = geoutils.gtiff2xarray(r_dict, GEO_NAT, DEF_CRS)
+def test_gtiff2array(wms_resp):
+    canopy_box = geoutils.gtiff2xarray(wms_resp, GEO_NAT.bounds, DEF_CRS)
+    canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS)
+
+    mask = canopy > 60
+    vec = geoutils.xarray2geodf(canopy, "float32", mask)
+
     expected = 72.042
     assert (
         abs(canopy_box.mean().values.item() - expected) < SMALL
         and abs(canopy.mean().values.item() - expected) < SMALL
         and isinstance(canopy.attrs["scales"], tuple)
         and isinstance(canopy.attrs["offsets"], tuple)
+        and vec.shape[0] == 1174
     )
 
 
