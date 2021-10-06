@@ -70,12 +70,13 @@ class MissingAttribute(Exception):
         List of valid inputs
     """
 
-    def __init__(
-        self, attr: str, avail_attrs: Union[List[str], Generator[str, None, None]]
-    ) -> None:
-        self.message = f"Given {attr} does not exist. Available attributes are:\n" + ", ".join(
-            str(i) for i in avail_attrs
-        )
+    def __init__(self, attr: str, avail_attrs: Optional[List[str]] = None) -> None:
+        if avail_attrs is not None:
+            self.message = f"Given {attr} does not exist. Available attributes are:\n" + ", ".join(
+                str(i) for i in avail_attrs
+            )
+        else:
+            self.message = f"The {attr} attribute is missing."
         super().__init__(self.message)
 
     def __str__(self) -> str:
