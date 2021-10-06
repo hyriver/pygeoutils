@@ -21,7 +21,7 @@ import xarray as xr
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 
-from .exceptions import EmptyResponse, InvalidInputType, MissingAttribute
+from .exceptions import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -41,6 +41,7 @@ __all__ = [
     "get_transform",
     "xarray_geomask",
     "gtiff2xarray",
+    "xarray2geodf",
 ]
 
 
@@ -54,7 +55,7 @@ def json2geodf(
     Parameters
     ----------
     content : dict or list of dict
-        A (Geo)JSON dictionary e.g., r.json() or a list of them.
+        A (Geo)JSON dictionary e.g., response.json() or a list of them.
     in_crs : str
         CRS of the content, defaults to ``epsg:4326``.
     crs : str, optional
@@ -347,18 +348,29 @@ def gtiff2xarray(
     )
     if len(ds.variables) - len(ds.dims) == 1:
         ds = ds[list(ds.keys())[0]]
+    ds = ds.sortby(attrs.dims[0], ascending=False)
     ds.attrs["crs"] = attrs.crs.to_string()
     ds.attrs["nodatavals"] = (attrs.nodata,)
-    transform = transform2tuple(get_transform(ds, attrs.dims)[0])
-    ds = ds.sortby(attrs.dims[0], ascending=False)
-    ds.attrs["transform"] = transform
-    ds.attrs["res"] = (transform[0], transform[-2])
+    transform, _, _ = get_transform(ds, attrs.dims)
+    ds.attrs["transform"] = transform2tuple(transform)
+    ds.attrs["res"] = (transform.a, transform.e)
 
-    for attr in ("scales", "offsets"):
-        if attr in ds.attrs and not isinstance(ds.attrs[attr], tuple):
-            ds.attrs[attr] = (ds.attrs[attr],)
+    ds = attrs2tuple(ds, ["scales", "offsets"])
+    if isinstance(ds, xr.Dataset):
+        for v in ds.keys():
+            ds[v] = attrs2tuple(ds[v], ["scales", "offsets"])
 
     return xarray_geomask(ds, geometry, geo_crs, attrs.dims, all_touched)
+
+
+def attrs2tuple(
+    ds: Union[xr.Dataset, xr.DataArray], attrs: List[str]
+) -> Union[xr.Dataset, xr.DataArray]:
+    """Convert the floats attributes of a dataset or dataarray to a tuple."""
+    for attr in attrs:
+        if attr in ds.attrs and not isinstance(ds.attrs[attr], tuple):
+            ds.attrs[attr] = (ds.attrs[attr],)
+    return ds
 
 
 def xarray_geomask(
@@ -508,7 +520,7 @@ def get_transform(
 
     Returns
     -------
-    rio.Affine, int, int
+    rasterio.Affine, int, int
         The affine transform, width, and height
     """
     ydim, xdim = ds_dims
@@ -578,3 +590,50 @@ def geo2polygon(
     if not geom.is_valid:
         geom = geom.buffer(0.0)
     return geom
+
+
+def xarray2geodf(
+    da: xr.DataArray, dtype: str, mask_da: Optional[xr.DataArray] = None
+) -> gpd.GeoDataFrame:
+    """Vectorize a ``xarray.DataArray`` to a ``geopandas.GeoDataFrame``.
+
+    Parameters
+    ----------
+    da : xarray.DataArray
+        The dataarray to vectorize.
+    dtype : type
+        The data type of the dataarray. Valid types are ``int16``, ``int32``,
+        ``uint8``, ``uint16``, and ``float32``.
+    mask_da : xarray.DataArray, optional
+        The dataarray to use as a mask, defaults to ``None``.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        The vectorized dataarray.
+    """
+    if not isinstance(da, xr.DataArray):
+        raise InvalidInputType("da", "xarray.DataArray")
+
+    if not isinstance(mask_da, (xr.DataArray, type(None))):
+        raise InvalidInputType("da", "xarray.DataArray or None")
+
+    valid_types = ["int16", "int32", "uint8", "uint16", "float32"]
+    if dtype not in valid_types:
+        raise InvalidInputValue("dtype", valid_types)
+    _dtype = getattr(np, dtype)
+
+    for attr in ["crs", "transform"]:
+        if attr not in da.attrs:
+            raise MissingAttribute(attr)
+
+    mask = None if mask_da is None else mask_da.to_numpy()
+    shapes = rio.features.shapes(
+        source=da.to_numpy().astype(_dtype), transform=da.transform, mask=mask
+    )
+    geometry, values = zip(*shapes)
+    return gpd.GeoDataFrame(
+        data={da.name: _dtype(values)},
+        geometry=[sgeom.shape(g) for g in geometry],
+        crs=da.crs,
+    )
