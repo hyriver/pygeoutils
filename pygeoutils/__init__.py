@@ -1,6 +1,4 @@
 """Top-level package for PyGeoUtils."""
-from pkg_resources import DistributionNotFound, get_distribution
-
 from .exceptions import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
 from .print_versions import show_versions
 from .pygeoutils import (
@@ -15,8 +13,13 @@ from .pygeoutils import (
 )
 
 try:
-    __version__ = get_distribution(__name__).version
-except DistributionNotFound:
+    import importlib.metadata as metadata
+except ImportError:
+    import importlib_metadata as metadata  # type: ignore[no-redef]
+
+try:
+    __version__ = metadata.version("pygeoutils")
+except Exception:
     __version__ = "999"
 
 __all__ = [
