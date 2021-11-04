@@ -2,6 +2,15 @@
 History
 =======
 
+0.11.7 (unreleased)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Use ``rioxarray`` for dealing with ``GeoTIFF`` binaries since ``xarray``
+  deprecated the ``xarray.open_rasterio`` function, as it's discussed
+  in this `issue <https://github.com/pydata/xarray/pull/5808>`.
+
 0.11.6 (2021-10-06)
 -------------------
 
