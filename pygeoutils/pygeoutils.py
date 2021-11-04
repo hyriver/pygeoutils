@@ -505,6 +505,7 @@ def get_transform(
         The dataset(array) to be masked
     ds_dims : tuple, optional
         Names of the coordinames in the dataset, defaults to ``("y", "x")``.
+        The order of the dimension names must be (vertical, horizontal).
 
     Returns
     -------
