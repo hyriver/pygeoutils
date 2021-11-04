@@ -53,8 +53,6 @@ def test_gtiff2array(wms_resp):
     assert (
         abs(canopy_box.mean().values.item() - expected) < SMALL
         and abs(canopy.mean().values.item() - expected) < SMALL
-        and isinstance(canopy.attrs["scales"], tuple)
-        and isinstance(canopy.attrs["offsets"], tuple)
         and vec.shape[0] == 1174
     )
 

@@ -15,6 +15,7 @@ import pyproj
 import rasterio as rio
 import rasterio.features as rio_features
 import rasterio.transform as rio_transform
+import rioxarray as rxr
 import shapely.geometry as sgeom
 import ujson as json
 import xarray as xr
@@ -331,12 +332,13 @@ def gtiff2xarray(
         with rio.MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
-                ds = xr.open_rasterio(vrt)
+                ds = rxr.open_rasterio(vrt)
                 with contextlib.suppress(ValueError):
                     ds = ds.squeeze("band", drop=True)
                 ds = ds.sortby(attrs.dims[0], ascending=False)
                 ds.attrs["crs"] = attrs.crs.to_string()
                 ds.attrs["transform"] = attrs.transform
+                ds.attrs["nodatavals"] = (attrs.nodata,)
                 ds.name = var_name[lyr]
                 fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
                 ds.to_netcdf(fpath)
@@ -345,32 +347,18 @@ def gtiff2xarray(
     ds = xr.open_mfdataset(
         (to_dataset(lyr, resp) for lyr, resp in r_dict.items()),
         parallel=True,
+        decode_coords="all",
     )
-    if len(ds.variables) - len(ds.dims) == 1:
-        ds = ds[list(ds.keys())[0]]
+    variables = list(ds.keys())
+    if len(variables) == 1:
+        ds = ds[variables[0]]
     ds = ds.sortby(attrs.dims[0], ascending=False)
     ds.attrs["crs"] = attrs.crs.to_string()
     ds.attrs["nodatavals"] = (attrs.nodata,)
     transform, _, _ = get_transform(ds, attrs.dims)
     ds.attrs["transform"] = transform2tuple(transform)
     ds.attrs["res"] = (transform.a, transform.e)
-
-    ds = attrs2tuple(ds, ["scales", "offsets"])
-    if isinstance(ds, xr.Dataset):
-        for v in ds.keys():
-            ds[v] = attrs2tuple(ds[v], ["scales", "offsets"])
-
     return xarray_geomask(ds, geometry, geo_crs, attrs.dims, all_touched)
-
-
-def attrs2tuple(
-    ds: Union[xr.Dataset, xr.DataArray], attrs: List[str]
-) -> Union[xr.Dataset, xr.DataArray]:
-    """Convert the floats attributes of a dataset or dataarray to a tuple."""
-    for attr in attrs:
-        if attr in ds.attrs and not isinstance(ds.attrs[attr], tuple):
-            ds.attrs[attr] = (ds.attrs[attr],)
-    return ds
 
 
 def xarray_geomask(
@@ -478,7 +466,7 @@ def get_gtiff_attrs(
             else:
                 nodata = np.dtype(src.dtypes[0]).type(src.nodata)
 
-            ds = xr.open_rasterio(src)
+            ds = rxr.open_rasterio(src)
             if ds_dims is None:
                 ds_dims = _get_dim_names(ds)
 
