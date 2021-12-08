@@ -33,10 +33,10 @@ def test_json2geodf():
     ]
 
     service = ArcGISRESTful(ServiceURL().restful.nhdplus_epa, 2, outformat="json", crs=ALT_CRS)
-    service.oids_bygeom(
+    oids = service.oids_bygeom(
         geom, geo_crs=ALT_CRS, sql_clause="FTYPE NOT IN (420,428,566)", distance=1500
     )
-    rjosn = service.get_features(return_m=True)
+    rjosn = service.get_features(oids, return_m=True)
     flw = geoutils.json2geodf(rjosn * 2, ALT_CRS, DEF_CRS)
 
     assert abs(flw.LENGTHKM.sum() - 8.917 * 2) < SMALL
