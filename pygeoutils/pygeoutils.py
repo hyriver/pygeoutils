@@ -282,6 +282,7 @@ def gtiff2xarray(
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
     all_touched: bool = False,
+    nodata: Union[float, int, None] = None,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
 
@@ -304,7 +305,9 @@ def gtiff2xarray(
     all_touched : bool, optional
         Include a pixel in the mask if it touches any of the shapes.
         If False (default), include a pixel only if its center is within one
-        of the shapes, or if it is selected by Bresenham’s line algorithm.
+        of the shapes, or if it is selected by Bresenham's line algorithm.
+    nodata : float or int, optional
+        The nodata value of the raster, defaults to None, i.e., is determined from the raster.
 
     Returns
     -------
@@ -324,7 +327,7 @@ def gtiff2xarray(
     else:
         var_name = dict(zip(r_dict, r_dict))
 
-    attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver)
+    attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
 
     tmp_dir = tempfile.gettempdir()
 
@@ -349,7 +352,7 @@ def gtiff2xarray(
         parallel=True,
         decode_coords="all",
     )
-    variables = list(ds.keys())
+    variables = list(ds)
     if len(variables) == 1:
         ds = ds[variables[0]]
     ds = ds.sortby(attrs.dims[0], ascending=False)
@@ -392,9 +395,8 @@ def xarray_geomask(
     xarray.Dataset or xarray.DataArray
         The input dataset with a mask applied (np.nan)
     """
-    attrs = ds.attrs
-    if "crs" not in attrs:
-        raise MissingAttribute("crs", list(attrs.keys()))
+    if "crs" not in ds.attrs:
+        raise MissingAttribute("crs", list(ds.attrs.keys()))
 
     if ds_dims is None:
         ds_dims = _get_dim_names(ds)
@@ -414,25 +416,33 @@ def xarray_geomask(
     mask = xr.DataArray(_mask, coords, dims=ds_dims)
 
     ds_masked = ds.where(mask, drop=True)
-    ds_masked.attrs = attrs
+    ds_masked.attrs = ds.attrs
     ds_masked.attrs["transform"] = transform2tuple(transform)
     ds_masked.attrs["bounds"] = _geometry.bounds
     ds_masked.attrs["res"] = (transform.a, transform.e)
-
+    if isinstance(ds_masked, xr.Dataset):
+        for v in ds_masked:
+            ds_masked[v].attrs = ds[v].attrs
+            ds_masked[v].attrs["transform"] = transform2tuple(transform)
+            ds_masked[v].attrs["bounds"] = _geometry.bounds
+            ds_masked[v].attrs["res"] = (transform.a, transform.e)
     return ds_masked
 
 
 class Attrs(NamedTuple):
     """Attributes of a GTiff byte response."""
 
-    nodata: np.float64
+    nodata: Union[float, int]
     crs: pyproj.crs.crs.CRS
     dims: Tuple[str, str]
     transform: Tuple[float, float, float, float, float, float]
 
 
 def get_gtiff_attrs(
-    resp: bytes, ds_dims: Optional[Tuple[str, str]] = None, driver: Optional[str] = None
+    resp: bytes,
+    ds_dims: Optional[Tuple[str, str]] = None,
+    driver: Optional[str] = None,
+    nodata: Union[float, int, None] = None,
 ) -> Attrs:
     """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
 
@@ -447,6 +457,8 @@ def get_gtiff_attrs(
     driver : str, optional
         A GDAL driver for reading the content, defaults to automatic detection. A list of
         the drivers can be found here: https://gdal.org/drivers/raster/index.html
+    nodata : float or int, optional
+        The nodata value of the raster, defaults to None, i.e., is determined from the raster.
 
     Returns
     -------
@@ -458,13 +470,17 @@ def get_gtiff_attrs(
         memfile.write(resp)
         with memfile.open(driver=driver) as src:
             r_crs = pyproj.CRS(src.crs)
-            if src.nodata is None:
-                try:
-                    nodata = np.iinfo(src.dtypes[0]).max
-                except ValueError:
-                    nodata = np.nan
+
+            if nodata is None:
+                if src.nodata is None:
+                    try:
+                        _nodata = np.iinfo(src.dtypes[0]).max
+                    except ValueError:
+                        _nodata = np.nan
+                else:
+                    _nodata = np.dtype(src.dtypes[0]).type(src.nodata)
             else:
-                nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+                _nodata = nodata
 
             ds = rxr.open_rasterio(src)
             if ds_dims is None:
@@ -477,7 +493,7 @@ def get_gtiff_attrs(
                 transform = transform2tuple(src.transform)
             else:
                 transform = src.transform  # type: ignore
-    return Attrs(nodata, r_crs, ds_dims, transform)
+    return Attrs(_nodata, r_crs, ds_dims, transform)
 
 
 def _get_dim_names(ds: Union[xr.DataArray, xr.Dataset]) -> Optional[Tuple[str, str]]:
