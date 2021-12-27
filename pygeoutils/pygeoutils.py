@@ -462,7 +462,7 @@ def get_gtiff_attrs(
 
     Returns
     -------
-    dict
+    Attrs
         No data, CRS, and dimension names for vertical and horizontal directions or
         a list of the existing dimensions if they are not in a list of common names.
     """
