@@ -191,12 +191,10 @@ def _rings2geojson(rings: List[List[List[float]]]) -> Dict[str, Any]:
     outer_rings, holes = _get_outer_rings(rings)
     uncontained_holes = _get_uncontained_holes(outer_rings, holes)
 
-    # if we couldn't match any holes using contains we can try intersects...
     while uncontained_holes:
         # pop a hole off out stack
         hole = uncontained_holes.pop()
 
-        # loop over all outer rings and see if any intersect our hole.
         intersects = False
         x = len(outer_rings) - 1
         while x >= 0:
@@ -204,7 +202,6 @@ def _rings2geojson(rings: List[List[List[float]]]) -> Dict[str, Any]:
             l1, l2 = LineString(outer_ring), LineString(hole)
             intersects = l1.intersects(l2)
             if intersects:
-                # the hole is contained push it into our polygon
                 outer_rings[x].append(hole)  # type: ignore
                 intersects = True
                 break
@@ -247,12 +244,9 @@ def _get_uncontained_holes(
     """Get all the uncontstrained holes."""
     uncontained_holes = []
 
-    # while there are holes left...
     while holes:
-        # pop a hole off out stack
         hole = holes.pop()
 
-        # loop over all outer rings and see if they contain our hole.
         contained = False
         x = len(outer_rings) - 1
         while x >= 0:
@@ -262,7 +256,6 @@ def _get_uncontained_holes(
             intersects = l1.intersects(l2)
             contains = l1.contains(p2)
             if not intersects and contains:
-                # the hole is contained push it into our polygon
                 outer_rings[x].append(hole)  # type: ignore
                 contained = True
                 break
