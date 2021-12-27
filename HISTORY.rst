@@ -2,6 +2,14 @@
 History
 =======
 
+0.12.0 (2021-12-27)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Add all the missing types so ``mypy --strict`` passes.
+- Bump version to 0.12.0 to match the release of ``pygeoogc``.
+
 0.11.7 (2021-11-09)
 -------------------
 
@@ -19,7 +27,7 @@ Internal Changes
 
 New Features
 ~~~~~~~~~~~~
-- Add a new function, ``xarray2geodf``, to convert an ``xarray.DataArray`` to a
+- Add a new function, ``xarray2geodf``, to convert a ``xarray.DataArray`` to a
   ``geopandas.GeoDataFrame``.
 
 0.11.5 (2021-06-16)
@@ -43,13 +51,13 @@ Internal Changes
 ~~~~~~~~~~~~~~~~
 - Use ``ujson`` for JSON parsing instead of ``orjson`` since ``orjson`` only serializes to
   ``bytes`` which is not compatible with ``aiohttp``.
-- Convert the transform attribute data type from ``Affine`` to ``tuple`` since saving an data
+- Convert the transform attribute data type from ``Affine`` to ``tuple`` since saving a data
   array to ``netcdf`` cannot handle the ``Affine`` type.
 
 0.11.3 (2021-08-19)
 -------------------
 
-- Fix an issue in ``geotiff2xarray`` related to saving an ``xarray`` object to netcdf when its
+- Fix an issue in ``geotiff2xarray`` related to saving a ``xarray`` object to NetCDF when its
   transform attribute has ``Affine`` type rather than a tuple.
 
 0.11.2 (2021-07-31)
@@ -124,7 +132,7 @@ Internal Changes
 -------------------
 
 - The first release after renaming ``hydrodata`` to ``PyGeoHydro``.
-- Address cheginit/py3dep#1 by sorting y coordinate after merge.
+- Address :issue_3dep:`1` by sorting y coordinate after merge.
 - Make ``mypy`` checks more strict and fix all the errors and prevent possible
   bugs.
 - Speed up CI testing by using ``mamba`` and caching.
@@ -134,10 +142,10 @@ Internal Changes
 
 - Bump version to the same version as PyGeoHydro.
 - Add ``gtiff2file`` for saving raster responses as ``geotiff`` file(s).
-- Fix an error in ``_get_nodata_crs`` for handling nodata value when its value in the source
+- Fix an error in ``_get_nodata_crs`` for handling no data value when its value in the source
   is None.
 - Fix the warning during the ``GeoDataFrame`` generation in ``json2geodf`` when there is
-  no geometry column in the input json.
+  no geometry column in the input JSON.
 
 0.2.0 (2020-12-06)
 -------------------
@@ -153,7 +161,7 @@ Internal Changes
 
 - Fixed the ``gtiff2xarray`` issue with high resolution requests and improved robustness
   of the function.
-- Replaced ``simplejson`` with ``orjson`` to speed up json operations.
+- Replaced ``simplejson`` with ``orjson`` to speed up JSON operations.
 
 
 0.1.9 (2020-08-11)
@@ -166,10 +174,10 @@ Internal Changes
 
 - Retained the compatibility with ``xarray`` 0.15 by removing the ``attrs`` flag.
 - Added ``xarray_geomask`` function and made it a public function.
-- More efficient handling of large geotiff responses by croping the response before
+- More efficient handling of large GeoTiff responses by cropping the response before
   converting it into a dataset.
 - Added a new function called ``geo2polygon`` for converting and transforming
-  a polygon or bounding box into a Shapley's Polygon in the target CRS.
+  a polygon or bounding box into a Shapely's Polygon in the target CRS.
 
 0.1.6 (2020-07-23)
 ------------------
