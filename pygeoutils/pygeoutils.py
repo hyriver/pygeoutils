@@ -433,7 +433,7 @@ class Attrs(NamedTuple):
     """Attributes of a GTiff byte response."""
 
     nodata: Union[float, int]
-    crs: pyproj.crs.crs.CRS
+    crs: pyproj.CRS
     dims: Tuple[str, str]
     transform: Tuple[float, float, float, float, float, float]
 
