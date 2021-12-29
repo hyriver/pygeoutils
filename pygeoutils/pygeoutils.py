@@ -127,7 +127,7 @@ class Convert:
                 geojson["coordinates"].append(arcgis["z"])
         return geojson
 
-    def rings(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+    def rings(self, arcgis: Dict[str, Any], _: Dict[str, Any]) -> Dict[str, Any]:
         outer_rings, holes = self.get_outer_rings(arcgis["rings"])
         uncontained_holes = self.get_uncontained_holes(outer_rings, holes)
 
@@ -153,8 +153,7 @@ class Convert:
         if len(outer_rings) == 1:
             return {"type": "Polygon", "coordinates": outer_rings[0]}
 
-        geojson = {"type": "MultiPolygon", "coordinates": outer_rings}
-        return geojson
+        return {"type": "MultiPolygon", "coordinates": outer_rings}
 
     def coords(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
         if self.isnumber([arcgis.get(c) for c in ("xmin", "xmax", "ymin", "ymax")]):
