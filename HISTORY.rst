@@ -2,6 +2,15 @@
 History
 =======
 
+0.12.1 (unreleased)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Refactor ``arcgis2geojson`` for better readability and maintainability.
+- In ``arcgis2geojson`` set the geometry to null if its type is not supported,
+  such as curved polylines.
+
 0.12.0 (2021-12-27)
 -------------------
 
