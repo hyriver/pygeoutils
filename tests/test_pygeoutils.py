@@ -115,6 +115,69 @@ def test_attr_none():
     assert geoutils.arcgis2geojson(resp) == expected
 
 
+def test_unsupported_geo():
+    resp = """
+    {
+        "geometry": {
+            "hasM": true,
+            "curveRings": [
+                [
+                [11, 11, 1],
+                [10, 10, 2],
+                [10, 11, 3],
+                [11, 11, 4],
+                {
+                    "b": [
+                    [15, 15, 2],
+                    [10, 17],
+                    [18, 20]
+                    ]
+                },
+                [11, 11, 4]
+                ],
+                [
+                [15, 15, 1],
+                {
+                    "c": [
+                    [20, 16, 3],
+                    [20, 14]
+                    ]
+                },
+                [15, 15, 3]
+                ]
+            ],
+            "rings":[
+                [
+                [11, 11, 1],
+                [10, 10, 2],
+                [10, 11, 3],
+                [11, 11, 4]
+                ],
+                [
+                [15, 15, 1],
+                [11, 11, 2],
+                [12, 15.5],
+                [15.4, 17.3],
+                [15, 15, 3]
+                ],
+                [
+                [20, 16 ,1],
+                [20, 14],
+                [17.6, 12.5],
+                [15, 15, 2],
+                [20, 16, 3]
+                ]
+            ]
+        }
+    }"""
+    expected = {
+        "type": "Feature",
+        "geometry": None,
+        "properties": None,
+    }
+    assert geoutils.arcgis2geojson(resp) == expected
+
+
 def test_geometry_none():
     resp = '{"attributes": {"OBJECTID": 5141}}'
     expected = {"type": "Feature", "geometry": None, "properties": {"OBJECTID": 5141}, "id": 5141}
