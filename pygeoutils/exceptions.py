@@ -2,6 +2,17 @@
 from typing import Generator, List, Optional, Union
 
 
+class MissingCRS(Exception):
+    """Exception raised when CRS is not given."""
+
+    def __init__(self) -> None:
+        self.message = "CRS of the input geometry is missing."
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class EmptyResponse(Exception):
     """Exception raised when the input response is empty."""
 
