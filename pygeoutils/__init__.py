@@ -1,5 +1,11 @@
 """Top-level package for PyGeoUtils."""
-from .exceptions import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
+from .exceptions import (
+    EmptyResponse,
+    InvalidInputType,
+    InvalidInputValue,
+    MissingAttribute,
+    MissingCRS,
+)
 from .print_versions import show_versions
 from .pygeoutils import (
     arcgis2geojson,
@@ -34,6 +40,7 @@ __all__ = [
     "InvalidInputType",
     "InvalidInputValue",
     "MissingAttribute",
+    "MissingCRS",
     "EmptyResponse",
     "show_versions",
 ]
