@@ -24,7 +24,13 @@ import xarray as xr
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 
-from .exceptions import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
+from .exceptions import (
+    EmptyResponse,
+    InvalidInputType,
+    InvalidInputValue,
+    MissingAttribute,
+    MissingCRS,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,7 +41,7 @@ logger.propagate = False
 
 DEF_CRS = "epsg:4326"
 BOX_ORD = "(west, south, east, north)"
-
+GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
 
 __all__ = [
     "json2geodf",
@@ -324,12 +330,13 @@ def convert(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dict[str, 
 
 def gtiff2xarray(
     r_dict: Dict[str, bytes],
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
-    geo_crs: str,
+    geometry: Optional[GTYPE] = None,
+    geo_crs: Optional[str] = None,
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
     all_touched: bool = False,
     nodata: Union[float, int, None] = None,
+    drop: bool = True,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
 
@@ -338,10 +345,12 @@ def gtiff2xarray(
     r_dict : dict
         Dictionary of (Geo)Tiff byte responses where keys are some names that are used
         for naming each responses, and values are bytes.
-    geometry : Polygon, MultiPolygon, or tuple
+    geometry : Polygon, MultiPolygon, or tuple, optional
         The geometry to mask the data that should be in the same CRS as the r_dict.
-    geo_crs : str
-        The spatial reference of the input geometry.
+        Defaults to ``None``.
+    geo_crs : str, optional
+        The spatial reference of the input geometry, defaults to ``None``. This
+        argument should be given when ``geometry`` is given.
     ds_dims : tuple of str, optional
         The names of the vertical and horizontal dimensions (in that order)
         of the target dataset, default to None. If None, dimension names are determined
@@ -355,6 +364,10 @@ def gtiff2xarray(
         of the shapes, or if it is selected by Bresenham's line algorithm.
     nodata : float or int, optional
         The nodata value of the raster, defaults to None, i.e., is determined from the raster.
+    drop : bool, optional
+        If True, drop the data outside of the extent of the mask geometries.
+        Otherwise, it will return the same raster with the data masked.
+        Default is True.
 
     Returns
     -------
@@ -408,15 +421,20 @@ def gtiff2xarray(
     transform, _, _ = get_transform(ds, attrs.dims)
     ds.attrs["transform"] = transform2tuple(transform)
     ds.attrs["res"] = (transform.a, transform.e)
-    return xarray_geomask(ds, geometry, geo_crs, attrs.dims, all_touched)
+    if geometry:
+        if geo_crs is None:
+            raise MissingCRS
+        return xarray_geomask(ds, geometry, geo_crs, attrs.dims, all_touched, drop)
+    return ds
 
 
 def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
+    geometry: GTYPE,
     geo_crs: str,
     ds_dims: Optional[Tuple[str, str]] = None,
     all_touched: bool = False,
+    drop: bool = True,
 ) -> Union[xr.Dataset, xr.DataArray]:
     """Mask a ``xarray.Dataset`` based on a geometry.
 
@@ -435,15 +453,27 @@ def xarray_geomask(
     all_touched : bool, optional
         Include a pixel in the mask if it touches any of the shapes.
         If False (default), include a pixel only if its center is within one
-        of the shapes, or if it is selected by Bresenham’s line algorithm.
+        of the shapes, or if it is selected by Bresenham's line algorithm.
+    drop : bool, optional
+        If True, drop the data outside of the extent of the mask geometries.
+        Otherwise, it will return the same raster with the data masked.
+        Default is True.
 
     Returns
     -------
     xarray.Dataset or xarray.DataArray
         The input dataset with a mask applied (np.nan)
     """
-    if "crs" not in ds.attrs:
-        raise MissingAttribute("crs", list(ds.attrs.keys()))
+    if isinstance(ds, xr.DataArray):
+        if "crs" not in ds.attrs:
+            raise MissingAttribute("crs", list(ds.attrs.keys()))
+        crs = ds.attrs["crs"]
+
+    if isinstance(ds, xr.Dataset):
+        crs_list = [ds[v].attrs["crs"] for v in ds if "crs" in ds[v].attrs]
+        if len(crs_list) == 0:
+            raise MissingAttribute("crs")
+        crs = crs_list[0]
 
     if ds_dims is None:
         ds_dims = _get_dim_names(ds)
@@ -453,7 +483,12 @@ def xarray_geomask(
         raise MissingAttribute("ds_dims", valid_dims)
 
     transform, width, height = get_transform(ds, ds_dims)
-    _geometry = geo2polygon(geometry, geo_crs, ds.crs)
+    _geometry = geo2polygon(geometry, geo_crs, crs)
+    attrs = {
+        "transform": transform2tuple(transform),
+        "bounds": _geometry.bounds,
+        "res": (transform.a, transform.e),
+    }
 
     _mask = rio_features.geometry_mask(
         [_geometry], (height, width), transform, invert=True, all_touched=all_touched
@@ -462,17 +497,22 @@ def xarray_geomask(
     coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
     mask = xr.DataArray(_mask, coords, dims=ds_dims)
 
-    ds_masked = ds.where(mask, drop=True)
+    ds_masked = ds.where(mask, drop=drop)
     ds_masked.attrs = ds.attrs
-    ds_masked.attrs["transform"] = transform2tuple(transform)
-    ds_masked.attrs["bounds"] = _geometry.bounds
-    ds_masked.attrs["res"] = (transform.a, transform.e)
+    ds_masked.attrs.update({k: v for k, v in attrs.items() if k in ds.attrs})
     if isinstance(ds_masked, xr.Dataset):
         for v in ds_masked:
             ds_masked[v].attrs = ds[v].attrs
-            ds_masked[v].attrs["transform"] = transform2tuple(transform)
-            ds_masked[v].attrs["bounds"] = _geometry.bounds
-            ds_masked[v].attrs["res"] = (transform.a, transform.e)
+            ds_masked[v].attrs.update(
+                {key: val for key, val in attrs.items() if key in ds[v].attrs}
+            )
+            if "nodatavals" in ds[v].attrs:
+                ds_masked[v] = ds_masked[v].fillna(ds[v].attrs["nodatavals"][0])
+                ds_masked[v] = ds_masked[v].astype(ds[v].dtype)
+    else:
+        if "nodatavals" in ds.attrs:
+            ds_masked = ds_masked.fillna(ds.attrs["nodatavals"][0])
+            ds_masked = ds_masked.astype(ds.dtype)
     return ds_masked
 
 
@@ -610,7 +650,7 @@ def transform2tuple(transform: rio.Affine) -> Tuple[float, float, float, float, 
 
 
 def geo2polygon(
-    geometry: Union[Polygon, MultiPolygon, Tuple[float, float, float, float]],
+    geometry: GTYPE,
     geo_crs: str,
     crs: str,
 ) -> Polygon:
@@ -645,7 +685,7 @@ def geo2polygon(
 
 
 def xarray2geodf(
-    da: xr.DataArray, dtype: str, mask_da: Optional[xr.DataArray] = None
+    da: xr.DataArray, dtype: str, mask_da: Optional[xr.DataArray] = None, connectivity: int = 8
 ) -> gpd.GeoDataFrame:
     """Vectorize a ``xarray.DataArray`` to a ``geopandas.GeoDataFrame``.
 
@@ -658,6 +698,9 @@ def xarray2geodf(
         ``uint8``, ``uint16``, and ``float32``.
     mask_da : xarray.DataArray, optional
         The dataarray to use as a mask, defaults to ``None``.
+    connectivity : int, optional
+        Use 4 or 8 pixel connectivity for grouping pixels into features,
+        defaults to 8.
 
     Returns
     -------
@@ -681,7 +724,10 @@ def xarray2geodf(
 
     mask = None if mask_da is None else mask_da.to_numpy()
     shapes = rio.features.shapes(
-        source=da.to_numpy().astype(_dtype), transform=da.transform, mask=mask
+        source=da.to_numpy().astype(_dtype),
+        transform=da.transform,
+        mask=mask,
+        connectivity=connectivity,
     )
     geometry, values = zip(*shapes)
     return gpd.GeoDataFrame(
