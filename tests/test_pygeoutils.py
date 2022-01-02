@@ -44,7 +44,7 @@ def test_json2geodf():
 
 def test_gtiff2array(wms_resp):
     canopy_box = geoutils.gtiff2xarray(wms_resp, GEO_NAT.bounds, DEF_CRS)
-    canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS)
+    canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS, drop=False)
 
     mask = canopy > 60
     vec = geoutils.xarray2geodf(canopy, "float32", mask)
@@ -53,7 +53,7 @@ def test_gtiff2array(wms_resp):
     assert (
         abs(canopy_box.mean().values.item() - expected) < SMALL
         and abs(canopy.mean().values.item() - expected) < SMALL
-        and vec.shape[0] == 1174
+        and vec.shape[0] == 1043
     )
 
 
