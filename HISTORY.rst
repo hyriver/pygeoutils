@@ -2,6 +2,21 @@
 History
 =======
 
+0.12.2 (unreleased)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- The ``geometry`` and ``geo_crs`` arguments of ``gtiff2xarray`` are now optional.
+  This is useful for cases when the input ``GeoTiff`` response is the results of
+  a bounding box query and there is no need for a geometry mask.
+- Replace the missing values after adding geometry mask via ``xarray_geomask`` by the
+  ``nodatavals`` attribute of the input ``xarray.DataArray`` or ``xarray.Dataset``.
+  Therefore, the data type of the input ``xarray.DataArray`` or ``xarray.Dataset``
+  is conserved.
+- Expose ``connectivity`` argument of ``rasterio.features.shapes`` function in
+  ``xarray2geodf`` function.
+
 0.12.1 (2021-12-31)
 -------------------
 
