@@ -54,6 +54,8 @@ def test_gtiff2array(wms_resp):
         abs(canopy_box.mean().values.item() - expected) < SMALL
         and abs(canopy.mean().values.item() - expected) < SMALL
         and vec.shape[0] == 1043
+        and "bounds" in canopy_box.attrs
+        and "bounds" in canopy.attrs
     )
 
 
