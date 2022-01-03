@@ -427,10 +427,10 @@ def gtiff2xarray(
     variables = list(ds)
     if len(variables) == 1:
         ds = ds[variables[0]].copy()
+        ds.attrs.update(ds_attrs)
         ds.attrs["nodatavals"] = (nodata_dict[ds.name] if nodata is None else nodata,)
-        ds.attrs.update({k: v for k, v in ds_attrs.items()})
     else:
-        ds.attrs.update({k: v for k, v in ds_attrs.items()})
+        ds.attrs.update(ds_attrs)
         for v in variables:
             ds[v].attrs["nodatavals"] = (nodata_dict[v] if nodata is None else nodata,)
     if geometry:
@@ -505,11 +505,13 @@ def xarray_geomask(
 
     ds_masked = ds.where(mask, drop=drop)
     ds_masked.attrs = ds.attrs
-    ds_masked.attrs.update({k: v for k, v in attrs.items()})
+    ds_masked.attrs.update({k: v for k, v in attrs.items() if k in ds_masked.attrs})
     if isinstance(ds_masked, xr.Dataset):
         for v in ds_masked:
             ds_masked[v].attrs = ds[v].attrs
-            ds_masked[v].attrs.update({key: val for key, val in attrs.items()})
+            ds_masked[v].attrs.update(
+                {key: val for key, val in attrs.items() if key in ds_masked[v].attrs}
+            )
             if "nodatavals" in ds[v].attrs:
                 ds_masked[v] = ds_masked[v].fillna(ds[v].attrs["nodatavals"][0])
                 ds_masked[v] = ds_masked[v].astype(ds[v].dtype)
