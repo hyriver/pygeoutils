@@ -388,6 +388,8 @@ def gtiff2xarray(
         var_name = dict(zip(r_dict, r_dict))
 
     attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
+    dtypes: Dict[str, type] = {}
+    nodata_dict: Dict[str, Union[float, int]] = {}
 
     tmp_dir = tempfile.gettempdir()
 
@@ -399,10 +401,9 @@ def gtiff2xarray(
                 with contextlib.suppress(ValueError):
                     ds = ds.squeeze("band", drop=True)
                 ds = ds.sortby(attrs.dims[0], ascending=False)
-                ds.attrs["crs"] = attrs.crs.to_string()
-                ds.attrs["transform"] = attrs.transform
-                ds.attrs["nodatavals"] = (attrs.nodata,)
                 ds.name = var_name[lyr]
+                dtypes[ds.name] = ds.dtype
+                nodata_dict[ds.name] = get_nodata(vrt)
                 fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
                 ds.to_netcdf(fpath)
                 return fpath
@@ -412,15 +413,26 @@ def gtiff2xarray(
         parallel=True,
         decode_coords="all",
     )
+    ds = ds.sortby(attrs.dims[0], ascending=False)
+    transform, _, _ = get_transform(ds, attrs.dims)
+    ds_attrs = {
+        "crs": attrs.crs.to_string(),
+        "transform": transform2tuple(transform),
+        "res": (transform.a, transform.e),
+        "bounds": get_bounds(ds, attrs.dims),
+    }
+    for v in ds:
+        ds[v] = ds[v].astype(dtypes[v])
+
     variables = list(ds)
     if len(variables) == 1:
-        ds = ds[variables[0]]
-    ds = ds.sortby(attrs.dims[0], ascending=False)
-    ds.attrs["crs"] = attrs.crs.to_string()
-    ds.attrs["nodatavals"] = (attrs.nodata,)
-    transform, _, _ = get_transform(ds, attrs.dims)
-    ds.attrs["transform"] = transform2tuple(transform)
-    ds.attrs["res"] = (transform.a, transform.e)
+        ds = ds[variables[0]].copy()
+        ds.attrs["nodatavals"] = (nodata_dict[ds.name] if nodata is None else nodata,)
+        ds.attrs.update({k: v for k, v in ds_attrs.items()})
+    else:
+        ds.attrs.update({k: v for k, v in ds_attrs.items()})
+        for v in variables:
+            ds[v].attrs["nodatavals"] = (nodata_dict[v] if nodata is None else nodata,)
     if geometry:
         if geo_crs is None:
             raise MissingCRS
@@ -464,16 +476,9 @@ def xarray_geomask(
     xarray.Dataset or xarray.DataArray
         The input dataset with a mask applied (np.nan)
     """
-    if isinstance(ds, xr.DataArray):
-        if "crs" not in ds.attrs:
-            raise MissingAttribute("crs", list(ds.attrs.keys()))
-        crs = ds.attrs["crs"]
-
-    if isinstance(ds, xr.Dataset):
-        crs_list = [ds[v].attrs["crs"] for v in ds if "crs" in ds[v].attrs]
-        if len(crs_list) == 0:
-            raise MissingAttribute("crs")
-        crs = crs_list[0]
+    if "crs" not in ds.attrs:
+        raise MissingAttribute("crs", list(ds.attrs.keys()))
+    crs = ds.attrs["crs"]
 
     if ds_dims is None:
         ds_dims = _get_dim_names(ds)
@@ -485,6 +490,7 @@ def xarray_geomask(
     transform, width, height = get_transform(ds, ds_dims)
     _geometry = geo2polygon(geometry, geo_crs, crs)
     attrs = {
+        "crs": crs,
         "transform": transform2tuple(transform),
         "bounds": _geometry.bounds,
         "res": (transform.a, transform.e),
@@ -499,13 +505,11 @@ def xarray_geomask(
 
     ds_masked = ds.where(mask, drop=drop)
     ds_masked.attrs = ds.attrs
-    ds_masked.attrs.update({k: v for k, v in attrs.items() if k in ds.attrs})
+    ds_masked.attrs.update({k: v for k, v in attrs.items()})
     if isinstance(ds_masked, xr.Dataset):
         for v in ds_masked:
             ds_masked[v].attrs = ds[v].attrs
-            ds_masked[v].attrs.update(
-                {key: val for key, val in attrs.items() if key in ds[v].attrs}
-            )
+            ds_masked[v].attrs.update({key: val for key, val in attrs.items()})
             if "nodatavals" in ds[v].attrs:
                 ds_masked[v] = ds_masked[v].fillna(ds[v].attrs["nodatavals"][0])
                 ds_masked[v] = ds_masked[v].astype(ds[v].dtype)
@@ -523,6 +527,18 @@ class Attrs(NamedTuple):
     crs: pyproj.CRS
     dims: Tuple[str, str]
     transform: Tuple[float, float, float, float, float, float]
+
+
+def get_nodata(src: Any) -> Union[float, int]:
+    """Get the nodata value of a GTiff byte response."""
+    if src.nodata is None:
+        try:
+            nodata: Union[float, int] = np.iinfo(src.dtypes[0]).max
+        except ValueError:
+            nodata = np.nan
+    else:
+        nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+    return nodata
 
 
 def get_gtiff_attrs(
@@ -557,17 +573,7 @@ def get_gtiff_attrs(
         memfile.write(resp)
         with memfile.open(driver=driver) as src:
             r_crs = pyproj.CRS(src.crs)
-
-            if nodata is None:
-                if src.nodata is None:
-                    try:
-                        _nodata = np.iinfo(src.dtypes[0]).max
-                    except ValueError:
-                        _nodata = np.nan
-                else:
-                    _nodata = np.dtype(src.dtypes[0]).type(src.nodata)
-            else:
-                _nodata = nodata
+            _nodata = get_nodata(src) if nodata is None else nodata
 
             ds = rxr.open_rasterio(src)
             if ds_dims is None:
@@ -576,10 +582,10 @@ def get_gtiff_attrs(
             valid_dims = list(ds.sizes)
             if ds_dims is None or any(d not in valid_dims for d in ds_dims):
                 raise MissingAttribute("ds_dims", valid_dims)
-            if not isinstance(src.transform, tuple):
+            if isinstance(src.transform, rio.Affine):
                 transform = transform2tuple(src.transform)
             else:
-                transform = src.transform  # type: ignore
+                transform = tuple(src.transform)  # type: ignore
     return Attrs(_nodata, r_crs, ds_dims, transform)
 
 
@@ -594,6 +600,31 @@ def _get_dim_names(ds: Union[xr.DataArray, xr.Dataset]) -> Optional[Tuple[str, s
         return None
     else:
         return (y_dim, x_dim)
+
+
+def get_bounds(
+    ds: Union[xr.Dataset, xr.DataArray],
+    ds_dims: Tuple[str, str] = ("y", "x"),
+) -> Tuple[float, float, float, float]:
+    """Get bounds of a ``xarray.Dataset`` or ``xarray.DataArray``.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset or xarray.DataArray
+        The dataset(array) to be masked
+    ds_dims : tuple, optional
+        Names of the coordinames in the dataset, defaults to ``("y", "x")``.
+        The order of the dimension names must be (vertical, horizontal).
+
+    Returns
+    -------
+    tuple
+        The bounds in the order of (left, bottom, right, top)
+    """
+    ydim, xdim = ds_dims
+    left, right = ds[xdim].min().item(), ds[xdim].max().item()
+    bottom, top = ds[ydim].min().item(), ds[ydim].max().item()
+    return left, bottom, right, top
 
 
 def get_transform(
@@ -618,8 +649,7 @@ def get_transform(
     ydim, xdim = ds_dims
     height, width = ds.sizes[ydim], ds.sizes[xdim]
 
-    left, right = ds[xdim].min().item(), ds[xdim].max().item()
-    bottom, top = ds[ydim].min().item(), ds[ydim].max().item()
+    left, bottom, right, top = get_bounds(ds, ds_dims)
 
     x_res = abs(left - right) / (width - 1)
     y_res = abs(top - bottom) / (height - 1)
