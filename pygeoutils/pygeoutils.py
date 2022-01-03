@@ -403,7 +403,7 @@ def gtiff2xarray(
                 ds = ds.sortby(attrs.dims[0], ascending=False)
                 ds.name = var_name[lyr]
                 dtypes[ds.name] = ds.dtype
-                nodata_dict[ds.name] = get_nodata(vrt)
+                nodata_dict[ds.name] = get_nodata(vrt) if nodata is None else nodata
                 fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
                 ds.to_netcdf(fpath)
                 return fpath
@@ -428,11 +428,11 @@ def gtiff2xarray(
     if len(variables) == 1:
         ds = ds[variables[0]].copy()
         ds.attrs.update(ds_attrs)
-        ds.attrs["nodatavals"] = (nodata_dict[ds.name] if nodata is None else nodata,)
+        ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
     else:
         ds.attrs.update(ds_attrs)
         for v in variables:
-            ds[v].attrs["nodatavals"] = (nodata_dict[v] if nodata is None else nodata,)
+            ds[v].attrs["nodatavals"] = (nodata_dict[v],)
     if geometry:
         if geo_crs is None:
             raise MissingCRS
