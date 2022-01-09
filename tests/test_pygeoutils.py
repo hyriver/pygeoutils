@@ -5,6 +5,7 @@ from pygeoogc import ArcGISRESTful, ServiceURL
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
+from pygeoutils import Coordinates
 
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
@@ -22,6 +23,11 @@ GEO_NAT = Polygon(
     [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
 )
 SMALL = 1e-3
+
+
+def test_coords():
+    c = Coordinates([460, 20, -30], [80, 200, 10])
+    assert c.points.x.tolist() == [100.0, -30.0]
 
 
 def test_json2geodf():
