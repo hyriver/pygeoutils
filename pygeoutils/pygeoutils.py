@@ -652,8 +652,8 @@ def get_transform(
 
     left, bottom, right, top = get_bounds(ds, ds_dims)
 
-    x_res = abs(left - right) / (width - 1)
-    y_res = abs(top - bottom) / (height - 1)
+    x_res = abs(left - right) / width
+    y_res = abs(top - bottom) / height
 
     left -= x_res * 0.5
     right += x_res * 0.5
