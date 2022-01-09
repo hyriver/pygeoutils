@@ -8,6 +8,7 @@ from .exceptions import (
 )
 from .print_versions import show_versions
 from .pygeoutils import (
+    Coordinates,
     arcgis2geojson,
     geo2polygon,
     get_gtiff_attrs,
@@ -37,6 +38,7 @@ __all__ = [
     "xarray2geodf",
     "json2geodf",
     "xarray_geomask",
+    "Coordinates",
     "InvalidInputType",
     "InvalidInputValue",
     "MissingAttribute",

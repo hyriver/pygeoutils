@@ -8,7 +8,7 @@ import uuid
 from dataclasses import dataclass
 from numbers import Number
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import geopandas as gpd
 import numpy as np
@@ -51,6 +51,7 @@ __all__ = [
     "xarray_geomask",
     "gtiff2xarray",
     "xarray2geodf",
+    "Coordinates",
 ]
 
 
@@ -148,13 +149,13 @@ class Convert:
                 l1, l2 = LineString(outer_ring), LineString(hole)
                 intersects = l1.intersects(l2)
                 if intersects:
-                    outer_rings[x].append(hole)  # type: ignore
+                    outer_rings[x].append(hole)
                     intersects = True
                     break
                 x = x - 1
 
             if not intersects:
-                outer_rings.append([hole[::-1]])  # type: ignore
+                outer_rings.append([hole[::-1]])
 
         if len(outer_rings) == 1:
             return {"type": "Polygon", "coordinates": outer_rings[0]}
@@ -216,8 +217,8 @@ class Convert:
 
     @staticmethod
     def get_outer_rings(
-        rings: List[List[List[float]]],
-    ) -> Tuple[List[List[float]], List[List[float]]]:
+        rings: List[Any],
+    ) -> Tuple[List[Any], List[Any]]:
         """Get outer rings and holes in a list of rings."""
         outer_rings = []
         holes = []
@@ -238,12 +239,10 @@ class Convert:
             else:
                 # wind inner rings clockwise for RFC 7946 compliance
                 holes.append(ring[::-1])
-        return outer_rings, holes  # type: ignore
+        return outer_rings, holes
 
     @staticmethod
-    def get_uncontained_holes(
-        outer_rings: List[List[float]], holes: List[List[float]]
-    ) -> List[List[float]]:
+    def get_uncontained_holes(outer_rings: List[Any], holes: List[Any]) -> List[Any]:
         """Get all the uncontstrained holes."""
         uncontained_holes = []
 
@@ -259,7 +258,7 @@ class Convert:
                 intersects = l1.intersects(l2)
                 contains = l1.contains(p2)
                 if not intersects and contains:
-                    outer_rings[x].append(hole)  # type: ignore
+                    outer_rings[x].append(hole)
                     contained = True
                     break
                 x = x - 1
@@ -335,7 +334,7 @@ def gtiff2xarray(
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
     all_touched: bool = False,
-    nodata: Union[float, int, None] = None,
+    nodata: Union[Number, None] = None,
     drop: bool = True,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
@@ -389,11 +388,11 @@ def gtiff2xarray(
 
     attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: Dict[str, type] = {}
-    nodata_dict: Dict[str, Union[float, int]] = {}
+    nodata_dict: Dict[str, Number] = {}
 
     tmp_dir = tempfile.gettempdir()
 
-    def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
+    def to_dataset(lyr: str, resp: bytes) -> Path:
         with rio.MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
@@ -525,17 +524,17 @@ def xarray_geomask(
 class Attrs(NamedTuple):
     """Attributes of a GTiff byte response."""
 
-    nodata: Union[float, int]
+    nodata: Number
     crs: pyproj.CRS
     dims: Tuple[str, str]
     transform: Tuple[float, float, float, float, float, float]
 
 
-def get_nodata(src: Any) -> Union[float, int]:
+def get_nodata(src: Any) -> Number:
     """Get the nodata value of a GTiff byte response."""
     if src.nodata is None:
         try:
-            nodata: Union[float, int] = np.iinfo(src.dtypes[0]).max
+            nodata: Number = np.iinfo(src.dtypes[0]).max
         except ValueError:
             nodata = np.nan
     else:
@@ -547,7 +546,7 @@ def get_gtiff_attrs(
     resp: bytes,
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
-    nodata: Union[float, int, None] = None,
+    nodata: Union[Number, None] = None,
 ) -> Attrs:
     """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
 
@@ -767,3 +766,57 @@ def xarray2geodf(
         geometry=[sgeom.shape(g) for g in geometry],
         crs=da.crs,
     )
+
+
+@dataclass
+class Coordinates:
+    """Generate validated and normalized coordinates in WGS84.
+
+    Parameters
+    ----------
+    lon : float or list of floats
+        Longitude(s) in decimal degrees.
+    lat : float or list of floats
+        Latitude(s) in decimal degrees.
+
+    Examples
+    --------
+    >>> from pygeoutils import Coordinates
+    >>> c = Coordinates([460, 20, -30], [80, 200, 10])
+    >>> c.points.x.tolist()
+    [100.0, -30.0]
+    """
+
+    lon: Union[Number, Sequence[Number]]
+    lat: Union[Number, Sequence[Number]]
+
+    def __post_init__(self) -> None:
+        """Normalize the longitude value within [-180, 180)."""
+        _lon = [self.lon] if isinstance(self.lon, Number) else self.lon
+        lat = [self.lat] if isinstance(self.lat, Number) else self.lat
+        if not isinstance(_lon, (list, tuple)) and not isinstance(lat, (list, tuple)):
+            raise InvalidInputType("lon/lat", "float or list")
+
+        lon = np.mod(np.mod(_lon, 360) + 540, 360) - 180
+        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs=self._crs)
+        self._points = self.__validate(pts, self._wgs84)
+
+    @property
+    def _crs(self) -> pyproj.CRS:
+        """Get EPSG:4326 CRS."""
+        return pyproj.CRS(4326)
+
+    @property
+    def _wgs84(self) -> sgeom.Polygon:
+        """Get the WGS84 bounds."""
+        return sgeom.box(*self._crs.area_of_use.bounds)
+
+    @staticmethod
+    def __validate(pts: gpd.GeoSeries, bbox: sgeom.Polygon) -> gpd.GeoSeries:
+        """Create a ``geopandas.GeoSeries`` from valid coords within a bounding box."""
+        return pts[pts.sindex.query(bbox)].sort_index()
+
+    @property
+    def points(self) -> gpd.GeoSeries:
+        """Get validate coordinate as a ``geopandas.GeoSeries``."""
+        return self._points
