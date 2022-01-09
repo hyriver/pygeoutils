@@ -5,6 +5,13 @@ History
 0.12.2 (unreleased)
 -------------------
 
+New Features
+~~~~~~~~~~~~
+- Add a new class called ``Coordinates`` that validates a set of lon/lat coordinates.
+  It normalizes longitudes to the range [-180, 180) and has a ``points`` property
+  that is ``geopandas.GeoSeries`` with validated coordinates. It uses spatial indexing
+  to speed up the validation and should be able to handle large datasets.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - The ``geometry`` and ``geo_crs`` arguments of ``gtiff2xarray`` are now optional.
