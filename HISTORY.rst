@@ -10,7 +10,7 @@ New Features
 - Add a new class called ``Coordinates`` that validates a set of lon/lat coordinates.
   It normalizes longitudes to the range [-180, 180) and has a ``points`` property
   that is ``geopandas.GeoSeries`` with validated coordinates. It uses spatial indexing
-  to speed up the validation and should be able to handle large datasets.
+  to speed up the validation and should be able to handle large datasets efficiently.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
@@ -23,6 +23,7 @@ Internal Changes
   is conserved.
 - Expose ``connectivity`` argument of ``rasterio.features.shapes`` function in
   ``xarray2geodf`` function.
+- Move all private functions to a new module to make the main module less cluttered.
 
 0.12.1 (2021-12-31)
 -------------------
