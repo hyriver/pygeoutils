@@ -9,12 +9,9 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import pyproj
 import rasterio as rio
-import rioxarray as rxr
 import ujson as json
 import xarray as xr
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon
-
-from .exceptions import MissingAttribute
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,18 +32,21 @@ class Convert:
     id_attr: Optional[str] = None
 
     def features(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the features from an ArcGIS JSON object."""
         geojson["type"] = "FeatureCollection"
         geojson["features"] = [convert(f, self.id_attr) for f in arcgis["features"]]
         return geojson
 
     @staticmethod
     def points(arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the points from an ArcGIS JSON object."""
         geojson["type"] = "MultiPoint"
         geojson["coordinates"] = arcgis["points"]
         return geojson
 
     @staticmethod
     def paths(arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the paths from an ArcGIS JSON object."""
         if len(arcgis["paths"]) == 1:
             geojson["type"] = "LineString"
             geojson["coordinates"] = arcgis["paths"][0]
@@ -56,6 +56,7 @@ class Convert:
         return geojson
 
     def xy(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the xy coordinates from an ArcGIS JSON object."""
         if self.isnumber([arcgis.get("x"), arcgis.get("y")]):
             geojson["type"] = "Point"
             geojson["coordinates"] = [arcgis["x"], arcgis["y"]]
@@ -64,6 +65,7 @@ class Convert:
         return geojson
 
     def rings(self, arcgis: Dict[str, Any], _: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the rings from an ArcGIS JSON object."""
         outer_rings, holes = self.get_outer_rings(arcgis["rings"])
         uncontained_holes = self.get_uncontained_holes(outer_rings, holes)
 
@@ -92,6 +94,7 @@ class Convert:
         return {"type": "MultiPolygon", "coordinates": outer_rings}
 
     def coords(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the bounds from an ArcGIS JSON object."""
         if self.isnumber([arcgis.get(c) for c in ("xmin", "xmax", "ymin", "ymax")]):
             geojson["type"] = "Polygon"
             geojson["coordinates"] = [
@@ -107,6 +110,7 @@ class Convert:
 
     @staticmethod
     def geometry(arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the geometry from an ArcGIS JSON object."""
         if arcgis.get("geometry") is not None:
             curves = {
                 "curveRings": "Curved Polygon",
@@ -135,6 +139,7 @@ class Convert:
         return geojson
 
     def attributes(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the attributes from an ArcGIS JSON object."""
         geojson["properties"] = arcgis["attributes"]
         keys = {self.id_attr, "OBJECTID", "FID"} if self.id_attr else {"OBJECTID", "FID"}
         key = list(itertools.dropwhile(lambda k: arcgis["attributes"].get(k) is None, keys))
