@@ -18,6 +18,7 @@ from .pygeoutils import (
     xarray2geodf,
     xarray_geomask,
 )
+from .utils import transform2tuple
 
 try:
     import importlib.metadata as metadata
@@ -37,6 +38,7 @@ __all__ = [
     "gtiff2xarray",
     "xarray2geodf",
     "json2geodf",
+    "transform2tuple",
     "xarray_geomask",
     "Coordinates",
     "InvalidInputType",
