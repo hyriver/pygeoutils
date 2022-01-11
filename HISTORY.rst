@@ -11,6 +11,7 @@ New Features
   It normalizes longitudes to the range [-180, 180) and has a ``points`` property
   that is ``geopandas.GeoSeries`` with validated coordinates. It uses spatial indexing
   to speed up the validation and should be able to handle large datasets efficiently.
+- Make ``transform2tuple`` a public function.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
