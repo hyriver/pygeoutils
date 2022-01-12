@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import pyproj
 import rasterio as rio
-import rasterio.features as rio_features
 import rasterio.transform as rio_transform
 import rioxarray as rxr
 import shapely.geometry as sgeom
@@ -213,39 +212,34 @@ def gtiff2xarray(
         decode_coords="all",
     )
     ds = ds.sortby(attrs.dims[0], ascending=False)
-    transform, _, _ = get_transform(ds, attrs.dims)
-    ds_attrs = {
-        "crs": attrs.crs.to_string(),
-        "transform": utils.transform2tuple(transform),
-        "res": (transform.a, transform.e),
-        "bounds": utils.get_bounds(ds, attrs.dims),
-    }
+
     for v in ds:
         ds[v] = ds[v].astype(dtypes[v])
 
     variables = list(ds)
     if len(variables) == 1:
         ds = ds[variables[0]].copy()
-        ds.attrs.update(ds_attrs)
+        ds.attrs["crs"] = attrs.crs.to_string()
         ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
     else:
-        ds.attrs.update(ds_attrs)
+        ds.attrs["crs"] = attrs.crs.to_string()
         for v in variables:
+            ds[v].attrs["crs"] = attrs.crs.to_string()
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
-    if geometry:
+    if isinstance(geometry, (Polygon, MultiPolygon)):
         if geo_crs is None:
             raise MissingCRS
-        return xarray_geomask(ds, geometry, geo_crs, attrs.dims, all_touched, drop)
+        return xarray_geomask(ds, geometry, geo_crs, all_touched, drop, from_disk=True)
     return ds
 
 
 def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
-    geometry: GTYPE,
-    geo_crs: str,
-    ds_dims: Optional[Tuple[str, str]] = None,
+    geometry: Union[Polygon, MultiPolygon],
+    crs: str,
     all_touched: bool = False,
     drop: bool = True,
+    from_disk: bool = False,
 ) -> Union[xr.Dataset, xr.DataArray]:
     """Mask a ``xarray.Dataset`` based on a geometry.
 
@@ -253,14 +247,10 @@ def xarray_geomask(
     ----------
     ds : xarray.Dataset or xarray.DataArray
         The dataset(array) to be masked
-    geometry : Polygon, MultiPolygon, or tuple of length 4
-        The geometry or bounding box to mask the data
-    geo_crs : str
+    geometry : Polygon, MultiPolygon
+        The geometry to mask the data
+    crs : str
         The spatial reference of the input geometry
-    ds_dims : tuple of str, optional
-        The names of the vertical and horizontal dimensions (in that order)
-        of the target dataset, default to None. If None, dimension names are determined
-        from a list of common names.
     all_touched : bool, optional
         Include a pixel in the mask if it touches any of the shapes.
         If False (default), include a pixel only if its center is within one
@@ -269,56 +259,27 @@ def xarray_geomask(
         If True, drop the data outside of the extent of the mask geometries.
         Otherwise, it will return the same raster with the data masked.
         Default is True.
+    from_disk : bool, optional
+         If True, it will clip from disk using rasterio.mask.mask if possible.
+         This is beneficial when the size of the data is larger than memory.
+         Default is False.
 
     Returns
     -------
     xarray.Dataset or xarray.DataArray
         The input dataset with a mask applied (np.nan)
     """
-    if "crs" not in ds.attrs:
-        raise MissingAttribute("crs", list(ds.attrs.keys()))
-    crs = ds.attrs["crs"]
+    ds_attrs = ds.attrs
+    if isinstance(ds, xr.Dataset):
+        da_attrs = {v: ds[v].attrs for v in ds}
 
-    if ds_dims is None:
-        ds_dims = utils.get_dim_names(ds)
+    ds = ds.rio.clip([geometry], crs=crs, all_touched=all_touched, drop=drop, from_disk=from_disk)
+    ds.rio.update_attrs(ds_attrs, inplace=True)
 
-    valid_dims = list(ds.sizes)
-    if ds_dims is None or any(d not in valid_dims for d in ds_dims):
-        raise MissingAttribute("ds_dims", valid_dims)
-
-    transform, width, height = get_transform(ds, ds_dims)
-    _geometry = geo2polygon(geometry, geo_crs, crs)
-    attrs = {
-        "crs": crs,
-        "transform": utils.transform2tuple(transform),
-        "bounds": _geometry.bounds,
-        "res": (transform.a, transform.e),
-    }
-
-    _mask = rio_features.geometry_mask(
-        [_geometry], (height, width), transform, invert=True, all_touched=all_touched
-    )
-
-    coords = {ds_dims[0]: ds.coords[ds_dims[0]], ds_dims[1]: ds.coords[ds_dims[1]]}
-    mask = xr.DataArray(_mask, coords, dims=ds_dims)
-
-    ds_masked = ds.where(mask, drop=drop)
-    ds_masked.attrs = ds.attrs
-    ds_masked.attrs.update({k: v for k, v in attrs.items() if k in ds_masked.attrs})
-    if isinstance(ds_masked, xr.Dataset):
-        for v in ds_masked:
-            ds_masked[v].attrs = ds[v].attrs
-            ds_masked[v].attrs.update(
-                {key: val for key, val in attrs.items() if key in ds_masked[v].attrs}
-            )
-            if "nodatavals" in ds[v].attrs:
-                ds_masked[v] = ds_masked[v].fillna(ds[v].attrs["nodatavals"][0])
-                ds_masked[v] = ds_masked[v].astype(ds[v].dtype)
-    else:
-        if "nodatavals" in ds.attrs:
-            ds_masked = ds_masked.fillna(ds.attrs["nodatavals"][0])
-            ds_masked = ds_masked.astype(ds.dtype)
-    return ds_masked
+    if isinstance(ds, xr.Dataset):
+        _ = [ds[v].rio.update_attrs(da_attrs[v], inplace=True) for v in ds]
+    ds.rio.update_encoding(ds.encoding, inplace=True)
+    return ds
 
 
 def get_gtiff_attrs(
@@ -426,13 +387,13 @@ def geo2polygon(
     Polygon
         A Polygon in the target CRS.
     """
-    if not isinstance(geometry, (Polygon, MultiPolygon, tuple)):
+    if not isinstance(geometry, (Polygon, MultiPolygon, Sequence)):
         raise InvalidInputType("geometry", "Polygon or tuple of length 4")
 
-    if isinstance(geometry, tuple) and len(geometry) != 4:
+    if isinstance(geometry, Sequence) and len(geometry) != 4:
         raise InvalidInputType("geometry", "tuple of length 4")
 
-    geom = sgeom.box(*geometry) if isinstance(geometry, tuple) else geometry
+    geom = sgeom.box(*geometry) if isinstance(geometry, Sequence) else geometry
     project = pyproj.Transformer.from_crs(geo_crs, crs, always_xy=True).transform
     geom = ops.transform(project, geom)
     if not geom.is_valid:
@@ -474,14 +435,14 @@ def xarray2geodf(
         raise InvalidInputValue("dtype", valid_types)
     _dtype = getattr(np, dtype)
 
-    for attr in ["crs", "transform"]:
-        if attr not in da.attrs:
-            raise MissingAttribute(attr)
+    crs = da.rio.crs if da.attrs.get("crs") is None else da.crs
+    if crs is None:
+        raise MissingCRS
 
     mask = None if mask_da is None else mask_da.to_numpy()
     shapes = rio.features.shapes(
         source=da.to_numpy().astype(_dtype),
-        transform=da.transform,
+        transform=da.rio.transform(),
         mask=mask,
         connectivity=connectivity,
     )
@@ -489,7 +450,7 @@ def xarray2geodf(
     return gpd.GeoDataFrame(
         data={da.name: _dtype(values)},
         geometry=[sgeom.shape(g) for g in geometry],
-        crs=da.crs,
+        crs=crs,
     )
 
 
