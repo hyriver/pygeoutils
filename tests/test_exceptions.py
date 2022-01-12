@@ -2,7 +2,7 @@ import pytest
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
-from pygeoutils import EmptyResponse, InvalidInputType, InvalidInputValue, MissingAttribute
+from pygeoutils import EmptyResponse, InvalidInputType, InvalidInputValue, MissingCRS
 
 try:
     import typeguard  # noqa: F401
@@ -78,11 +78,3 @@ class TestX2GFail:
         with pytest.raises(InvalidInputType) as ex:
             _ = geoutils.xarray2geodf(canopy, "float32", mask.to_dataset())
         assert "DataArray" in str(ex.value)
-
-    def test_missing_attr(self, wms_resp):
-        canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS)
-        mask = canopy > 60
-        canopy.attrs = {}
-        with pytest.raises(MissingAttribute) as ex:
-            _ = geoutils.xarray2geodf(canopy, "float32", mask)
-        assert "crs" in str(ex.value)
