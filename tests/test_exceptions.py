@@ -2,7 +2,7 @@ import pytest
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
-from pygeoutils import EmptyResponse, InvalidInputType, InvalidInputValue, MissingCRS
+from pygeoutils import EmptyResponse, InvalidInputType, InvalidInputValue
 
 try:
     import typeguard  # noqa: F401
