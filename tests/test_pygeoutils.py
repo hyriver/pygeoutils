@@ -1,11 +1,12 @@
 """Tests for PyGeoUtils"""
 import io
 
+import geopandas as gpd
 from pygeoogc import ArcGISRESTful, ServiceURL
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
-from pygeoutils import Coordinates
+from pygeoutils import Coordinates, GeoBSpline
 
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
@@ -28,6 +29,25 @@ SMALL = 1e-3
 def test_coords():
     c = Coordinates([460, 20, -30], [80, 200, 10])
     assert c.points.x.tolist() == [100.0, -30.0]
+
+
+def test_bspline():
+    xl, yl = zip(
+        *[
+            (-97.06138, 32.837),
+            (-97.06133, 32.836),
+            (-97.06124, 32.834),
+            (-97.06127, 32.832),
+        ]
+    )
+    pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs="epsg:4326")).to_crs("epsg:3857")
+    sp = GeoBSpline(pts, 10).spline
+    assert (
+        len(sp.x) == 10
+        and abs(sum(sp.y) - 38734230.680) < SMALL
+        and abs(sp.phi.max() - (-1.527)) < SMALL
+        and abs(sp.radius.min() - 9618.943) < SMALL
+    )
 
 
 def test_json2geodf():
