@@ -1,6 +1,7 @@
 """Top-level package for PyGeoUtils."""
 from .exceptions import (
     EmptyResponse,
+    InvalidInputRange,
     InvalidInputType,
     InvalidInputValue,
     MissingAttribute,
@@ -9,6 +10,7 @@ from .exceptions import (
 from .print_versions import show_versions
 from .pygeoutils import (
     Coordinates,
+    GeoBSpline,
     arcgis2geojson,
     geo2polygon,
     get_gtiff_attrs,
@@ -41,8 +43,10 @@ __all__ = [
     "transform2tuple",
     "xarray_geomask",
     "Coordinates",
+    "GeoBSpline",
     "InvalidInputType",
     "InvalidInputValue",
+    "InvalidInputRange",
     "MissingAttribute",
     "MissingCRS",
     "EmptyResponse",

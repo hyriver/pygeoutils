@@ -106,3 +106,22 @@ class UndeterminedDims(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class InvalidInputRange(Exception):
+    """Exception raised when a function argument is not in the valid range.
+
+    Parameters
+    ----------
+    variable : str
+        Variable with invalid value
+    valid_range : str
+        Valid range
+    """
+
+    def __init__(self, variable: str, valid_range: str) -> None:
+        self.message = f"Valid range for {variable} is {valid_range}."
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message

@@ -19,12 +19,14 @@ import rioxarray as rxr
 import shapely.geometry as sgeom
 import ujson as json
 import xarray as xr
+from scipy.interpolate import BSpline
 from shapely import ops
-from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry import LineString, MultiPolygon, Polygon
 
 from . import utils
 from .exceptions import (
     EmptyResponse,
+    InvalidInputRange,
     InvalidInputType,
     InvalidInputValue,
     MissingAttribute,
@@ -52,6 +54,7 @@ __all__ = [
     "gtiff2xarray",
     "xarray2geodf",
     "Coordinates",
+    "GeoBSpline",
 ]
 
 
@@ -506,3 +509,176 @@ class Coordinates:
     def points(self) -> gpd.GeoSeries:
         """Get validate coordinate as a ``geopandas.GeoSeries``."""
         return self._points
+
+
+@dataclass
+class Spline:
+    """Provide attributes of an interpolated B-spline.
+
+    Attributes
+    ----------
+    x : numpy.ndarray
+        The x-coordinates of the interpolated points.
+    y : numpy.ndarray
+        The y-coordinates of the interpolated points.
+    phi : numpy.ndarray
+        Curvature of the B-spline in radians.
+    radius : numpy.ndarray
+        Radius of curvature of the B-spline.
+    distance : numpy.ndarray
+        Total distance of each point along the B-spline from the start point.
+    """
+
+    x: np.ndarray
+    y: np.ndarray
+    phi: np.ndarray
+    radius: np.ndarray
+    distance: np.ndarray
+
+
+class GeoBSpline:
+    """Create B-spline from a geo-dataframe of points.
+
+    Parameters
+    ----------
+    points : geopandas.GeoDataFrame or geopandas.GeoSeries
+        Input points as a ``GeoDataFrame`` or ``GeoSeries`` in a projected CRS.
+    npts_sp : int
+        Number of points in the output spline curve.
+    degree : int, optional
+        Degree of the spline. Should be less than the number of points and
+        greater than 1. Default is 3.
+
+    Examples
+    --------
+    >>> from pygeoutils import GeoBSpline
+    >>> import geopandas as gpd
+    >>> xl, yl = zip(
+    ...     *[
+    ...         (-97.06138, 32.837),
+    ...         (-97.06133, 32.836),
+    ...         (-97.06124, 32.834),
+    ...         (-97.06127, 32.832),
+    ...     ]
+    ... )
+    >>> pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs="epsg:4326"))
+    >>> sp = GeoBSpline(pts.to_crs("epsg:3857"), 5).spline
+    >>> pts_sp = gpd.GeoSeries(gpd.points_from_xy(sp.x, sp.y, crs="epsg:3857"))
+    >>> pts_sp = pts_sp.to_crs("epsg:4326")
+    >>> list(zip(pts_sp.x, pts_sp.y))
+    [(-97.06138, 32.837),
+    (-97.06135, 32.83629),
+    (-97.06131, 32.83538),
+    (-97.06128, 32.83434),
+    (-97.06127, 32.83319)]
+    """
+
+    def __init__(
+        self, points: Union[gpd.GeoDataFrame, gpd.GeoSeries], npts_sp: int, degree: int = 3
+    ) -> None:
+        self.degree = degree
+        self.crs = points.crs
+        if self.crs is None:
+            raise MissingCRS
+
+        if not self.crs.is_projected:
+            raise InvalidInputType("points.crs", "projected CRS")
+
+        if any(points.geom_type != "Point"):
+            raise InvalidInputType("points.geom_type", "Point")
+        self.points = points
+
+        if npts_sp < 1:
+            raise InvalidInputRange("npts_sp", ">= 1")
+        self.npts_sp = npts_sp
+
+        tx, ty = zip(*(g.xy for g in points.geometry))
+        self.x_ln = np.array(tx, dtype="f8").squeeze()
+        self.y_ln = np.array(ty, dtype="f8").squeeze()
+        self.npts_ln = self.x_ln.size
+        self.l_ln = LineString(points.geometry).length
+        self._spline = self.__spline(npts_sp, degree)
+
+    @property
+    def spline(self) -> Spline:
+        """Get the spline as a ``Spline`` object."""
+        return self._spline
+
+    def __spline(self, npts_sp: int, degree: int = 3) -> Spline:
+        """Create a B-spline curve from a set of points.
+
+        Notes
+        -----
+        This function is based on https://stackoverflow.com/a/45928473/5797702.
+
+        Parameters
+        ----------
+        npts_sp : int
+            Number of points in the output spline curve.
+        degree : int, optional
+            Degree of the spline. Should be less than the number of points and
+            greater than 1. Default is 3.
+
+        Returns
+        -------
+        Spline
+            A Spline object with ``x``, ``y``, ``phi``, and ``radius`` attributes.
+        """
+        degree = np.clip(degree, 1, self.npts_ln - 1)
+        konts = np.clip(np.arange(self.npts_ln + degree + 1) - degree, 0, self.npts_ln - degree)
+        spl = BSpline(konts, np.column_stack([self.x_ln, self.y_ln]), degree)
+
+        x_sp, y_sp = spl(np.linspace(0, self.npts_ln - degree, max(npts_sp, 3), endpoint=False)).T
+        phi_sp, rad_sp = self.__curvature(x_sp, y_sp, self.l_ln)
+        geom = (
+            LineString([(x1, y1), (x2, y2)])
+            for x1, y1, x2, y2 in zip(x_sp[:-1], y_sp[:-1], x_sp[1:], y_sp[1:])
+        )
+        d_sp = gpd.GeoSeries(geom, crs=self.crs).length.cumsum().values
+        if npts_sp < 3:
+            idx = np.r_[:npts_sp]
+            return Spline(x_sp[idx], y_sp[idx], phi_sp[idx], rad_sp[idx], d_sp[idx])
+
+        return Spline(x_sp, y_sp, phi_sp, rad_sp, d_sp)
+
+    @staticmethod
+    def __curvature(
+        xs: Union[Sequence[float], np.ndarray], ys: Union[Sequence[float], np.ndarray], l_tot: float
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Compute the curvature of a B-spline curve.
+
+        Notes
+        -----
+        This function is based on `nldi-xstool <https://code.usgs.gov/wma/nhgf/toolsteam/nldi-xstool>`__.
+
+        Parameters
+        ----------
+        xs : array_like
+            x coordinates of the points.
+        ys : array_like
+            y coordinates of the points.
+        l_tot : float
+            Total distance of points along the B-spline from the start point.
+
+        Returns
+        -------
+        tuple of array_like
+            Curvature and radius of curvature.
+        """
+        size = len(xs)
+        dx = np.diff(xs, prepend=xs[0])
+        dy = np.diff(ys, prepend=ys[0])
+        phi = np.zeros(size) + np.pi * 0.5 * np.sign(dy)
+        nonzero = np.nonzero(dx)
+
+        phi[nonzero] = np.arctan2(dy[nonzero], dx[nonzero])
+        phi[0] = (2.0 * phi[1]) - phi[2]
+
+        rad = np.zeros(size) + 100000000.0
+        dphi = np.zeros(size)
+        scals = l_tot / (dx.size - 1)
+
+        dphi[1:] = np.fabs(phi[1:]) - np.fabs(phi[:-1])
+        non_small = np.where(dphi > 0.0001)[0]
+        rad[non_small] = scals / dphi[non_small]
+        return phi, rad
