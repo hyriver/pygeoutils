@@ -33,12 +33,12 @@ dependencies:
   - numpy>=1.17
   - pygeos
   - rasterio>=1.2
+  - scipy
   - xarray>=0.18
   - rioxarray>=0.8
 
   # py3dep
   - click>=7.0
-  - scipy
   - richdem>=0.3.4
 
   # pynhd deps
