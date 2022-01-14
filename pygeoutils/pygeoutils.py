@@ -60,8 +60,8 @@ __all__ = [
 
 def json2geodf(
     content: Union[List[Dict[str, Any]], Dict[str, Any]],
-    in_crs: str = DEF_CRS,
-    crs: str = DEF_CRS,
+    in_crs: Union[str, pyproj.CRS] = DEF_CRS,
+    crs: Union[str, pyproj.CRS] = DEF_CRS,
 ) -> gpd.GeoDataFrame:
     """Create GeoDataFrame from (Geo)JSON.
 
@@ -69,9 +69,9 @@ def json2geodf(
     ----------
     content : dict or list of dict
         A (Geo)JSON dictionary e.g., response.json() or a list of them.
-    in_crs : str
+    in_crs: str or pyproj.CRS
         CRS of the content, defaults to ``epsg:4326``.
-    crs : str, optional
+    crs: str or pyproj.CRS, optional
         The target CRS of the output GeoDataFrame, defaults to ``epsg:4326``.
 
     Returns
@@ -149,7 +149,7 @@ def gtiff2xarray(
     geometry : Polygon, MultiPolygon, or tuple, optional
         The geometry to mask the data that should be in the same CRS as the r_dict.
         Defaults to ``None``.
-    geo_crs : str, optional
+    geo_crs: str or pyproj.CRS, optional
         The spatial reference of the input geometry, defaults to ``None``. This
         argument should be given when ``geometry`` is given.
     ds_dims : tuple of str, optional
@@ -239,7 +239,7 @@ def gtiff2xarray(
 def xarray_geomask(
     ds: Union[xr.Dataset, xr.DataArray],
     geometry: Union[Polygon, MultiPolygon],
-    crs: str,
+    crs: Union[str, pyproj.CRS],
     all_touched: bool = False,
     drop: bool = True,
     from_disk: bool = False,
@@ -252,7 +252,7 @@ def xarray_geomask(
         The dataset(array) to be masked
     geometry : Polygon, MultiPolygon
         The geometry to mask the data
-    crs : str
+    crs: str or pyproj.CRS
         The spatial reference of the input geometry
     all_touched : bool, optional
         Include a pixel in the mask if it touches any of the shapes.
@@ -371,8 +371,8 @@ def get_transform(
 
 def geo2polygon(
     geometry: GTYPE,
-    geo_crs: str,
-    crs: str,
+    geo_crs: Union[str, pyproj.CRS],
+    crs: Union[str, pyproj.CRS],
 ) -> Polygon:
     """Convert a geometry to a Shapely's Polygon and transform to any CRS.
 
@@ -380,9 +380,9 @@ def geo2polygon(
     ----------
     geometry : Polygon or tuple of length 4
         Polygon or bounding box (west, south, east, north).
-    geo_crs : str
+    geo_crs: str or pyproj.CRS
         Spatial reference of the input geometry
-    crs : str
+    crs: str or pyproj.CRS
         Target spatial reference.
 
     Returns
