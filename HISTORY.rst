@@ -2,16 +2,16 @@
 History
 =======
 
-0.12.2 (unreleased)
+0.12.2 (2022-01-15)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
 - Add a new class called ``GeoBSpline`` that generates B-splines from a set of
   coordinates. The ``spline`` attribute of this class has five attributes:
-  ``x`` and ``y``-coordinates, ``phi`` and ``radius`` which are curvature and
-  radius of curvature, and ``distance`` which is the distance of each point in
-  the spline from the starting points.
+  ``x`` and ``y`` coordinates, ``phi`` and ``radius`` which are curvature and
+  radius of curvature, respectively, and ``distance`` which is the total distance
+  of each point along the B-spline from the starting points.
 - Add a new class called ``Coordinates`` that validates a set of lon/lat coordinates.
   It normalizes longitudes to the range [-180, 180) and has a ``points`` property
   that is ``geopandas.GeoSeries`` with validated coordinates. It uses spatial indexing
