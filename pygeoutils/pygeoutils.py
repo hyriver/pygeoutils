@@ -622,7 +622,8 @@ class GeoBSpline:
         Returns
         -------
         Spline
-            A Spline object with ``x``, ``y``, ``phi``, and ``radius`` attributes.
+            A Spline object with ``x``, ``y``, ``phi``, ``radius``,
+            and ``distance`` attributes.
         """
         degree = np.clip(degree, 1, self.npts_ln - 1)
         konts = np.clip(np.arange(self.npts_ln + degree + 1) - degree, 0, self.npts_ln - degree)
@@ -674,11 +675,10 @@ class GeoBSpline:
         phi[nonzero] = np.arctan2(dy[nonzero], dx[nonzero])
         phi[0] = (2.0 * phi[1]) - phi[2]
 
-        rad = np.zeros(size) + 100000000.0
-        dphi = np.zeros(size)
+        rad = np.zeros(size) + 1.0e8
         scals = l_tot / (dx.size - 1)
 
-        dphi[1:] = np.fabs(phi[1:]) - np.fabs(phi[:-1])
-        non_small = np.where(dphi > 0.0001)[0]
+        dphi = np.diff(np.abs(phi), prepend=np.abs(phi[0]))
+        non_small = np.where(dphi > 1e-4)[0]
         rad[non_small] = scals / dphi[non_small]
         return phi, rad
