@@ -3,7 +3,7 @@ import io
 
 import geopandas as gpd
 from pygeoogc import ArcGISRESTful, ServiceURL
-from shapely.geometry import Polygon
+from shapely.geometry import LineString, Point, Polygon
 
 import pygeoutils as geoutils
 from pygeoutils import Coordinates, GeoBSpline
@@ -19,11 +19,34 @@ GEO_URB = Polygon(
         [-118.72, 34.118],
     ]
 )
-
 GEO_NAT = Polygon(
     [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
 )
 SMALL = 1e-3
+
+
+def test_break_line():
+    crs_proj = "epsg:3857"
+    lines = gpd.GeoSeries([LineString([[0, 0], [2, 2]])], crs=crs_proj)
+    pt = Point(1, 1)
+    points = gpd.GeoDataFrame({"direction": ["down"]}, geometry=[pt], crs=crs_proj, index=[0])
+    lb_wo_tol = geoutils.break_lines(lines, points)
+    pt = Point(0.5, 1.5)
+    points = gpd.GeoDataFrame({"direction": ["up"]}, geometry=[pt], crs=crs_proj, index=[0])
+    lb_w_tol = geoutils.break_lines(lines, points, tol=0.5)
+    assert abs(lb_wo_tol.length.sum() - lb_w_tol.length.sum()) < SMALL
+
+    lines = gpd.GeoDataFrame({"id": [0]}, geometry=[LineString([[0, 0], [2, 2]])], crs=crs_proj)
+    lb_w_df = geoutils.break_lines(lines, points, tol=0.5)
+    assert abs(lb_wo_tol.length.sum() - lb_w_df.length.sum()) < SMALL
+
+
+def test_snap():
+    crs_proj = "epsg:3857"
+    lines = gpd.GeoSeries([LineString([[0, 0], [2, 2]])], crs=crs_proj)
+    points = gpd.GeoSeries([Point(0.5, 1.5)], crs=crs_proj)
+    pts = geoutils.snap2nearest(lines, points, tol=0.5)
+    assert pts.geom_equals(gpd.GeoSeries([Point(1, 1)], crs=crs_proj)).sum() == 1
 
 
 def test_coords():
