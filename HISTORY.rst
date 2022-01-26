@@ -2,6 +2,17 @@
 History
 =======
 
+0.12.3 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a function called ``break_lines`` for breaking lines at given points.
+- Add a function called ``snap2nearest`` for snapping points to the nearest
+  point on a line with a given tolerance. It accepts a ``geopandas.GeoSeries`` of
+  points and a ``geopandas.GeoSeries`` or ``geopandas.GeoDataFrame`` of lines. It
+  automatically snaps to the closest lines in the input data.
+
 0.12.2 (2022-01-15)
 -------------------
 
