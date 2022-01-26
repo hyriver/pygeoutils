@@ -7,8 +7,9 @@ import uuid
 from dataclasses import dataclass
 from numbers import Number
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
 
+import cytoolz as tlz
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -23,16 +24,18 @@ from scipy.interpolate import BSpline
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
 
-from . import utils
+from . import _utils as utils
+from ._utils import Attrs
 from .exceptions import (
     EmptyResponse,
     InvalidInputRange,
     InvalidInputType,
     InvalidInputValue,
     MissingAttribute,
+    MissingColumns,
     MissingCRS,
+    UnprojectedCRS,
 )
-from .utils import Attrs
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -44,8 +47,11 @@ logger.propagate = False
 DEF_CRS = "epsg:4326"
 BOX_ORD = "(west, south, east, north)"
 GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
+GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
 
 __all__ = [
+    "snap2nearest",
+    "break_lines",
     "json2geodf",
     "arcgis2geojson",
     "geo2polygon",
@@ -573,9 +579,7 @@ class GeoBSpline:
     (-97.06127, 32.83319)]
     """
 
-    def __init__(
-        self, points: Union[gpd.GeoDataFrame, gpd.GeoSeries], npts_sp: int, degree: int = 3
-    ) -> None:
+    def __init__(self, points: GDF, npts_sp: int, degree: int = 3) -> None:
         self.degree = degree
         self.crs = points.crs
         if self.crs is None:
@@ -682,3 +686,117 @@ class GeoBSpline:
         non_small = np.where(dphi > 1e-4)[0]
         rad[non_small] = scals / dphi[non_small]
         return phi, rad
+
+
+def snap2nearest(lines: GDF, points: GDF, tol: float) -> GDF:
+    """Break lines at specified points at given direction.
+
+    Parameters
+    ----------
+    lines : geopandas.GeoDataFrame or geopandas.GeoSeries
+        Lines.
+    points : geopandas.GeoDataFrame or geopandas.GeoSeries
+        Points to snap to lines.
+    tol : float, optional
+        Tolerance for snapping points to the nearest lines in meters.
+        It must be greater than 0.0.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame or geopandas.GeoSeries
+        Points snapped to lines.
+    """
+    if lines.crs is None or points.crs is None:
+        raise MissingCRS
+
+    if not lines.crs.is_projected or not points.crs.is_projected:
+        raise UnprojectedCRS
+
+    if isinstance(points, gpd.GeoSeries):
+        pts: gpd.GeoDataFrame = points.to_frame("geometry").reset_index()
+    else:
+        pts = points.copy()
+
+    cols = list(pts.columns)
+    cols.remove("geometry")
+    pts_idx, ln_idx = lines.sindex.query_bulk(pts.buffer(tol))
+    merged_idx = tlz.merge_with(list, ({p: f} for p, f in zip(pts_idx, ln_idx)))
+    _pts = {
+        pi: (
+            *pts.iloc[pi][cols],  # type: ignore[has-type]
+            ops.nearest_points(lines.iloc[fi].geometry.unary_union, pts.iloc[pi].geometry)[0],
+        )
+        for pi, fi in merged_idx.items()
+    }
+    pts = gpd.GeoDataFrame.from_dict(_pts, orient="index")
+    pts.columns = cols + ["geometry"]
+    pts = pts.set_geometry("geometry", crs=points.crs)
+
+    if isinstance(points, gpd.GeoSeries):
+        return pts.geometry
+    return pts
+
+
+def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
+    """Break lines at specified points at given direction.
+
+    Parameters
+    ----------
+    lines : geopandas.GeoDataFrame
+        Lines to break at intersection points.
+    points : geopandas.GeoDataFrame
+        Points to break lines at. It must contain a column named ``direction``
+        with values ``up`` or ``down``. This column is used to determine which
+        part of the lines to keep, i.e., upstream or downstream of points.
+    tol : float, optional
+        Tolerance for snapping points to the nearest lines in meters.
+        The default is 0.0.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        Original lines except for the parts that have been broken at the specified
+        points.
+    """
+    if lines.crs is None or points.crs is None:
+        raise MissingCRS
+
+    if "direction" not in points.columns:
+        raise MissingColumns(["direction"])
+
+    if (points.direction == "up").sum() + (points.direction == "down").sum() != len(points):
+        raise InvalidInputValue("direction", ["up", "down"])
+
+    if lines.crs != points.crs or not lines.crs.is_projected or not points.crs.is_projected:
+        crs_proj = "epsg:3857"
+        lns = lines.to_crs(crs_proj)
+        pts = points.to_crs(crs_proj)
+    else:
+        crs_proj = lines.crs
+        lns = lines.copy()
+        pts = points.copy()
+
+    if tol > 0.0:
+        pts = snap2nearest(lns, pts, tol)
+
+    pts_idx, flw_idx = lns.sindex.query_bulk(pts.geometry)
+    if len(pts_idx) == 0:
+        raise ValueError("No intersection between lines and points")  # noqa: TC003
+
+    flw_geom = lns.iloc[flw_idx].geometry
+    pts_geom = pts.iloc[pts_idx].geometry
+    pts_dir = pts.iloc[pts_idx].direction
+    idx = lns.iloc[flw_idx].index
+    broken_lines = gpd.GeoSeries(
+        [
+            ops.substring(fl, *((0, fl.project(pt)) if d == "up" else (fl.project(pt), fl.length)))
+            for fl, pt, d in zip(flw_geom, pts_geom, pts_dir)
+        ],
+        crs=crs_proj,
+        index=idx,
+    )
+    if isinstance(lns, gpd.GeoDataFrame):
+        lns.loc[idx, "geometry"] = broken_lines
+    else:
+        lns.loc[idx] = broken_lines
+    return lns.to_crs(lines.crs)

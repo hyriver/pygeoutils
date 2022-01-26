@@ -2,11 +2,39 @@
 from typing import Generator, List, Optional, Union
 
 
+class MissingColumns(Exception):
+    """Exception raised when a required column is missing from a dataframe.
+
+    Parameters
+    ----------
+    missing : list
+        List of missing columns.
+    """
+
+    def __init__(self, missing: List[str]) -> None:
+        self.message = "The following columns are missing:\n" + f"{', '.join(missing)}"
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class MissingCRS(Exception):
     """Exception raised when CRS is not given."""
 
     def __init__(self) -> None:
         self.message = "CRS of the input geometry is missing."
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class UnprojectedCRS(Exception):
+    """Exception raised when CRS is not given."""
+
+    def __init__(self) -> None:
+        self.message = "CRS must be projected."
         super().__init__(self.message)
 
     def __str__(self) -> str:
