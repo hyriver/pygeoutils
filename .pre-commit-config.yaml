@@ -105,7 +105,7 @@ repos:
       additional_dependencies: [types-all]
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.1
+    rev: 1.7.2
     hooks:
     - id: bandit
       name: Check for security issues with bandit
