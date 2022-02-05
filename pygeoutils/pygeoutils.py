@@ -784,8 +784,8 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
 
     mlines = lns.geom_type == "MultiLineString"
     if mlines.any():
-        lns.loc[mlines, "geometry"] = [list(g.geoms) for g in lns.loc[mlines, "geometry"]]
-        lns = lns.explode("geometry")
+        lns.loc[mlines, "geometry"] = lns.loc[mlines, "geometry"].apply(lambda g: list(g.geoms))
+        lns = lns.explode("geometry").set_crs(crs_proj)
 
     pts_idx, flw_idx = lns.sindex.query_bulk(pts.geometry)
     if len(pts_idx) == 0:
