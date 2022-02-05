@@ -767,6 +767,9 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
     if (points.direction == "up").sum() + (points.direction == "down").sum() != len(points):
         raise InvalidInputValue("direction", ["up", "down"])
 
+    if not lines.geom_type.isin(["LineString", "MultiLineString"]).all():
+        raise InvalidInputType("geometry", "LineString or MultiLineString")
+
     if lines.crs != points.crs or not lines.crs.is_projected or not points.crs.is_projected:
         crs_proj = "epsg:3857"
         lns = lines.to_crs(crs_proj)
@@ -778,6 +781,11 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
 
     if tol > 0.0:
         pts = snap2nearest(lns, pts, tol)
+
+    mlines = lns.geom_type == "MultiLineString"
+    if mlines.any():
+        lns.loc[mlines, "geometry"] = [list(g.geoms) for g in lns.loc[mlines, "geometry"]]
+        lns = lns.explode("geometry")
 
     pts_idx, flw_idx = lns.sindex.query_bulk(pts.geometry)
     if len(pts_idx) == 0:
@@ -795,6 +803,7 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
         crs=crs_proj,
         index=idx,
     )
+
     if isinstance(lns, gpd.GeoDataFrame):
         lns.loc[idx, "geometry"] = broken_lines
     else:
