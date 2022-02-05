@@ -2,6 +2,14 @@
 History
 =======
 
+0.12.4 (unreleased)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- In the ``break_lines`` function, convert ``MultiLineString`` into
+  ``LineString`` since ``shapely.ops.substring`` only accepts ``LineString``.
+
 0.12.3 (2022-02-04)
 -------------------
 
