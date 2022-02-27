@@ -32,3 +32,19 @@ def wms_resp():
         1e3,
         box_crs=DEF_CRS,
     )
+
+
+@pytest.fixture()
+def cover_resp():
+    """Return a WMS response."""
+    wms = WMS(
+        ServiceURL().wms.mrlc,
+        layers="NLCD_2019_Land_Cover_Science_Product_L48",
+        outformat="image/geotiff",
+        crs=DEF_CRS,
+    )
+    return wms.getmap_bybox(
+        GEO_NAT.bounds,
+        1e3,
+        box_crs=DEF_CRS,
+    )

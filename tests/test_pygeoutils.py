@@ -91,18 +91,20 @@ def test_json2geodf():
     assert abs(flw.LENGTHKM.sum() - 8.917 * 2) < SMALL
 
 
-def test_gtiff2array(wms_resp):
+def test_gtiff2array(wms_resp, cover_resp):
     canopy_box = geoutils.gtiff2xarray(wms_resp, GEO_NAT.bounds, DEF_CRS)
     canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS, drop=False)
+    cover = geoutils.gtiff2xarray(cover_resp, GEO_NAT, DEF_CRS)
 
     mask = canopy > 60
     vec = geoutils.xarray2geodf(canopy, "float32", mask)
 
-    expected = 72.042
+    expected = 72.2235
     assert (
         abs(canopy_box.mean().values.item() - expected) < SMALL
         and abs(canopy.mean().values.item() - expected) < SMALL
-        and vec.shape[0] == 1043
+        and vec.shape[0] == 1014
+        and cover.rio.nodata == 0
     )
 
 
