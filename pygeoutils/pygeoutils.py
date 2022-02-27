@@ -211,6 +211,7 @@ def gtiff2xarray(
                 ds.name = var_name[lyr]
                 dtypes[ds.name] = ds.dtype
                 nodata_dict[ds.name] = utils.get_nodata(vrt) if nodata is None else nodata
+                ds = ds.rio.write_nodata(nodata_dict[ds.name])
                 fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
                 ds.to_netcdf(fpath)
                 return fpath
@@ -230,11 +231,15 @@ def gtiff2xarray(
         ds = ds[variables[0]].copy()
         ds.attrs["crs"] = attrs.crs.to_string()
         ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
+        ds = ds.rio.write_nodata(nodata_dict[ds.name])
+        ds = ds.rio.write_crs(attrs.crs)
     else:
         ds.attrs["crs"] = attrs.crs.to_string()
+        ds = ds.rio.write_crs(attrs.crs)
         for v in variables:
             ds[v].attrs["crs"] = attrs.crs.to_string()
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
+            ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
     if isinstance(geometry, (Polygon, MultiPolygon)):
         if geo_crs is None:
             raise MissingCRS
