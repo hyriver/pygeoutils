@@ -5,6 +5,11 @@ History
 0.12.4 (unreleased)
 -------------------
 
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Write ``nodata`` attribute using ``rioxarray`` in ``geotiff2xarray`` since the
+  clipping operation of ``rioxarray`` uses this value as fill value.
+
 Bug Fixes
 ~~~~~~~~~
 - In the ``break_lines`` function, convert ``MultiLineString`` into
