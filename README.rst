@@ -104,7 +104,7 @@ Features
 --------
 
 PyGeoUtils is a part of `HyRiver <https://github.com/cheginit/HyRiver>`__ software stack that
-is designed to aid in watershed analysis through web services. This package provides
+is designed to aid in hydroclimate analysis through web services. This package provides
 utilities for manipulating (Geo)JSON and (Geo)TIFF responses from web services.
 These utilities are:
 
