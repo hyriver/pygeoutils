@@ -64,6 +64,33 @@ __all__ = [
 ]
 
 
+def arcgis2geojson(
+    arcgis: Union[str, Dict[str, Any]], id_attr: Optional[str] = None
+) -> Dict[str, Any]:
+    """Convert ESRIGeoJSON format to GeoJSON.
+
+    Notes
+    -----
+    Based on `arcgis2geojson <https://github.com/chris48s/arcgis2geojson>`__.
+
+    Parameters
+    ----------
+    arcgis : str or binary
+        The ESRIGeoJSON format str (or binary)
+    id_attr : str, optional
+        ID of the attribute of interest, defaults to ``None``.
+
+    Returns
+    -------
+    dict
+        A GeoJSON file readable by GeoPandas.
+    """
+    if isinstance(arcgis, str):
+        return utils.convert(json.loads(arcgis), id_attr)
+
+    return utils.convert(arcgis, id_attr)
+
+
 def json2geodf(
     content: Union[List[Dict[str, Any]], Dict[str, Any]],
     in_crs: Union[str, pyproj.CRS] = DEF_CRS,
@@ -108,31 +135,101 @@ def json2geodf(
     return geodf
 
 
-def arcgis2geojson(
-    arcgis: Union[str, Dict[str, Any]], id_attr: Optional[str] = None
-) -> Dict[str, Any]:
-    """Convert ESRIGeoJSON format to GeoJSON.
-
-    Notes
-    -----
-    Based on `arcgis2geojson <https://github.com/chris48s/arcgis2geojson>`__.
+def xarray_geomask(
+    ds: Union[xr.Dataset, xr.DataArray],
+    geometry: Union[Polygon, MultiPolygon],
+    crs: Union[str, pyproj.CRS],
+    all_touched: bool = False,
+    drop: bool = True,
+    from_disk: bool = False,
+) -> Union[xr.Dataset, xr.DataArray]:
+    """Mask a ``xarray.Dataset`` based on a geometry.
 
     Parameters
     ----------
-    arcgis : str or binary
-        The ESRIGeoJSON format str (or binary)
-    id_attr : str, optional
-        ID of the attribute of interest, defaults to ``None``.
+    ds : xarray.Dataset or xarray.DataArray
+        The dataset(array) to be masked
+    geometry : Polygon, MultiPolygon
+        The geometry to mask the data
+    crs: str or pyproj.CRS
+        The spatial reference of the input geometry
+    all_touched : bool, optional
+        Include a pixel in the mask if it touches any of the shapes.
+        If False (default), include a pixel only if its center is within one
+        of the shapes, or if it is selected by Bresenham's line algorithm.
+    drop : bool, optional
+        If True, drop the data outside of the extent of the mask geometries.
+        Otherwise, it will return the same raster with the data masked.
+        Default is True.
+    from_disk : bool, optional
+         If True, it will clip from disk using rasterio.mask.mask if possible.
+         This is beneficial when the size of the data is larger than memory.
+         Default is False.
 
     Returns
     -------
-    dict
-        A GeoJSON file readable by GeoPandas.
+    xarray.Dataset or xarray.DataArray
+        The input dataset with a mask applied (np.nan)
     """
-    if isinstance(arcgis, str):
-        return utils.convert(json.loads(arcgis), id_attr)
+    ds_attrs = ds.attrs
+    if isinstance(ds, xr.Dataset):
+        da_attrs = {v: ds[v].attrs for v in ds}
 
-    return utils.convert(arcgis, id_attr)
+    ds = ds.rio.clip([geometry], crs=crs, all_touched=all_touched, drop=drop, from_disk=from_disk)
+    ds.rio.update_attrs(ds_attrs, inplace=True)
+
+    if isinstance(ds, xr.Dataset):
+        _ = [ds[v].rio.update_attrs(da_attrs[v], inplace=True) for v in ds]
+    ds.rio.update_encoding(ds.encoding, inplace=True)
+    return ds
+
+
+def get_gtiff_attrs(
+    resp: bytes,
+    ds_dims: Optional[Tuple[str, str]] = None,
+    driver: Optional[str] = None,
+    nodata: Union[Number, None] = None,
+) -> Attrs:
+    """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
+
+    Parameters
+    ----------
+    resp : bytes
+        Raster response returned from a wed service request such as WMS
+    ds_dims : tuple of str, optional
+        The names of the vertical and horizontal dimensions (in that order)
+        of the target dataset, default to None. If None, dimension names are determined
+        from a list of common names.
+    driver : str, optional
+        A GDAL driver for reading the content, defaults to automatic detection. A list of
+        the drivers can be found here: https://gdal.org/drivers/raster/index.html
+    nodata : float or int, optional
+        The nodata value of the raster, defaults to None, i.e., is determined from the raster.
+
+    Returns
+    -------
+    Attrs
+        No data, CRS, and dimension names for vertical and horizontal directions or
+        a list of the existing dimensions if they are not in a list of common names.
+    """
+    with rio.MemoryFile() as memfile:
+        memfile.write(resp)
+        with memfile.open(driver=driver) as src:
+            r_crs = pyproj.CRS(src.crs)
+            _nodata = utils.get_nodata(src) if nodata is None else nodata
+
+            ds = rxr.open_rasterio(src)
+            if ds_dims is None:
+                ds_dims = utils.get_dim_names(ds)
+
+            valid_dims = list(ds.sizes)
+            if ds_dims is None or any(d not in valid_dims for d in ds_dims):
+                raise MissingAttribute("ds_dims", valid_dims)
+            if isinstance(src.transform, rio.Affine):
+                transform = utils.transform2tuple(src.transform)
+            else:
+                transform = tuple(src.transform)  # type: ignore
+    return Attrs(_nodata, r_crs, ds_dims, transform)
 
 
 def gtiff2xarray(
@@ -245,103 +342,6 @@ def gtiff2xarray(
             raise MissingCRS
         return xarray_geomask(ds, geometry, geo_crs, all_touched, drop, from_disk=True)
     return ds
-
-
-def xarray_geomask(
-    ds: Union[xr.Dataset, xr.DataArray],
-    geometry: Union[Polygon, MultiPolygon],
-    crs: Union[str, pyproj.CRS],
-    all_touched: bool = False,
-    drop: bool = True,
-    from_disk: bool = False,
-) -> Union[xr.Dataset, xr.DataArray]:
-    """Mask a ``xarray.Dataset`` based on a geometry.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset or xarray.DataArray
-        The dataset(array) to be masked
-    geometry : Polygon, MultiPolygon
-        The geometry to mask the data
-    crs: str or pyproj.CRS
-        The spatial reference of the input geometry
-    all_touched : bool, optional
-        Include a pixel in the mask if it touches any of the shapes.
-        If False (default), include a pixel only if its center is within one
-        of the shapes, or if it is selected by Bresenham's line algorithm.
-    drop : bool, optional
-        If True, drop the data outside of the extent of the mask geometries.
-        Otherwise, it will return the same raster with the data masked.
-        Default is True.
-    from_disk : bool, optional
-         If True, it will clip from disk using rasterio.mask.mask if possible.
-         This is beneficial when the size of the data is larger than memory.
-         Default is False.
-
-    Returns
-    -------
-    xarray.Dataset or xarray.DataArray
-        The input dataset with a mask applied (np.nan)
-    """
-    ds_attrs = ds.attrs
-    if isinstance(ds, xr.Dataset):
-        da_attrs = {v: ds[v].attrs for v in ds}
-
-    ds = ds.rio.clip([geometry], crs=crs, all_touched=all_touched, drop=drop, from_disk=from_disk)
-    ds.rio.update_attrs(ds_attrs, inplace=True)
-
-    if isinstance(ds, xr.Dataset):
-        _ = [ds[v].rio.update_attrs(da_attrs[v], inplace=True) for v in ds]
-    ds.rio.update_encoding(ds.encoding, inplace=True)
-    return ds
-
-
-def get_gtiff_attrs(
-    resp: bytes,
-    ds_dims: Optional[Tuple[str, str]] = None,
-    driver: Optional[str] = None,
-    nodata: Union[Number, None] = None,
-) -> Attrs:
-    """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
-
-    Parameters
-    ----------
-    resp : bytes
-        Raster response returned from a wed service request such as WMS
-    ds_dims : tuple of str, optional
-        The names of the vertical and horizontal dimensions (in that order)
-        of the target dataset, default to None. If None, dimension names are determined
-        from a list of common names.
-    driver : str, optional
-        A GDAL driver for reading the content, defaults to automatic detection. A list of
-        the drivers can be found here: https://gdal.org/drivers/raster/index.html
-    nodata : float or int, optional
-        The nodata value of the raster, defaults to None, i.e., is determined from the raster.
-
-    Returns
-    -------
-    Attrs
-        No data, CRS, and dimension names for vertical and horizontal directions or
-        a list of the existing dimensions if they are not in a list of common names.
-    """
-    with rio.MemoryFile() as memfile:
-        memfile.write(resp)
-        with memfile.open(driver=driver) as src:
-            r_crs = pyproj.CRS(src.crs)
-            _nodata = utils.get_nodata(src) if nodata is None else nodata
-
-            ds = rxr.open_rasterio(src)
-            if ds_dims is None:
-                ds_dims = utils.get_dim_names(ds)
-
-            valid_dims = list(ds.sizes)
-            if ds_dims is None or any(d not in valid_dims for d in ds_dims):
-                raise MissingAttribute("ds_dims", valid_dims)
-            if isinstance(src.transform, rio.Affine):
-                transform = utils.transform2tuple(src.transform)
-            else:
-                transform = tuple(src.transform)  # type: ignore
-    return Attrs(_nodata, r_crs, ds_dims, transform)
 
 
 def get_transform(
@@ -490,17 +490,6 @@ class Coordinates:
     lon: Union[Number, Sequence[Number]]
     lat: Union[Number, Sequence[Number]]
 
-    def __post_init__(self) -> None:
-        """Normalize the longitude value within [-180, 180)."""
-        _lon = [self.lon] if isinstance(self.lon, Number) else self.lon
-        lat = [self.lat] if isinstance(self.lat, Number) else self.lat
-        if not isinstance(_lon, (list, tuple)) and not isinstance(lat, (list, tuple)):
-            raise InvalidInputType("lon/lat", "float or list")
-
-        lon = np.mod(np.mod(_lon, 360) + 540, 360) - 180
-        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs=self._crs)
-        self._points = self.__validate(pts, self._wgs84)
-
     @property
     def _crs(self) -> pyproj.CRS:
         """Get EPSG:4326 CRS."""
@@ -515,6 +504,17 @@ class Coordinates:
     def __validate(pts: gpd.GeoSeries, bbox: sgeom.Polygon) -> gpd.GeoSeries:
         """Create a ``geopandas.GeoSeries`` from valid coords within a bounding box."""
         return pts[pts.sindex.query(bbox)].sort_index()
+
+    def __post_init__(self) -> None:
+        """Normalize the longitude value within [-180, 180)."""
+        _lon = [self.lon] if isinstance(self.lon, Number) else self.lon
+        lat = [self.lat] if isinstance(self.lat, Number) else self.lat
+        if not isinstance(_lon, (list, tuple)) and not isinstance(lat, (list, tuple)):
+            raise InvalidInputType("lon/lat", "float or list")
+
+        lon = np.mod(np.mod(_lon, 360) + 540, 360) - 180
+        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs=self._crs)
+        self._points = self.__validate(pts, self._wgs84)
 
     @property
     def points(self) -> gpd.GeoSeries:
@@ -584,73 +584,6 @@ class GeoBSpline:
     (-97.06127, 32.83319)]
     """
 
-    def __init__(self, points: GDF, npts_sp: int, degree: int = 3) -> None:
-        self.degree = degree
-        self.crs = points.crs
-        if self.crs is None:
-            raise MissingCRS
-
-        if not self.crs.is_projected:
-            raise InvalidInputType("points.crs", "projected CRS")
-
-        if any(points.geom_type != "Point"):
-            raise InvalidInputType("points.geom_type", "Point")
-        self.points = points
-
-        if npts_sp < 1:
-            raise InvalidInputRange("npts_sp", ">= 1")
-        self.npts_sp = npts_sp
-
-        tx, ty = zip(*(g.xy for g in points.geometry))
-        self.x_ln = np.array(tx, dtype="f8").squeeze()
-        self.y_ln = np.array(ty, dtype="f8").squeeze()
-        self.npts_ln = self.x_ln.size
-        self.l_ln = LineString(points.geometry).length
-        self._spline = self.__spline(npts_sp, degree)
-
-    @property
-    def spline(self) -> Spline:
-        """Get the spline as a ``Spline`` object."""
-        return self._spline
-
-    def __spline(self, npts_sp: int, degree: int = 3) -> Spline:
-        """Create a B-spline curve from a set of points.
-
-        Notes
-        -----
-        This function is based on https://stackoverflow.com/a/45928473/5797702.
-
-        Parameters
-        ----------
-        npts_sp : int
-            Number of points in the output spline curve.
-        degree : int, optional
-            Degree of the spline. Should be less than the number of points and
-            greater than 1. Default is 3.
-
-        Returns
-        -------
-        Spline
-            A Spline object with ``x``, ``y``, ``phi``, ``radius``,
-            and ``distance`` attributes.
-        """
-        degree = np.clip(degree, 1, self.npts_ln - 1)
-        konts = np.clip(np.arange(self.npts_ln + degree + 1) - degree, 0, self.npts_ln - degree)
-        spl = BSpline(konts, np.column_stack([self.x_ln, self.y_ln]), degree)
-
-        x_sp, y_sp = spl(np.linspace(0, self.npts_ln - degree, max(npts_sp, 3), endpoint=False)).T
-        phi_sp, rad_sp = self.__curvature(x_sp, y_sp, self.l_ln)
-        geom = (
-            LineString([(x1, y1), (x2, y2)])
-            for x1, y1, x2, y2 in zip(x_sp[:-1], y_sp[:-1], x_sp[1:], y_sp[1:])
-        )
-        d_sp = gpd.GeoSeries(geom, crs=self.crs).length.cumsum().values
-        if npts_sp < 3:
-            idx = np.r_[:npts_sp]
-            return Spline(x_sp[idx], y_sp[idx], phi_sp[idx], rad_sp[idx], d_sp[idx])
-
-        return Spline(x_sp, y_sp, phi_sp, rad_sp, d_sp)
-
     @staticmethod
     def __curvature(
         xs: Union[Sequence[float], np.ndarray], ys: Union[Sequence[float], np.ndarray], l_tot: float
@@ -691,6 +624,73 @@ class GeoBSpline:
         non_small = np.where(dphi > 1e-4)[0]
         rad[non_small] = scals / dphi[non_small]
         return phi, rad
+
+    def __spline(self, npts_sp: int, degree: int = 3) -> Spline:
+        """Create a B-spline curve from a set of points.
+
+        Notes
+        -----
+        This function is based on https://stackoverflow.com/a/45928473/5797702.
+
+        Parameters
+        ----------
+        npts_sp : int
+            Number of points in the output spline curve.
+        degree : int, optional
+            Degree of the spline. Should be less than the number of points and
+            greater than 1. Default is 3.
+
+        Returns
+        -------
+        Spline
+            A Spline object with ``x``, ``y``, ``phi``, ``radius``,
+            and ``distance`` attributes.
+        """
+        degree = np.clip(degree, 1, self.npts_ln - 1)
+        konts = np.clip(np.arange(self.npts_ln + degree + 1) - degree, 0, self.npts_ln - degree)
+        spl = BSpline(konts, np.column_stack([self.x_ln, self.y_ln]), degree)
+
+        x_sp, y_sp = spl(np.linspace(0, self.npts_ln - degree, max(npts_sp, 3), endpoint=False)).T
+        phi_sp, rad_sp = self.__curvature(x_sp, y_sp, self.l_ln)
+        geom = (
+            LineString([(x1, y1), (x2, y2)])
+            for x1, y1, x2, y2 in zip(x_sp[:-1], y_sp[:-1], x_sp[1:], y_sp[1:])
+        )
+        d_sp = gpd.GeoSeries(geom, crs=self.crs).length.cumsum().values
+        if npts_sp < 3:
+            idx = np.r_[:npts_sp]
+            return Spline(x_sp[idx], y_sp[idx], phi_sp[idx], rad_sp[idx], d_sp[idx])
+
+        return Spline(x_sp, y_sp, phi_sp, rad_sp, d_sp)
+
+    def __init__(self, points: GDF, npts_sp: int, degree: int = 3) -> None:
+        self.degree = degree
+        self.crs = points.crs
+        if self.crs is None:
+            raise MissingCRS
+
+        if not self.crs.is_projected:
+            raise InvalidInputType("points.crs", "projected CRS")
+
+        if any(points.geom_type != "Point"):
+            raise InvalidInputType("points.geom_type", "Point")
+        self.points = points
+
+        if npts_sp < 1:
+            raise InvalidInputRange("npts_sp", ">= 1")
+        self.npts_sp = npts_sp
+
+        tx, ty = zip(*(g.xy for g in points.geometry))
+        self.x_ln = np.array(tx, dtype="f8").squeeze()
+        self.y_ln = np.array(ty, dtype="f8").squeeze()
+        self.npts_ln = self.x_ln.size
+        self.l_ln = LineString(points.geometry).length
+        self._spline = self.__spline(npts_sp, degree)
+
+    @property
+    def spline(self) -> Spline:
+        """Get the spline as a ``Spline`` object."""
+        return self._spline
 
 
 def snap2nearest(lines: GDF, points: GDF, tol: float) -> GDF:

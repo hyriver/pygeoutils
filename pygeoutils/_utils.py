@@ -145,8 +145,6 @@ class Convert:
         key = list(itertools.dropwhile(lambda k: arcgis["attributes"].get(k) is None, keys))
         if key:
             geojson["id"] = arcgis["attributes"][key[0]]
-        else:
-            logger.warning("No valid id attribute found.")
         return geojson
 
     @staticmethod
