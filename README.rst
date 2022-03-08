@@ -125,7 +125,7 @@ it on your system by clicking on the binder badge. A Jupyter Lab
 instance with the HyRiver stack pre-installed will be launched in your web browser, and you
 can start coding!
 
-Please note that since this project is in early development stages, while the provided
+Please note that since this project is in the early development stages, while the provided
 functionalities should be stable, changes in APIs are possible in new releases. But we
 appreciate it if you give this project a try and provide feedback. Contributions are most welcome.
 
@@ -152,7 +152,7 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 Quick start
 -----------
 
-To demonstrate capabilities of PyGeoUtils let's use
+To demonstrate the capabilities of PyGeoUtils let's use
 `PyGeoOGC <https://github.com/cheginit/pygeoogc>`__ to access
 `National Wetlands Inventory <https://www.fws.gov/wetlands/>`__ from WMS, and
 `FEMA National Flood Hazard <https://www.fema.gov/national-flood-hazard-layer-nfhl>`__
