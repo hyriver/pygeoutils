@@ -27,14 +27,13 @@ from .pygeoutils import (
 )
 
 try:
-    import importlib.metadata as metadata
+    import importlib.metadata
 except ImportError:
-    import importlib_metadata as metadata  # type: ignore[no-redef]
+    import importlib_metadata
 
-try:
-    __version__ = metadata.version("pygeoutils")
-except Exception:
-    __version__ = "999"
+    __version__ = importlib_metadata.version("pygeoutils")
+else:
+    __version__ = importlib.metadata.version("pygeoutils")
 
 __all__ = [
     "arcgis2geojson",
