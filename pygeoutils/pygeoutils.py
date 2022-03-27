@@ -48,6 +48,7 @@ DEF_CRS = "epsg:4326"
 BOX_ORD = "(west, south, east, north)"
 GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
 GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
+XD = TypeVar("XD", xr.Dataset, xr.DataArray)
 
 __all__ = [
     "snap2nearest",
@@ -136,13 +137,13 @@ def json2geodf(
 
 
 def xarray_geomask(
-    ds: Union[xr.Dataset, xr.DataArray],
+    ds: XD,
     geometry: Union[Polygon, MultiPolygon],
     crs: Union[str, pyproj.CRS],
     all_touched: bool = False,
     drop: bool = True,
     from_disk: bool = False,
-) -> Union[xr.Dataset, xr.DataArray]:
+) -> XD:
     """Mask a ``xarray.Dataset`` based on a geometry.
 
     Parameters
@@ -694,7 +695,7 @@ class GeoBSpline:
 
 
 def snap2nearest(lines: GDF, points: GDF, tol: float) -> GDF:
-    """Break lines at specified points at given direction.
+    """Find the nearest points on a line to a set of points.
 
     Parameters
     ----------
