@@ -189,7 +189,7 @@ def get_gtiff_attrs(
     resp: bytes,
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
-    nodata: Union[Number, None] = None,
+    nodata: Optional[Number] = None,
 ) -> Attrs:
     """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
 
@@ -240,7 +240,7 @@ def gtiff2xarray(
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
     all_touched: bool = False,
-    nodata: Union[Number, None] = None,
+    nodata: Optional[Number] = None,
     drop: bool = True,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
