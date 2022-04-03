@@ -26,6 +26,8 @@ def wms_resp():
         layers="NLCD_2011_Tree_Canopy_L48",
         outformat="image/geotiff",
         crs=DEF_CRS,
+        validation=False,
+        ssl=False,
     )
     return wms.getmap_bybox(
         GEO_NAT.bounds,
@@ -42,6 +44,8 @@ def cover_resp():
         layers="NLCD_2019_Land_Cover_Science_Product_L48",
         outformat="image/geotiff",
         crs=DEF_CRS,
+        validation=False,
+        ssl=False,
     )
     return wms.getmap_bybox(
         GEO_NAT.bounds,
