@@ -490,16 +490,21 @@ class Coordinates:
 
     lon: Union[Number, Sequence[Number]]
     lat: Union[Number, Sequence[Number]]
+    bounds: Optional[Tuple[float, float, float, float]] = None
 
-    @property
-    def _crs(self) -> pyproj.CRS:
+    @staticmethod
+    def __box_geo(bounds: Optional[Tuple[float, float, float, float]]) -> sgeom.Polygon:
         """Get EPSG:4326 CRS."""
-        return pyproj.CRS(4326)
+        if bounds is None:
+            return sgeom.box(*pyproj.CRS(4326).area_of_use.bounds)
 
-    @property
-    def _wgs84(self) -> sgeom.Polygon:
-        """Get the WGS84 bounds."""
-        return sgeom.box(*self._crs.area_of_use.bounds)
+        if not isinstance(bounds, (tuple, list)) or len(bounds) != 4:
+            raise InvalidInputType("bounds", "tuple of length 4")
+
+        bbox = sgeom.box(*bounds)
+        if not bbox.within(sgeom.box(*pyproj.CRS(4326).area_of_use.bounds)):
+            raise InvalidInputRange("bounds", "within EPSG:4326")
+        return bbox
 
     @staticmethod
     def __validate(pts: gpd.GeoSeries, bbox: sgeom.Polygon) -> gpd.GeoSeries:
@@ -514,13 +519,33 @@ class Coordinates:
             raise InvalidInputType("lon/lat", "float or list")
 
         lon = np.mod(np.mod(_lon, 360) + 540, 360) - 180
-        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs=self._crs)
-        self._points = self.__validate(pts, self._wgs84)
+        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs="epsg:4326")
+        self._points = self.__validate(pts, self.__box_geo(self.bounds))
 
     @property
     def points(self) -> gpd.GeoSeries:
         """Get validate coordinate as a ``geopandas.GeoSeries``."""
         return self._points
+
+
+def validate_crs(val: Union[str, int, pyproj.CRS]) -> str:
+    """Validate a CRS.
+
+    Parameters
+    ----------
+    val : str or int
+        Input CRS.
+
+    Returns
+    -------
+    str
+        Validated CRS as a string.
+    """
+    try:
+        crs: str = pyproj.CRS(val).to_string()
+    except pyproj.exceptions.CRSError as ex:
+        raise InvalidInputType("crs", "a valid CRS") from ex
+    return crs
 
 
 @dataclass
