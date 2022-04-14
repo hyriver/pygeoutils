@@ -2,6 +2,17 @@
 History
 =======
 
+0.13.1 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add support for passing a custom bounding box in the ``Coordinates`` class.
+  The default is the bounds of ``EPSG:4326`` to retain backward compatibility.
+  This new class parameter allows a user to check if a list of coordinates
+  is within a custom bounding box. The bounds should be the ``EPSG:4326`` coordinate
+  system.
+
 0.13.0 (2022-03-03)
 -------------------
 
