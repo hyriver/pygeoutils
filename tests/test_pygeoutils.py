@@ -3,7 +3,7 @@ import io
 
 import geopandas as gpd
 from pygeoogc import ArcGISRESTful, ServiceURL
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 
 import pygeoutils as geoutils
 from pygeoutils import Coordinates, GeoBSpline
@@ -23,6 +23,15 @@ GEO_NAT = Polygon(
     [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
 )
 SMALL = 1e-3
+
+
+def test_geom_list():
+    glist = geoutils.geometry_list(GEO_URB)
+    assert len(glist) == 1
+    glist = geoutils.geometry_list(GEO_URB.bounds)
+    assert len(glist) == 1
+    glist = geoutils.geometry_list(MultiPolygon([GEO_URB, GEO_NAT]))
+    assert len(glist) == 2
 
 
 def test_break_line():
