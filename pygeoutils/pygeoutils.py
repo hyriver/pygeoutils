@@ -57,6 +57,7 @@ __all__ = [
     "arcgis2geojson",
     "geo2polygon",
     "get_transform",
+    "geometry_list",
     "xarray_geomask",
     "gtiff2xarray",
     "xarray2geodf",
@@ -840,3 +841,27 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
     else:
         lns.loc[idx] = broken_lines
     return lns.to_crs(lines.crs)
+
+
+def geometry_list(
+    geometry: Union[GTYPE, sgeom.Point, sgeom.MultiPoint, sgeom.LineString, sgeom.MultiLineString]
+) -> Union[sgeom.Polygon, sgeom.Point, sgeom.LineString]:
+    """Get a list of polygons, points, and lines from a geometry."""
+    if isinstance(geometry, (sgeom.Polygon, sgeom.LineString, sgeom.Point)):
+        return [geometry]
+
+    if isinstance(geometry, (sgeom.MultiPolygon, sgeom.MultiLineString, sgeom.MultiPoint)):
+        return list(geometry.geoms)
+
+    if isinstance(geometry, (tuple, list)) and len(geometry) == 4:
+        return [sgeom.box(*geometry)]
+    valid_geoms = [
+        "Polygon",
+        "MultiPolygon",
+        "tuple/list of length 4",
+        "Point",
+        "MultiPoint",
+        "LineString",
+        "MultiLineString",
+    ]
+    raise InvalidInputType("geometry", ", ".join(valid_geoms))
