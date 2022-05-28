@@ -326,19 +326,22 @@ def gtiff2xarray(
         ds[v] = ds[v].astype(dtypes[v])
 
     variables = list(ds)
+    _gm = ds.rio.get_gcps()
+    grid_mapping = _gm.grid_mapping if _gm else "spatial_ref"
+    if grid_mapping in ds:
+        ds = ds.drop_vars(grid_mapping)
     if len(variables) == 1:
         ds = ds[variables[0]].copy()
         ds.attrs["crs"] = attrs.crs.to_string()
         ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
         ds = ds.rio.write_nodata(nodata_dict[ds.name])
-        ds = ds.rio.write_crs(attrs.crs)
     else:
         ds.attrs["crs"] = attrs.crs.to_string()
-        ds = ds.rio.write_crs(attrs.crs)
         for v in variables:
             ds[v].attrs["crs"] = attrs.crs.to_string()
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
             ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
+    ds = ds.rio.write_crs(attrs.crs, grid_mapping_name=grid_mapping)
     if isinstance(geometry, (Polygon, MultiPolygon)):
         if geo_crs is None:
             raise MissingCRS
