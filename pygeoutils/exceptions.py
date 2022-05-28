@@ -52,7 +52,7 @@ class EmptyResponse(Exception):
         return self.message
 
 
-class InvalidInputType(Exception):
+class InvalidInputType(TypeError):
     """Exception raised when a function argument type is invalid.
 
     Parameters
