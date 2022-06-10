@@ -12,7 +12,7 @@ New Features
   This new class parameter allows a user to check if a list of coordinates
   is within a custom bounding box. The bounds should be the ``EPSG:4326`` coordinate
   system.
-- Add a new funnction called ``geometry_list`` for converting a list of
+- Add a new function called ``geometry_list`` for converting a list of
   multi-geometries to a list of geometries.
 
 0.13.0 (2022-03-03)
