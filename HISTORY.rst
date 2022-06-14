@@ -2,6 +2,23 @@
 History
 =======
 
+0.13.2 (2022-06-14)
+-------------------
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Set the minimum supported version of Python to 3.8 since many of the
+  dependencies such as ``xarray``, ``pandas``, ``rioxarray`` have dropped support
+  for Python 3.7.
+- Bump min versions of ``rioxarray`` to 0.10 since it adds reading/writing GCPs.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Use `micromamba <https://github.com/marketplace/actions/provision-with-micromamba>`__
+  for running tests
+  and use `nox <https://github.com/marketplace/actions/setup-nox>`__
+  for linting in CI.
+
 0.13.1 (2022-06-11)
 -------------------
 
