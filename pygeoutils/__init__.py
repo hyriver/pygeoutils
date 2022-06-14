@@ -1,4 +1,6 @@
 """Top-level package for PyGeoUtils."""
+import importlib.metadata
+
 from ._utils import transform2tuple
 from .exceptions import (
     EmptyResponse,
@@ -27,14 +29,7 @@ from .pygeoutils import (
     xarray_geomask,
 )
 
-try:
-    import importlib.metadata
-except ImportError:
-    import importlib_metadata
-
-    __version__ = importlib_metadata.version("pygeoutils")
-else:
-    __version__ = importlib.metadata.version("pygeoutils")
+__version__ = importlib.metadata.version("pygeoutils")
 
 __all__ = [
     "arcgis2geojson",
