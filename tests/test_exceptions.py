@@ -41,6 +41,7 @@ def test_json2geodf_empty():
     assert "The input response is empty." in str(ex.value)
 
 
+@pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")
 def test_geom_list_wrong_geom():
     with pytest.raises(InvalidInputType) as ex:
         _ = geoutils.geometry_list([-69.77, 45.07])
