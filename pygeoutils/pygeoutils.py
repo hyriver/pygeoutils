@@ -288,10 +288,9 @@ def gtiff2xarray(
     except StopIteration as ex:
         raise EmptyResponse from ex
 
+    var_name = dict(zip(r_dict, r_dict))
     if "_dd_" in key1:
         var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
-    else:
-        var_name = dict(zip(r_dict, r_dict))
 
     attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: Dict[str, type] = {}
@@ -322,22 +321,22 @@ def gtiff2xarray(
     )
     ds = ds.sortby(attrs.dims[0], ascending=False)
 
-    for v in ds:
-        ds[v] = ds[v].astype(dtypes[v])
-
     variables = list(ds)
     _gm = ds.rio.get_gcps()
     grid_mapping = _gm.grid_mapping if _gm else "spatial_ref"
     if grid_mapping in ds:
         ds = ds.drop_vars(grid_mapping)
+
     if len(variables) == 1:
         ds = ds[variables[0]].copy()
+        ds = ds.astype(dtypes[variables[0]])
         ds.attrs["crs"] = attrs.crs.to_string()
         ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
         ds = ds.rio.write_nodata(nodata_dict[ds.name])
     else:
         ds.attrs["crs"] = attrs.crs.to_string()
         for v in variables:
+            ds[v] = ds[v].astype(dtypes[v])
             ds[v].attrs["crs"] = attrs.crs.to_string()
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
             ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
@@ -848,7 +847,7 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
 
 def geometry_list(
     geometry: Union[GTYPE, sgeom.Point, sgeom.MultiPoint, sgeom.LineString, sgeom.MultiLineString]
-) -> Union[sgeom.Polygon, sgeom.Point, sgeom.LineString]:
+) -> List[Union[sgeom.Polygon, sgeom.Point, sgeom.LineString]]:
     """Get a list of polygons, points, and lines from a geometry."""
     if isinstance(geometry, (sgeom.Polygon, sgeom.LineString, sgeom.Point)):
         return [geometry]
