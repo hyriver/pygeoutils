@@ -44,6 +44,7 @@ repos:
     hooks:
     - id: black
       name: Autoformat with black
+      args: [-t, py38, -l, "100"]
 
   - repo: https://github.com/asottile/blacken-docs
     rev: v1.12.1
