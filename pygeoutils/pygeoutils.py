@@ -27,14 +27,14 @@ from shapely.geometry import LineString, MultiPolygon, Polygon
 from . import _utils as utils
 from ._utils import Attrs
 from .exceptions import (
-    EmptyResponse,
-    InvalidInputRange,
-    InvalidInputType,
-    InvalidInputValue,
-    MissingAttribute,
-    MissingColumns,
-    MissingCRS,
-    UnprojectedCRS,
+    EmptyResponseError,
+    InputRangeError,
+    InputTypeError,
+    InputValueError,
+    MissingAttributeError,
+    MissingColumnError,
+    MissingCRSError,
+    UnprojectedCRSError,
 )
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ def json2geodf(
         Generated geo-data frame from a GeoJSON
     """
     if not isinstance(content, (list, dict)):
-        raise InvalidInputType("content", "list or list of dict ((geo)json)")
+        raise InputTypeError("content", "list or list of dict ((geo)json)")
 
     content = content if isinstance(content, list) else [content]
     try:
@@ -124,7 +124,7 @@ def json2geodf(
         content = [arcgis2geojson(c) for c in content]
         geodf = gpd.GeoDataFrame.from_features(content[0])
     except StopIteration as ex:
-        raise EmptyResponse from ex
+        raise EmptyResponseError from ex
 
     if len(content) > 1:
         geodf = gpd.GeoDataFrame(pd.concat(gpd.GeoDataFrame.from_features(c) for c in content))
@@ -226,7 +226,7 @@ def get_gtiff_attrs(
 
             valid_dims = list(ds.sizes)
             if ds_dims is None or any(d not in valid_dims for d in ds_dims):
-                raise MissingAttribute("ds_dims", valid_dims)
+                raise MissingAttributeError("ds_dims", valid_dims)
             if isinstance(src.transform, rio.Affine):
                 transform = utils.transform2tuple(src.transform)
             else:
@@ -281,12 +281,12 @@ def gtiff2xarray(
         Parallel (with dask) dataset or dataarray.
     """
     if not isinstance(r_dict, dict):
-        raise InvalidInputType("r_dict", "dict", '{"name": bytes}')  # noqa: FS003
+        raise InputTypeError("r_dict", "dict", '{"name": bytes}')  # noqa: FS003
 
     try:
         key1 = next(iter(r_dict.keys()))
     except StopIteration as ex:
-        raise EmptyResponse from ex
+        raise EmptyResponseError from ex
 
     var_name = dict(zip(r_dict, r_dict))
     if "_dd_" in key1:
@@ -343,7 +343,7 @@ def gtiff2xarray(
     ds = ds.rio.write_crs(attrs.crs, grid_mapping_name=grid_mapping)
     if isinstance(geometry, (Polygon, MultiPolygon)):
         if geo_crs is None:
-            raise MissingCRS
+            raise MissingCRSError
         return xarray_geomask(ds, geometry, geo_crs, all_touched, drop, from_disk=True)
     return ds
 
@@ -406,10 +406,10 @@ def geo2polygon(
         A Polygon in the target CRS.
     """
     if not isinstance(geometry, (Polygon, MultiPolygon, Sequence)):
-        raise InvalidInputType("geometry", "Polygon or tuple of length 4")
+        raise InputTypeError("geometry", "Polygon or tuple of length 4")
 
     if isinstance(geometry, Sequence) and len(geometry) != 4:
-        raise InvalidInputType("geometry", "tuple of length 4")
+        raise InputTypeError("geometry", "tuple of length 4")
 
     geom = sgeom.box(*geometry) if isinstance(geometry, Sequence) else geometry
     project = pyproj.Transformer.from_crs(geo_crs, crs, always_xy=True).transform
@@ -443,19 +443,19 @@ def xarray2geodf(
         The vectorized dataarray.
     """
     if not isinstance(da, xr.DataArray):
-        raise InvalidInputType("da", "xarray.DataArray")
+        raise InputTypeError("da", "xarray.DataArray")
 
     if not isinstance(mask_da, (xr.DataArray, type(None))):
-        raise InvalidInputType("da", "xarray.DataArray or None")
+        raise InputTypeError("da", "xarray.DataArray or None")
 
     valid_types = ["int16", "int32", "uint8", "uint16", "float32"]
     if dtype not in valid_types:
-        raise InvalidInputValue("dtype", valid_types)
+        raise InputValueError("dtype", valid_types)
     _dtype = getattr(np, dtype)
 
     crs = da.rio.crs if da.attrs.get("crs") is None else da.crs
     if crs is None:
-        raise MissingCRS
+        raise MissingCRSError
 
     mask = None if mask_da is None else mask_da.to_numpy()
     shapes = rio.features.shapes(
@@ -502,11 +502,11 @@ class Coordinates:
             return sgeom.box(*pyproj.CRS(4326).area_of_use.bounds)
 
         if not isinstance(bounds, (tuple, list)) or len(bounds) != 4:
-            raise InvalidInputType("bounds", "tuple of length 4")
+            raise InputTypeError("bounds", "tuple of length 4")
 
         bbox = sgeom.box(*bounds)
         if not bbox.within(sgeom.box(*pyproj.CRS(4326).area_of_use.bounds)):
-            raise InvalidInputRange("bounds", "within EPSG:4326")
+            raise InputRangeError("bounds", "within EPSG:4326")
         return bbox
 
     @staticmethod
@@ -519,7 +519,7 @@ class Coordinates:
         _lon = [self.lon] if isinstance(self.lon, Number) else self.lon
         lat = [self.lat] if isinstance(self.lat, Number) else self.lat
         if not isinstance(_lon, (list, tuple)) and not isinstance(lat, (list, tuple)):
-            raise InvalidInputType("lon/lat", "float or list")
+            raise InputTypeError("lon/lat", "float or list")
 
         lon = np.mod(np.mod(_lon, 360) + 540, 360) - 180
         pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs="epsg:4326")
@@ -547,7 +547,7 @@ def validate_crs(val: Union[str, int, pyproj.CRS]) -> str:
     try:
         crs: str = pyproj.CRS(val).to_string()
     except pyproj.exceptions.CRSError as ex:
-        raise InvalidInputType("crs", "a valid CRS") from ex
+        raise InputTypeError("crs", "a valid CRS") from ex
     return crs
 
 
@@ -696,17 +696,17 @@ class GeoBSpline:
         self.degree = degree
         self.crs = points.crs
         if self.crs is None:
-            raise MissingCRS
+            raise MissingCRSError
 
         if not self.crs.is_projected:
-            raise InvalidInputType("points.crs", "projected CRS")
+            raise InputTypeError("points.crs", "projected CRS")
 
         if any(points.geom_type != "Point"):
-            raise InvalidInputType("points.geom_type", "Point")
+            raise InputTypeError("points.geom_type", "Point")
         self.points = points
 
         if npts_sp < 1:
-            raise InvalidInputRange("npts_sp", ">= 1")
+            raise InputRangeError("npts_sp", ">= 1")
         self.npts_sp = npts_sp
 
         tx, ty = zip(*(g.xy for g in points.geometry))
@@ -741,10 +741,10 @@ def snap2nearest(lines: GDF, points: GDF, tol: float) -> GDF:
         Points snapped to lines.
     """
     if lines.crs is None or points.crs is None:
-        raise MissingCRS
+        raise MissingCRSError
 
     if not lines.crs.is_projected or not points.crs.is_projected:
-        raise UnprojectedCRS
+        raise UnprojectedCRSError
 
     if isinstance(points, gpd.GeoSeries):
         pts: gpd.GeoDataFrame = points.to_frame("geometry").reset_index()
@@ -793,16 +793,16 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
         points.
     """
     if lines.crs is None or points.crs is None:
-        raise MissingCRS
+        raise MissingCRSError
 
     if "direction" not in points.columns:
-        raise MissingColumns(["direction"])
+        raise MissingColumnError(["direction"])
 
     if (points.direction == "up").sum() + (points.direction == "down").sum() != len(points):
-        raise InvalidInputValue("direction", ["up", "down"])
+        raise InputValueError("direction", ["up", "down"])
 
     if not lines.geom_type.isin(["LineString", "MultiLineString"]).all():
-        raise InvalidInputType("geometry", "LineString or MultiLineString")
+        raise InputTypeError("geometry", "LineString or MultiLineString")
 
     if lines.crs != points.crs or not lines.crs.is_projected or not points.crs.is_projected:
         crs_proj = "epsg:3857"
@@ -866,4 +866,4 @@ def geometry_list(
         "LineString",
         "MultiLineString",
     ]
-    raise InvalidInputType("geometry", ", ".join(valid_geoms))
+    raise InputTypeError("geometry", ", ".join(valid_geoms))

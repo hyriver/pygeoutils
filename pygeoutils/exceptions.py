@@ -2,7 +2,7 @@
 from typing import Generator, List, Optional, Union
 
 
-class MissingColumns(Exception):
+class MissingColumnError(Exception):
     """Exception raised when a required column is missing from a dataframe.
 
     Parameters
@@ -19,7 +19,7 @@ class MissingColumns(Exception):
         return self.message
 
 
-class MissingCRS(Exception):
+class MissingCRSError(Exception):
     """Exception raised when CRS is not given."""
 
     def __init__(self) -> None:
@@ -30,7 +30,7 @@ class MissingCRS(Exception):
         return self.message
 
 
-class UnprojectedCRS(Exception):
+class UnprojectedCRSError(Exception):
     """Exception raised when CRS is not given."""
 
     def __init__(self) -> None:
@@ -41,7 +41,7 @@ class UnprojectedCRS(Exception):
         return self.message
 
 
-class EmptyResponse(Exception):
+class EmptyResponseError(Exception):
     """Exception raised when the input response is empty."""
 
     def __init__(self) -> None:
@@ -52,7 +52,7 @@ class EmptyResponse(Exception):
         return self.message
 
 
-class InvalidInputType(TypeError):
+class InputTypeError(TypeError):
     """Exception raised when a function argument type is invalid.
 
     Parameters
@@ -75,7 +75,7 @@ class InvalidInputType(TypeError):
         return self.message
 
 
-class InvalidInputValue(Exception):
+class InputValueError(Exception):
     """Exception raised for invalid input.
 
     Parameters
@@ -98,7 +98,7 @@ class InvalidInputValue(Exception):
         return self.message
 
 
-class MissingAttribute(Exception):
+class MissingAttributeError(Exception):
     """Exception raised for missing attribute.
 
     Parameters
@@ -122,21 +122,7 @@ class MissingAttribute(Exception):
         return self.message
 
 
-class UndeterminedDims(Exception):
-    """Exception raised for dimensions cannot be determined."""
-
-    def __init__(self) -> None:
-        self.message = (
-            "Dimensions cannot be determined from the dataset,"
-            + "they must be provided via ds_dims argument."
-        )
-        super().__init__(self.message)
-
-    def __str__(self) -> str:
-        return self.message
-
-
-class InvalidInputRange(Exception):
+class InputRangeError(Exception):
     """Exception raised when a function argument is not in the valid range.
 
     Parameters

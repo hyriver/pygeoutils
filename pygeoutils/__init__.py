@@ -1,5 +1,5 @@
 """Top-level package for PyGeoUtils."""
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 from ._utils import transform2tuple
 from .exceptions import (
