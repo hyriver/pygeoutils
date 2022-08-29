@@ -1,16 +1,16 @@
 """Top-level package for PyGeoUtils."""
-import importlib.metadata
+from importlib.metadata import version, PackageNotFoundError
 
 from ._utils import transform2tuple
 from .exceptions import (
-    EmptyResponse,
-    InvalidInputRange,
-    InvalidInputType,
-    InvalidInputValue,
-    MissingAttribute,
-    MissingColumns,
-    MissingCRS,
-    UnprojectedCRS,
+    EmptyResponseError,
+    InputRangeError,
+    InputTypeError,
+    InputValueError,
+    MissingAttributeError,
+    MissingColumnError,
+    MissingCRSError,
+    UnprojectedCRSError,
 )
 from .print_versions import show_versions
 from .pygeoutils import (
@@ -29,7 +29,10 @@ from .pygeoutils import (
     xarray_geomask,
 )
 
-__version__ = importlib.metadata.version("pygeoutils")
+try:
+    __version__ = version("pygeoutils")
+except PackageNotFoundError:
+    __version__ = "999"
 
 __all__ = [
     "arcgis2geojson",
@@ -46,13 +49,13 @@ __all__ = [
     "xarray_geomask",
     "Coordinates",
     "GeoBSpline",
-    "InvalidInputType",
-    "InvalidInputValue",
-    "InvalidInputRange",
-    "MissingAttribute",
-    "MissingColumns",
-    "MissingCRS",
-    "UnprojectedCRS",
-    "EmptyResponse",
+    "InputTypeError",
+    "InputValueError",
+    "InputRangeError",
+    "MissingAttributeError",
+    "MissingColumnError",
+    "MissingCRSError",
+    "UnprojectedCRSError",
+    "EmptyResponseError",
     "show_versions",
 ]
