@@ -33,8 +33,8 @@
     :target: https://github.com/hyriver/pydaymet/actions/workflows/test.yml
     :alt: Github Actions
 
-.. |async| image:: https://github.com/hyriver/async_retriever/actions/workflows/test.yml/badge.svg
-    :target: https://github.com/hyriver/async_retriever/actions/workflows/test.yml
+.. |async| image:: https://github.com/hyriver/async-retriever/actions/workflows/test.yml/badge.svg
+    :target: https://github.com/hyriver/async-retriever/actions/workflows/test.yml
     :alt: Github Actions
 
 =============== ==================================================================== ============
@@ -50,7 +50,7 @@ PyGeoUtils_     Convert responses from PyGeoOGC's supported web services to data
 =============== ==================================================================== ============
 
 .. _PyGeoHydro: https://github.com/hyriver/pygeohydro
-.. _AsyncRetriever: https://github.com/hyriver/async_retriever
+.. _AsyncRetriever: https://github.com/hyriver/async-retriever
 .. _PyGeoOGC: https://github.com/hyriver/pygeoogc
 .. _PyGeoUtils: https://github.com/hyriver/pygeoutils
 .. _PyNHD: https://github.com/hyriver/pynhd
