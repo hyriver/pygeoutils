@@ -305,7 +305,6 @@ def gtiff2xarray(
                 ds = rxr.open_rasterio(vrt)
                 with contextlib.suppress(ValueError):
                     ds = ds.squeeze("band", drop=True)
-                ds = ds.sortby(attrs.dims[0], ascending=False)
                 ds.name = var_name[lyr]
                 dtypes[ds.name] = ds.dtype
                 nodata_dict[ds.name] = utils.get_nodata(vrt) if nodata is None else nodata
@@ -316,10 +315,10 @@ def gtiff2xarray(
 
     ds = xr.open_mfdataset(
         (to_dataset(lyr, resp) for lyr, resp in r_dict.items()),
+        combine="nested",
         parallel=True,
         decode_coords="all",
     )
-    ds = ds.sortby(attrs.dims[0], ascending=False)
 
     variables = list(ds)
     _gm = ds.rio.get_gcps()
