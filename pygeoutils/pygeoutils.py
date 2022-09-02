@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import cytoolz as tlz
+import dask
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -313,12 +314,13 @@ def gtiff2xarray(
                 ds.to_netcdf(fpath)
                 return fpath
 
-    ds = xr.open_mfdataset(
-        (to_dataset(lyr, resp) for lyr, resp in r_dict.items()),
-        combine="nested",
-        parallel=True,
-        decode_coords="all",
-    )
+    with dask.config.set(**{"array.slicing.split_large_chunks": True}):
+        ds = xr.open_mfdataset(
+            (to_dataset(lyr, resp) for lyr, resp in r_dict.items()),
+            chunks="auto",
+            parallel=True,
+            decode_coords="all",
+        )
 
     variables = list(ds)
     _gm = ds.rio.get_gcps()
