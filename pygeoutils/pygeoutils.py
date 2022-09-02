@@ -45,11 +45,11 @@ handler.setFormatter(logging.Formatter(""))
 logger.handlers = [handler]
 logger.propagate = False
 
-DEF_CRS = "epsg:4326"
 BOX_ORD = "(west, south, east, north)"
 GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
 GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
 XD = TypeVar("XD", xr.Dataset, xr.DataArray)
+CRSTYPE = Union[int, str, pyproj.CRS]
 
 __all__ = [
     "snap2nearest",
@@ -96,8 +96,8 @@ def arcgis2geojson(
 
 def json2geodf(
     content: Union[List[Dict[str, Any]], Dict[str, Any]],
-    in_crs: Union[str, pyproj.CRS] = DEF_CRS,
-    crs: Union[str, pyproj.CRS] = DEF_CRS,
+    in_crs: CRSTYPE = 4326,
+    crs: CRSTYPE = 4326,
 ) -> gpd.GeoDataFrame:
     """Create GeoDataFrame from (Geo)JSON.
 
@@ -105,9 +105,9 @@ def json2geodf(
     ----------
     content : dict or list of dict
         A (Geo)JSON dictionary e.g., response.json() or a list of them.
-    in_crs: str or pyproj.CRS
+    in_crs : int, str, or pyproj.CRS, optional
         CRS of the content, defaults to ``epsg:4326``.
-    crs: str or pyproj.CRS, optional
+    crs : int, str, or pyproj.CRS, optional
         The target CRS of the output GeoDataFrame, defaults to ``epsg:4326``.
 
     Returns
@@ -141,7 +141,7 @@ def json2geodf(
 def xarray_geomask(
     ds: XD,
     geometry: Union[Polygon, MultiPolygon],
-    crs: Union[str, pyproj.CRS],
+    crs: CRSTYPE,
     all_touched: bool = False,
     drop: bool = True,
     from_disk: bool = False,
@@ -154,7 +154,7 @@ def xarray_geomask(
         The dataset(array) to be masked
     geometry : Polygon, MultiPolygon
         The geometry to mask the data
-    crs: str or pyproj.CRS
+    crs : int, str, or pyproj.CRS
         The spatial reference of the input geometry
     all_touched : bool, optional
         Include a pixel in the mask if it touches any of the shapes.
@@ -238,7 +238,7 @@ def get_gtiff_attrs(
 def gtiff2xarray(
     r_dict: Dict[str, bytes],
     geometry: Optional[GTYPE] = None,
-    geo_crs: Optional[str] = None,
+    geo_crs: Optional[CRSTYPE] = None,
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
     all_touched: bool = False,
@@ -255,7 +255,7 @@ def gtiff2xarray(
     geometry : Polygon, MultiPolygon, or tuple, optional
         The geometry to mask the data that should be in the same CRS as the r_dict.
         Defaults to ``None``.
-    geo_crs: str or pyproj.CRS, optional
+    geo_crs : int, str, or pyproj.CRS, optional
         The spatial reference of the input geometry, defaults to ``None``. This
         argument should be given when ``geometry`` is given.
     ds_dims : tuple of str, optional
@@ -387,8 +387,8 @@ def get_transform(
 
 def geo2polygon(
     geometry: GTYPE,
-    geo_crs: Union[str, pyproj.CRS],
-    crs: Union[str, pyproj.CRS],
+    geo_crs: CRSTYPE,
+    crs: CRSTYPE,
 ) -> Polygon:
     """Convert a geometry to a Shapely's Polygon and transform to any CRS.
 
@@ -396,9 +396,9 @@ def geo2polygon(
     ----------
     geometry : Polygon or tuple of length 4
         Polygon or bounding box (west, south, east, north).
-    geo_crs: str or pyproj.CRS
+    geo_crs : int, str, or pyproj.CRS
         Spatial reference of the input geometry
-    crs: str or pyproj.CRS
+    crs : int, str, or pyproj.CRS
         Target spatial reference.
 
     Returns
@@ -532,12 +532,12 @@ class Coordinates:
         return self._points
 
 
-def validate_crs(val: Union[str, int, pyproj.CRS]) -> str:
+def validate_crs(crs: CRSTYPE) -> str:
     """Validate a CRS.
 
     Parameters
     ----------
-    val : str or int
+    crs : str, int, or pyproj.CRS
         Input CRS.
 
     Returns
@@ -546,10 +546,9 @@ def validate_crs(val: Union[str, int, pyproj.CRS]) -> str:
         Validated CRS as a string.
     """
     try:
-        crs: str = pyproj.CRS(val).to_string()
+        return pyproj.CRS(crs).to_string()  # type: ignore
     except pyproj.exceptions.CRSError as ex:
         raise InputTypeError("crs", "a valid CRS") from ex
-    return crs
 
 
 @dataclass
