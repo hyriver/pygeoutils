@@ -2,6 +2,14 @@
 History
 =======
 
+0.13.7 (unreleased)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- When combining the responses, now ``dask`` handles data chunking more efficiently.
+  This is especially important for handling large responses from WMS services.
+
 0.13.6 (2022-08-30)
 -------------------
 
