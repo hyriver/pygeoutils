@@ -9,6 +9,8 @@ Internal Changes
 ~~~~~~~~~~~~~~~~
 - When combining the responses, now ``dask`` handles data chunking more efficiently.
   This is especially important for handling large responses from WMS services.
+- Improve type hints for CRS-related arguments of all functions by including string,
+  integer, and ``pyproj.CRS`` types.
 
 0.13.6 (2022-08-30)
 -------------------
