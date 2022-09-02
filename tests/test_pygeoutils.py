@@ -108,11 +108,11 @@ def test_gtiff2array(wms_resp, cover_resp):
     mask = canopy > 60
     vec = geoutils.xarray2geodf(canopy, "float32", mask)
 
-    expected = 72.2235
+    expected = 72.436
     assert (
         abs(canopy_box.mean().values.item() - expected) < SMALL
         and abs(canopy.mean().values.item() - expected) < SMALL
-        and vec.shape[0] == 1014
+        and vec.shape[0] == 1065
         and cover.rio.nodata == 0
     )
 
