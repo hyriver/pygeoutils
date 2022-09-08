@@ -483,6 +483,9 @@ class Coordinates:
         Longitude(s) in decimal degrees.
     lat : float or list of floats
         Latitude(s) in decimal degrees.
+    bounds : tuple of length 4, optional
+        The bounding box to check of the input coordinates fall within.
+        Defaults to WGS84 bounds.
 
     Examples
     --------
