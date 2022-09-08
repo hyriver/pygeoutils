@@ -1,7 +1,5 @@
 """Some utilities for manipulating GeoSpatial data."""
 import contextlib
-import logging
-import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
@@ -37,13 +35,6 @@ from .exceptions import (
     MissingCRSError,
     UnprojectedCRSError,
 )
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(logging.Formatter(""))
-logger.handlers = [handler]
-logger.propagate = False
 
 BOX_ORD = "(west, south, east, north)"
 GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]

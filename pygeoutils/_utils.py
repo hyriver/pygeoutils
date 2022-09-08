@@ -1,6 +1,5 @@
 """Some utilities for manipulating GeoSpatial data."""
 import itertools
-import logging
 import sys
 from dataclasses import dataclass
 from numbers import Number
@@ -11,18 +10,25 @@ import pyproj
 import rasterio as rio
 import ujson as json
 import xarray as xr
-from shapely.geometry import LineString, MultiPolygon, Point, Polygon
+from loguru import logger
+from shapely.geometry import LineString, Point
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(logging.Formatter(""))
-logger.handlers = [handler]
-logger.propagate = False
-
-DEF_CRS = "epsg:4326"
-BOX_ORD = "(west, south, east, north)"
-GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
+logger.configure(
+    handlers=[
+        {
+            "sink": sys.stdout,
+            "colorize": True,
+            "format": " | ".join(
+                [
+                    "{time:YYYY-MM-DD at HH:mm:ss}",  # noqa: FS003
+                    "{name: ^15}.{function: ^15}:{line: >3}",  # noqa: FS003
+                    "{message}",  # noqa: FS003
+                ]
+            ),
+        }
+    ]
+)
+logger.disable("pygeoutils")
 
 
 @dataclass
@@ -122,13 +128,8 @@ class Convert:
             not_supported = [v for k, v in curves.items() if k in arcgis["geometry"]]
             if not_supported:
                 logger.warning(
-                    " ".join(
-                        [
-                            f"Elements of type {','.join(not_supported)}",
-                            "can not be converted to GeoJSON.",
-                            "Converting to null geometry",
-                        ]
-                    )
+                    "Elements of type {} can not be converted. Converting to null geometry",
+                    ", ".join(not_supported),
                 )
                 geojson["geometry"] = None
             else:
