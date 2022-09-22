@@ -13,6 +13,8 @@ import xarray as xr
 from loguru import logger
 from shapely.geometry import LineString, Point
 
+NUMBER = Union[int, float]
+
 logger.configure(
     handlers=[
         {
@@ -236,17 +238,17 @@ def convert(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dict[str, 
 class Attrs(NamedTuple):
     """Attributes of a GTiff byte response."""
 
-    nodata: Number
+    nodata: NUMBER
     crs: pyproj.CRS
     dims: Tuple[str, str]
     transform: Tuple[float, float, float, float, float, float]
 
 
-def get_nodata(src: Any) -> Number:
+def get_nodata(src: Any) -> NUMBER:
     """Get the nodata value of a GTiff byte response."""
     if src.nodata is None:
         try:
-            nodata: Number = np.iinfo(src.dtypes[0]).max
+            nodata: NUMBER = np.iinfo(src.dtypes[0]).max
         except ValueError:
             nodata = np.nan
     else:

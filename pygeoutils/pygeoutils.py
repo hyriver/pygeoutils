@@ -3,7 +3,6 @@ import contextlib
 import tempfile
 import uuid
 from dataclasses import dataclass
-from numbers import Number
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
 
@@ -41,6 +40,7 @@ GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
 GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
 XD = TypeVar("XD", xr.Dataset, xr.DataArray)
 CRSTYPE = Union[int, str, pyproj.CRS]
+NUMBER = Union[int, float]
 
 __all__ = [
     "snap2nearest",
@@ -182,7 +182,7 @@ def get_gtiff_attrs(
     resp: bytes,
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
-    nodata: Optional[Number] = None,
+    nodata: Optional[NUMBER] = None,
 ) -> Attrs:
     """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
 
@@ -233,7 +233,7 @@ def gtiff2xarray(
     ds_dims: Optional[Tuple[str, str]] = None,
     driver: Optional[str] = None,
     all_touched: bool = False,
-    nodata: Optional[Number] = None,
+    nodata: Optional[NUMBER] = None,
     drop: bool = True,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
@@ -286,7 +286,7 @@ def gtiff2xarray(
 
     attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: Dict[str, type] = {}
-    nodata_dict: Dict[str, Number] = {}
+    nodata_dict: Dict[str, NUMBER] = {}
 
     tmp_dir = tempfile.gettempdir()
 
@@ -486,8 +486,8 @@ class Coordinates:
     [100.0, -30.0]
     """
 
-    lon: Union[Number, Sequence[Number]]
-    lat: Union[Number, Sequence[Number]]
+    lon: Union[NUMBER, Sequence[NUMBER]]
+    lat: Union[NUMBER, Sequence[NUMBER]]
     bounds: Optional[Tuple[float, float, float, float]] = None
 
     @staticmethod
@@ -511,13 +511,11 @@ class Coordinates:
 
     def __post_init__(self) -> None:
         """Normalize the longitude value within [-180, 180)."""
-        _lon = [self.lon] if isinstance(self.lon, Number) else self.lon
-        lat = [self.lat] if isinstance(self.lat, Number) else self.lat
-        if not isinstance(_lon, (list, tuple)) and not isinstance(lat, (list, tuple)):
-            raise InputTypeError("lon/lat", "float or list")
+        _lon = [self.lon] if isinstance(self.lon, (int, float)) else list(self.lon)
+        lat = [self.lat] if isinstance(self.lat, (int, float)) else list(self.lat)
 
-        lon = np.mod(np.mod(_lon, 360) + 540, 360) - 180
-        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs="epsg:4326")
+        lon = np.mod(np.mod(_lon, 360.0) + 540.0, 360.0) - 180.0
+        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs=4326)
         self._points = self.__validate(pts, self.__box_geo(self.bounds))
 
     @property
@@ -595,7 +593,7 @@ class GeoBSpline:
     ...         (-97.06127, 32.832),
     ...     ]
     ... )
-    >>> pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs="epsg:4326"))
+    >>> pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs=4326))
     >>> sp = GeoBSpline(pts.to_crs("epsg:3857"), 5).spline
     >>> pts_sp = gpd.GeoSeries(gpd.points_from_xy(sp.x, sp.y, crs="epsg:3857"))
     >>> pts_sp = pts_sp.to_crs("epsg:4326")
