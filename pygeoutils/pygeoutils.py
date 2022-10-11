@@ -23,7 +23,7 @@ from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
 
 from . import _utils as utils
-from ._utils import Attrs
+from ._utils import NUMBER, Attrs
 from .exceptions import (
     EmptyResponseError,
     InputRangeError,
@@ -40,7 +40,6 @@ GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
 GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
 XD = TypeVar("XD", xr.Dataset, xr.DataArray)
 CRSTYPE = Union[int, str, pyproj.CRS]
-NUMBER = Union[int, float]
 
 __all__ = [
     "snap2nearest",
@@ -313,26 +312,27 @@ def gtiff2xarray(
             decode_coords="all",
         )
 
-    variables = list(ds)
-    _gm = ds.rio.get_gcps()
-    grid_mapping = _gm.grid_mapping if _gm else "spatial_ref"
-    if grid_mapping in ds:
-        ds = ds.drop_vars(grid_mapping)
+        variables = list(ds)
+        _gm = ds.rio.get_gcps()
+        grid_mapping = _gm.grid_mapping if _gm else "spatial_ref"
+        if grid_mapping in ds:
+            ds = ds.drop_vars(grid_mapping)
 
-    if len(variables) == 1:
-        ds = ds[variables[0]].copy()
-        ds = ds.astype(dtypes[variables[0]])
-        ds.attrs["crs"] = attrs.crs.to_string()
-        ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
-        ds = ds.rio.write_nodata(nodata_dict[ds.name])
-    else:
-        ds.attrs["crs"] = attrs.crs.to_string()
-        for v in variables:
-            ds[v] = ds[v].astype(dtypes[v])
-            ds[v].attrs["crs"] = attrs.crs.to_string()
-            ds[v].attrs["nodatavals"] = (nodata_dict[v],)
-            ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
-    ds = ds.rio.write_crs(attrs.crs, grid_mapping_name=grid_mapping)
+        if len(variables) == 1:
+            ds = ds[variables[0]].copy()
+            ds = ds.astype(dtypes[variables[0]])
+            ds.attrs["crs"] = attrs.crs.to_string()
+            ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
+            ds = ds.rio.write_nodata(nodata_dict[ds.name])
+        else:
+            ds.attrs["crs"] = attrs.crs.to_string()
+            for v in variables:
+                ds[v] = ds[v].astype(dtypes[v])
+                ds[v].attrs["crs"] = attrs.crs.to_string()
+                ds[v].attrs["nodatavals"] = (nodata_dict[v],)
+                ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
+        ds = ds.rio.write_crs(attrs.crs, grid_mapping_name=grid_mapping)
+
     if isinstance(geometry, (Polygon, MultiPolygon)):
         if geo_crs is None:
             raise MissingCRSError
