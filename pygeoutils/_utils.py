@@ -13,7 +13,7 @@ import xarray as xr
 from loguru import logger
 from shapely.geometry import LineString, Point
 
-NUMBER = Union[int, float]
+NUMBER = Union[int, float, np.number]
 
 logger.configure(
     handlers=[
