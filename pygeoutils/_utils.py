@@ -1,5 +1,6 @@
 """Some utilities for manipulating GeoSpatial data."""
 import itertools
+import os
 import sys
 from dataclasses import dataclass
 from numbers import Number
@@ -30,8 +31,10 @@ logger.configure(
         }
     ]
 )
-logger.disable("pygeoutils")
-
+if os.environ.get("HYRIVER_VERBOSE", "false").lower() == "true":
+    logger.enable("pygeoutils")
+else:
+    logger.disable("pygeoutils")
 
 @dataclass
 class Convert:
