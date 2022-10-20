@@ -36,6 +36,7 @@ if os.environ.get("HYRIVER_VERBOSE", "false").lower() == "true":
 else:
     logger.disable("pygeoutils")
 
+
 @dataclass
 class Convert:
     """Functions to Convert an ArcGIS JSON object to a GeoJSON object."""
