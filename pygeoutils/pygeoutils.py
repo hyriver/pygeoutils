@@ -309,7 +309,7 @@ def gtiff2xarray(
             (to_dataset(lyr, resp) for lyr, resp in r_dict.items()),
             chunks="auto",
             parallel=True,
-            decode_coords="all",
+            engine="rasterio",
         )
 
         variables = list(ds)
