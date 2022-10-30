@@ -1,10 +1,12 @@
 """Some utilities for manipulating GeoSpatial data."""
+from __future__ import annotations
+
 import itertools
 import os
 import sys
 from dataclasses import dataclass
 from numbers import Number
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, NamedTuple, Union
 
 import numpy as np
 import pyproj
@@ -41,23 +43,23 @@ else:
 class Convert:
     """Functions to Convert an ArcGIS JSON object to a GeoJSON object."""
 
-    id_attr: Optional[str] = None
+    id_attr: str | None = None
 
-    def features(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+    def features(self, arcgis: dict[str, Any], geojson: dict[str, Any]) -> dict[str, Any]:
         """Get the features from an ArcGIS JSON object."""
         geojson["type"] = "FeatureCollection"
         geojson["features"] = [convert(f, self.id_attr) for f in arcgis["features"]]
         return geojson
 
     @staticmethod
-    def points(arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+    def points(arcgis: dict[str, Any], geojson: dict[str, Any]) -> dict[str, Any]:
         """Get the points from an ArcGIS JSON object."""
         geojson["type"] = "MultiPoint"
         geojson["coordinates"] = arcgis["points"]
         return geojson
 
     @staticmethod
-    def paths(arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+    def paths(arcgis: dict[str, Any], geojson: dict[str, Any]) -> dict[str, Any]:
         """Get the paths from an ArcGIS JSON object."""
         if len(arcgis["paths"]) == 1:
             geojson["type"] = "LineString"
@@ -67,7 +69,7 @@ class Convert:
             geojson["coordinates"] = arcgis["paths"]
         return geojson
 
-    def xy(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+    def xy(self, arcgis: dict[str, Any], geojson: dict[str, Any]) -> dict[str, Any]:
         """Get the xy coordinates from an ArcGIS JSON object."""
         if self.isnumber([arcgis.get("x"), arcgis.get("y")]):
             geojson["type"] = "Point"
@@ -76,7 +78,7 @@ class Convert:
                 geojson["coordinates"].append(arcgis["z"])
         return geojson
 
-    def rings(self, arcgis: Dict[str, Any], _: Dict[str, Any]) -> Dict[str, Any]:
+    def rings(self, arcgis: dict[str, Any], _: dict[str, Any]) -> dict[str, Any]:
         """Get the rings from an ArcGIS JSON object."""
         outer_rings, holes = self.get_outer_rings(arcgis["rings"])
         uncontained_holes = self.get_uncontained_holes(outer_rings, holes)
@@ -105,7 +107,7 @@ class Convert:
 
         return {"type": "MultiPolygon", "coordinates": outer_rings}
 
-    def coords(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+    def coords(self, arcgis: dict[str, Any], geojson: dict[str, Any]) -> dict[str, Any]:
         """Get the bounds from an ArcGIS JSON object."""
         if self.isnumber([arcgis.get(c) for c in ("xmin", "xmax", "ymin", "ymax")]):
             geojson["type"] = "Polygon"
@@ -121,7 +123,7 @@ class Convert:
         return geojson
 
     @staticmethod
-    def geometry(arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+    def geometry(arcgis: dict[str, Any], geojson: dict[str, Any]) -> dict[str, Any]:
         """Get the geometry from an ArcGIS JSON object."""
         if arcgis.get("geometry") is not None:
             curves = {
@@ -145,7 +147,7 @@ class Convert:
 
         return geojson
 
-    def attributes(self, arcgis: Dict[str, Any], geojson: Dict[str, Any]) -> Dict[str, Any]:
+    def attributes(self, arcgis: dict[str, Any], geojson: dict[str, Any]) -> dict[str, Any]:
         """Get the attributes from an ArcGIS JSON object."""
         geojson["properties"] = arcgis["attributes"]
         keys = {self.id_attr, "OBJECTID", "FID"} if self.id_attr else {"OBJECTID", "FID"}
@@ -156,8 +158,8 @@ class Convert:
 
     @staticmethod
     def get_outer_rings(
-        rings: List[Any],
-    ) -> Tuple[List[Any], List[Any]]:
+        rings: list[Any],
+    ) -> tuple[list[Any], list[Any]]:
         """Get outer rings and holes in a list of rings."""
         outer_rings = []
         holes = []
@@ -181,7 +183,7 @@ class Convert:
         return outer_rings, holes
 
     @staticmethod
-    def get_uncontained_holes(outer_rings: List[Any], holes: List[Any]) -> List[Any]:
+    def get_uncontained_holes(outer_rings: list[Any], holes: list[Any]) -> list[Any]:
         """Get all the uncontstrained holes."""
         uncontained_holes = []
 
@@ -209,15 +211,15 @@ class Convert:
         return uncontained_holes
 
     @staticmethod
-    def isnumber(nums: List[Any]) -> bool:
+    def isnumber(nums: list[Any]) -> bool:
         """Check if all items in a list are numbers."""
         return all(isinstance(n, Number) for n in nums)
 
 
-def convert(arcgis: Dict[str, Any], id_attr: Optional[str] = None) -> Dict[str, Any]:
+def convert(arcgis: dict[str, Any], id_attr: str | None = None) -> dict[str, Any]:
     """Convert an ArcGIS JSON object to a GeoJSON object."""
     togeojson = Convert(id_attr)
-    geojson: Dict[str, Any] = {}
+    geojson: dict[str, Any] = {}
 
     keys = ["features", "xy", "points", "paths", "rings", "coords"]
     for k in keys:
@@ -244,8 +246,8 @@ class Attrs(NamedTuple):
 
     nodata: NUMBER
     crs: pyproj.CRS
-    dims: Tuple[str, str]
-    transform: Tuple[float, float, float, float, float, float]
+    dims: tuple[str, str]
+    transform: tuple[float, float, float, float, float, float]
 
 
 def get_nodata(src: Any) -> NUMBER:
@@ -260,7 +262,7 @@ def get_nodata(src: Any) -> NUMBER:
     return nodata
 
 
-def get_dim_names(ds: Union[xr.DataArray, xr.Dataset]) -> Optional[Tuple[str, str]]:
+def get_dim_names(ds: xr.DataArray | xr.Dataset) -> tuple[str, str] | None:
     """Get vertical and horizontal dimension names."""
     y_dims = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
     x_dims = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
@@ -274,9 +276,9 @@ def get_dim_names(ds: Union[xr.DataArray, xr.Dataset]) -> Optional[Tuple[str, st
 
 
 def get_bounds(
-    ds: Union[xr.Dataset, xr.DataArray],
-    ds_dims: Tuple[str, str] = ("y", "x"),
-) -> Tuple[float, float, float, float]:
+    ds: xr.Dataset | xr.DataArray,
+    ds_dims: tuple[str, str] = ("y", "x"),
+) -> tuple[float, float, float, float]:
     """Get bounds of a ``xarray.Dataset`` or ``xarray.DataArray``.
 
     Parameters
@@ -298,7 +300,7 @@ def get_bounds(
     return left, bottom, right, top
 
 
-def transform2tuple(transform: rio.Affine) -> Tuple[float, float, float, float, float, float]:
+def transform2tuple(transform: rio.Affine) -> tuple[float, float, float, float, float, float]:
     """Convert an affine transform to a tuple.
 
     Parameters

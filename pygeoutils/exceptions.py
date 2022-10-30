@@ -1,5 +1,7 @@
 """Customized PyGeoUtils exceptions."""
-from typing import Generator, List, Optional, Union
+from __future__ import annotations
+
+from typing import Generator
 
 
 class MissingColumnError(Exception):
@@ -11,7 +13,7 @@ class MissingColumnError(Exception):
         List of missing columns.
     """
 
-    def __init__(self, missing: List[str]) -> None:
+    def __init__(self, missing: list[str]) -> None:
         self.message = "The following columns are missing:\n" + f"{', '.join(missing)}"
         super().__init__(self.message)
 
@@ -65,7 +67,7 @@ class InputTypeError(TypeError):
         An example of a valid form of the argument, defaults to None.
     """
 
-    def __init__(self, arg: str, valid_type: str, example: Optional[str] = None) -> None:
+    def __init__(self, arg: str, valid_type: str, example: str | None = None) -> None:
         self.message = f"The {arg} argument should be of type {valid_type}"
         if example is not None:
             self.message += f":\n{example}"
@@ -86,9 +88,7 @@ class InputValueError(Exception):
         List of valid inputs
     """
 
-    def __init__(
-        self, inp: str, valid_inputs: Union[List[str], Generator[str, None, None]]
-    ) -> None:
+    def __init__(self, inp: str, valid_inputs: list[str] | Generator[str, None, None]) -> None:
         self.message = f"Given {inp} is invalid. Valid {inp}s are:\n" + ", ".join(
             str(i) for i in valid_inputs
         )
@@ -109,7 +109,7 @@ class MissingAttributeError(Exception):
         List of valid inputs
     """
 
-    def __init__(self, attr: str, avail_attrs: Optional[List[str]] = None) -> None:
+    def __init__(self, attr: str, avail_attrs: list[str] | None = None) -> None:
         if avail_attrs is not None:
             self.message = f"Given {attr} does not exist. Available attributes are:\n" + ", ".join(
                 str(i) for i in avail_attrs

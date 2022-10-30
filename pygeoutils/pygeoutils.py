@@ -1,10 +1,12 @@
 """Some utilities for manipulating GeoSpatial data."""
+from __future__ import annotations
+
 import contextlib
 import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Sequence, Tuple, TypeVar, Union
 
 import cytoolz as tlz
 import dask
@@ -23,7 +25,7 @@ from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
 
 from . import _utils as utils
-from ._utils import NUMBER, Attrs
+from ._utils import Attrs
 from .exceptions import (
     EmptyResponseError,
     InputRangeError,
@@ -40,6 +42,7 @@ GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
 GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
 XD = TypeVar("XD", xr.Dataset, xr.DataArray)
 CRSTYPE = Union[int, str, pyproj.CRS]
+NUMBER = Union[int, float, np.number]
 
 __all__ = [
     "snap2nearest",
@@ -57,9 +60,7 @@ __all__ = [
 ]
 
 
-def arcgis2geojson(
-    arcgis: Union[str, Dict[str, Any]], id_attr: Optional[str] = None
-) -> Dict[str, Any]:
+def arcgis2geojson(arcgis: str | dict[str, Any], id_attr: str | None = None) -> dict[str, Any]:
     """Convert ESRIGeoJSON format to GeoJSON.
 
     Notes
@@ -85,7 +86,7 @@ def arcgis2geojson(
 
 
 def json2geodf(
-    content: Union[List[Dict[str, Any]], Dict[str, Any]],
+    content: list[dict[str, Any]] | dict[str, Any],
     in_crs: CRSTYPE = 4326,
     crs: CRSTYPE = 4326,
 ) -> gpd.GeoDataFrame:
@@ -130,7 +131,7 @@ def json2geodf(
 
 def xarray_geomask(
     ds: XD,
-    geometry: Union[Polygon, MultiPolygon],
+    geometry: Polygon | MultiPolygon,
     crs: CRSTYPE,
     all_touched: bool = False,
     drop: bool = True,
@@ -179,9 +180,9 @@ def xarray_geomask(
 
 def get_gtiff_attrs(
     resp: bytes,
-    ds_dims: Optional[Tuple[str, str]] = None,
-    driver: Optional[str] = None,
-    nodata: Optional[NUMBER] = None,
+    ds_dims: tuple[str, str] | None = None,
+    driver: str | None = None,
+    nodata: NUMBER | None = None,
 ) -> Attrs:
     """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
 
@@ -226,15 +227,15 @@ def get_gtiff_attrs(
 
 
 def gtiff2xarray(
-    r_dict: Dict[str, bytes],
-    geometry: Optional[GTYPE] = None,
-    geo_crs: Optional[CRSTYPE] = None,
-    ds_dims: Optional[Tuple[str, str]] = None,
-    driver: Optional[str] = None,
+    r_dict: dict[str, bytes],
+    geometry: GTYPE | None = None,
+    geo_crs: CRSTYPE | None = None,
+    ds_dims: tuple[str, str] | None = None,
+    driver: str | None = None,
     all_touched: bool = False,
-    nodata: Optional[NUMBER] = None,
+    nodata: NUMBER | None = None,
     drop: bool = True,
-) -> Union[xr.DataArray, xr.Dataset]:
+) -> xr.DataArray | xr.Dataset:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
 
     Parameters
@@ -284,8 +285,8 @@ def gtiff2xarray(
         var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
 
     attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
-    dtypes: Dict[str, type] = {}
-    nodata_dict: Dict[str, NUMBER] = {}
+    dtypes: dict[str, type] = {}
+    nodata_dict: dict[str, NUMBER] = {}
 
     tmp_dir = tempfile.gettempdir()
 
@@ -311,12 +312,9 @@ def gtiff2xarray(
             parallel=True,
             engine="rasterio",
         )
+        ds = ds.squeeze("band", drop=True)
 
         variables = list(ds)
-        _gm = ds.rio.get_gcps()
-        grid_mapping = _gm.grid_mapping if _gm else "spatial_ref"
-        if grid_mapping in ds:
-            ds = ds.drop_vars(grid_mapping)
 
         if len(variables) == 1:
             ds = ds[variables[0]].copy()
@@ -331,7 +329,6 @@ def gtiff2xarray(
                 ds[v].attrs["crs"] = attrs.crs.to_string()
                 ds[v].attrs["nodatavals"] = (nodata_dict[v],)
                 ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
-        ds = ds.rio.write_crs(attrs.crs, grid_mapping_name=grid_mapping)
 
     if isinstance(geometry, (Polygon, MultiPolygon)):
         if geo_crs is None:
@@ -341,9 +338,9 @@ def gtiff2xarray(
 
 
 def get_transform(
-    ds: Union[xr.Dataset, xr.DataArray],
-    ds_dims: Tuple[str, str] = ("y", "x"),
-) -> Tuple[rio.Affine, int, int]:
+    ds: xr.Dataset | xr.DataArray,
+    ds_dims: tuple[str, str] = ("y", "x"),
+) -> tuple[rio.Affine, int, int]:
     """Get transform of a ``xarray.Dataset`` or ``xarray.DataArray``.
 
     Parameters
@@ -412,7 +409,7 @@ def geo2polygon(
 
 
 def xarray2geodf(
-    da: xr.DataArray, dtype: str, mask_da: Optional[xr.DataArray] = None, connectivity: int = 8
+    da: xr.DataArray, dtype: str, mask_da: xr.DataArray | None = None, connectivity: int = 8
 ) -> gpd.GeoDataFrame:
     """Vectorize a ``xarray.DataArray`` to a ``geopandas.GeoDataFrame``.
 
@@ -486,12 +483,12 @@ class Coordinates:
     [100.0, -30.0]
     """
 
-    lon: Union[NUMBER, Sequence[NUMBER]]
-    lat: Union[NUMBER, Sequence[NUMBER]]
-    bounds: Optional[Tuple[float, float, float, float]] = None
+    lon: NUMBER | Sequence[NUMBER]
+    lat: NUMBER | Sequence[NUMBER]
+    bounds: tuple[float, float, float, float] | None = None
 
     @staticmethod
-    def __box_geo(bounds: Optional[Tuple[float, float, float, float]]) -> sgeom.Polygon:
+    def __box_geo(bounds: tuple[float, float, float, float] | None) -> sgeom.Polygon:
         """Get EPSG:4326 CRS."""
         if bounds is None:
             return sgeom.box(*pyproj.CRS(4326).area_of_use.bounds)
@@ -607,8 +604,8 @@ class GeoBSpline:
 
     @staticmethod
     def __curvature(
-        xs: Union[Sequence[float], np.ndarray], ys: Union[Sequence[float], np.ndarray], l_tot: float
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        xs: Sequence[float] | np.ndarray, ys: Sequence[float] | np.ndarray, l_tot: float
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Compute the curvature of a B-spline curve.
 
         Notes
@@ -838,8 +835,8 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
 
 
 def geometry_list(
-    geometry: Union[GTYPE, sgeom.Point, sgeom.MultiPoint, sgeom.LineString, sgeom.MultiLineString]
-) -> List[Union[sgeom.Polygon, sgeom.Point, sgeom.LineString]]:
+    geometry: GTYPE | sgeom.Point | sgeom.MultiPoint | sgeom.LineString | sgeom.MultiLineString,
+) -> list[sgeom.Polygon | sgeom.Point | sgeom.LineString]:
     """Get a list of polygons, points, and lines from a geometry."""
     if isinstance(geometry, (sgeom.Polygon, sgeom.LineString, sgeom.Point)):
         return [geometry]
