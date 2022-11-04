@@ -2,7 +2,7 @@
 History
 =======
 
-0.13.7 (unreleased)
+0.13.7 (2022-11-04)
 -------------------
 
 Internal Changes
@@ -11,6 +11,8 @@ Internal Changes
   This is especially important for handling large responses from WMS services.
 - Improve type hints for CRS-related arguments of all functions by including string,
   integer, and ``pyproj.CRS`` types.
+- In ``gtiff2xarray`` use ``rasterio`` engine to make sure all ``rioxarray`` attrs
+  are read.
 
 0.13.6 (2022-08-30)
 -------------------
