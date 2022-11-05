@@ -2,6 +2,19 @@
 History
 =======
 
+0.13.8 (2022-11-04)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Improve the performance of ``xarray_geomask`` significantly by first
+  clipping the data to the geometry's bounding box, then if the geometry
+  is a polygon, masking the data with the polygon. This is much faster
+  than directly masking the data with the polygon. Also, support passing
+  a bounding box to ``xarray_geomask`` in addition to polygon and multipolygon.
+- Fix deprecation warning of ``pandas`` when changing the geometry column
+  of a ``GeoDataFrame`` in then ``break_lines`` function.
+
 0.13.7 (2022-11-04)
 -------------------
 
