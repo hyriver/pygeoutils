@@ -129,9 +129,44 @@ def json2geodf(
     return geodf
 
 
+def geo2polygon(
+    geometry: GTYPE,
+    geo_crs: CRSTYPE,
+    crs: CRSTYPE,
+) -> Polygon:
+    """Convert a geometry to a Shapely's Polygon and transform to any CRS.
+
+    Parameters
+    ----------
+    geometry : Polygon or tuple of length 4
+        Polygon or bounding box (west, south, east, north).
+    geo_crs : int, str, or pyproj.CRS
+        Spatial reference of the input geometry
+    crs : int, str, or pyproj.CRS
+        Target spatial reference.
+
+    Returns
+    -------
+    Polygon
+        A Polygon in the target CRS.
+    """
+    if not isinstance(geometry, (Polygon, MultiPolygon, Sequence)):
+        raise InputTypeError("geometry", "Polygon or tuple of length 4")
+
+    if isinstance(geometry, Sequence) and len(geometry) != 4:
+        raise InputTypeError("geometry", "tuple of length 4")
+
+    geom = sgeom.box(*geometry) if isinstance(geometry, Sequence) else geometry
+    project = pyproj.Transformer.from_crs(geo_crs, crs, always_xy=True).transform
+    geom = ops.transform(project, geom)
+    if not geom.is_valid:
+        geom = geom.buffer(0.0)
+    return geom
+
+
 def xarray_geomask(
     ds: XD,
-    geometry: Polygon | MultiPolygon,
+    geometry: GTYPE,
     crs: CRSTYPE,
     all_touched: bool = False,
     drop: bool = True,
@@ -143,7 +178,7 @@ def xarray_geomask(
     ----------
     ds : xarray.Dataset or xarray.DataArray
         The dataset(array) to be masked
-    geometry : Polygon, MultiPolygon
+    geometry : Polygon, MultiPolygon, or tuple of length 4
         The geometry to mask the data
     crs : int, str, or pyproj.CRS
         The spatial reference of the input geometry
@@ -169,9 +204,15 @@ def xarray_geomask(
     if isinstance(ds, xr.Dataset):
         da_attrs = {v: ds[v].attrs for v in ds}
 
-    ds = ds.rio.clip([geometry], crs=crs, all_touched=all_touched, drop=drop, from_disk=from_disk)
-    ds.rio.update_attrs(ds_attrs, inplace=True)
+    if ds.rio.crs is None:
+        raise MissingCRSError
 
+    geom = geo2polygon(geometry, crs, ds.rio.crs)
+    ds = ds.rio.clip_box(*geom.bounds)
+    if isinstance(geometry, (Polygon, MultiPolygon)):
+        ds = ds.rio.clip([geom], all_touched=all_touched, drop=drop, from_disk=from_disk)
+
+    ds.rio.update_attrs(ds_attrs, inplace=True)
     if isinstance(ds, xr.Dataset):
         _ = [ds[v].rio.update_attrs(da_attrs[v], inplace=True) for v in ds]
     ds.rio.update_encoding(ds.encoding, inplace=True)
@@ -371,41 +412,6 @@ def get_transform(
 
     transform = rio_transform.from_bounds(left, bottom, right, top, width, height)
     return transform, width, height
-
-
-def geo2polygon(
-    geometry: GTYPE,
-    geo_crs: CRSTYPE,
-    crs: CRSTYPE,
-) -> Polygon:
-    """Convert a geometry to a Shapely's Polygon and transform to any CRS.
-
-    Parameters
-    ----------
-    geometry : Polygon or tuple of length 4
-        Polygon or bounding box (west, south, east, north).
-    geo_crs : int, str, or pyproj.CRS
-        Spatial reference of the input geometry
-    crs : int, str, or pyproj.CRS
-        Target spatial reference.
-
-    Returns
-    -------
-    Polygon
-        A Polygon in the target CRS.
-    """
-    if not isinstance(geometry, (Polygon, MultiPolygon, Sequence)):
-        raise InputTypeError("geometry", "Polygon or tuple of length 4")
-
-    if isinstance(geometry, Sequence) and len(geometry) != 4:
-        raise InputTypeError("geometry", "tuple of length 4")
-
-    geom = sgeom.box(*geometry) if isinstance(geometry, Sequence) else geometry
-    project = pyproj.Transformer.from_crs(geo_crs, crs, always_xy=True).transform
-    geom = ops.transform(project, geom)
-    if not geom.is_valid:
-        geom = geom.buffer(0.0)
-    return geom
 
 
 def xarray2geodf(
@@ -826,12 +832,9 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
         crs=crs_proj,
         index=idx,
     )
-
-    if isinstance(lns, gpd.GeoDataFrame):
-        lns.loc[idx, "geometry"] = broken_lines
-    else:
-        lns.loc[idx] = broken_lines
-    return lns.to_crs(lines.crs)
+    out = lns.loc[idx].drop(columns="geometry")
+    out = gpd.GeoDataFrame(out, geometry=broken_lines, crs=crs_proj)
+    return out.to_crs(lines.crs)
 
 
 def geometry_list(
