@@ -6,7 +6,6 @@ from shapely.geometry import Polygon
 import pygeoutils as geoutils
 from pygeoutils import EmptyResponseError, InputTypeError, InputValueError
 
-
 has_typeguard = True if sys.modules.get("typeguard") else False
 
 DEF_CRS = "epsg:4326"
