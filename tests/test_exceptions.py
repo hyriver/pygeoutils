@@ -1,15 +1,13 @@
+import sys
+
 import pytest
 from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
 from pygeoutils import EmptyResponseError, InputTypeError, InputValueError
 
-try:
-    import typeguard  # noqa: F401
-except ImportError:
-    has_typeguard = False
-else:
-    has_typeguard = True
+
+has_typeguard = True if sys.modules.get("typeguard") else False
 
 DEF_CRS = "epsg:4326"
 GEO_URB = Polygon(
