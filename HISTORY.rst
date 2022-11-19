@@ -2,6 +2,14 @@
 History
 =======
 
+0.13.9 (unreleased)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Modify the codebase based on `Refurb <https://github.com/dosisod/refurb>`__
+  suggestions.
+
 0.13.8 (2022-11-04)
 -------------------
 

@@ -1,7 +1,7 @@
 """Customized PyGeoUtils exceptions."""
 from __future__ import annotations
 
-from typing import Generator
+from typing import Generator, Sequence
 
 
 class MissingColumnError(Exception):
@@ -88,7 +88,9 @@ class InputValueError(Exception):
         List of valid inputs
     """
 
-    def __init__(self, inp: str, valid_inputs: list[str] | Generator[str, None, None]) -> None:
+    def __init__(
+        self, inp: str, valid_inputs: Sequence[str | int] | Generator[str | int, None, None]
+    ) -> None:
         self.message = f"Given {inp} is invalid. Valid {inp}s are:\n" + ", ".join(
             str(i) for i in valid_inputs
         )
@@ -111,9 +113,8 @@ class MissingAttributeError(Exception):
 
     def __init__(self, attr: str, avail_attrs: list[str] | None = None) -> None:
         if avail_attrs is not None:
-            self.message = f"Given {attr} does not exist. Available attributes are:\n" + ", ".join(
-                str(i) for i in avail_attrs
-            )
+            self.message = f"Given {attr} does not exist. Available attributes are:\n"
+            self.message += ", ".join(avail_attrs)
         else:
             self.message = f"The {attr} attribute is missing."
         super().__init__(self.message)

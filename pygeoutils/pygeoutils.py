@@ -1,7 +1,6 @@
 """Some utilities for manipulating GeoSpatial data."""
 from __future__ import annotations
 
-import contextlib
 import tempfile
 import uuid
 from dataclasses import dataclass
@@ -336,7 +335,7 @@ def gtiff2xarray(
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
                 ds = rxr.open_rasterio(vrt)
-                with contextlib.suppress(ValueError):
+                if "band" in ds.dims:
                     ds = ds.squeeze("band", drop=True)
                 ds.name = var_name[lyr]
                 dtypes[ds.name] = ds.dtype
@@ -353,23 +352,25 @@ def gtiff2xarray(
             parallel=True,
             engine="rasterio",
         )
+
+    if "band" in ds.dims:
         ds = ds.squeeze("band", drop=True)
 
-        variables = list(ds)
+    variables = list(ds)
 
-        if len(variables) == 1:
-            ds = ds[variables[0]].copy()
-            ds = ds.astype(dtypes[variables[0]])
-            ds.attrs["crs"] = attrs.crs.to_string()
-            ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
-            ds = ds.rio.write_nodata(nodata_dict[ds.name])
-        else:
-            ds.attrs["crs"] = attrs.crs.to_string()
-            for v in variables:
-                ds[v] = ds[v].astype(dtypes[v])
-                ds[v].attrs["crs"] = attrs.crs.to_string()
-                ds[v].attrs["nodatavals"] = (nodata_dict[v],)
-                ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
+    if len(variables) == 1:
+        ds = ds[variables[0]].copy()
+        ds = ds.astype(dtypes[variables[0]])
+        ds.attrs["crs"] = attrs.crs.to_string()
+        ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
+        ds = ds.rio.write_nodata(nodata_dict[ds.name])
+    else:
+        ds.attrs["crs"] = attrs.crs.to_string()
+        for v in variables:
+            ds[v] = ds[v].astype(dtypes[v])
+            ds[v].attrs["crs"] = attrs.crs.to_string()
+            ds[v].attrs["nodatavals"] = (nodata_dict[v],)
+            ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
 
     if isinstance(geometry, (Polygon, MultiPolygon)):
         if geo_crs is None:

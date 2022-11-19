@@ -313,4 +313,4 @@ def transform2tuple(transform: rio.Affine) -> tuple[float, float, float, float, 
     tuple
         The affine transform as a tuple (a, b, c, d, e, f)
     """
-    return tuple(getattr(transform, c) for c in ["a", "b", "c", "d", "e", "f"])  # type: ignore
+    return (transform.a, transform.b, transform.c, transform.d, transform.e, transform.f)
