@@ -5,6 +5,11 @@ History
 0.13.9 (unreleased)
 -------------------
 
+New Features
+~~~~~~~~~~~~
+- Add a new function called ``nested_polygons`` for determining nested
+  (multi)polygons in a ``gepandas.GeoDataFrame`` or ``geopandas.GeoSeries``.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Modify the codebase based on `Refurb <https://github.com/dosisod/refurb>`__
