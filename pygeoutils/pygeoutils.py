@@ -56,6 +56,7 @@ __all__ = [
     "xarray2geodf",
     "Coordinates",
     "GeoBSpline",
+    "nested_polygons",
 ]
 
 
@@ -860,3 +861,29 @@ def geometry_list(
         "MultiLineString",
     ]
     raise InputTypeError("geometry", ", ".join(valid_geoms))
+
+
+def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, list[int | str]]:
+    """Get nested polygons in a GeoDataFrame.
+
+    Parameters
+    ----------
+    gdf : geopandas.GeoDataFrame or geopandas.GeoSeries
+        A GeoDataFrame or GeoSeries with (multi)polygons.
+
+    Returns
+    -------
+    dict
+        A dictionary where keys are indices of larger ploygons and
+        values are a list of indices of smaller polygons that are
+        contained within the larger polygons.
+    """
+    if gdf.geom_type.str.contains("Polygon").sum() != len(gdf):
+        raise InputTypeError("gdf", "dataframe with (Multi)Polygons")
+
+    gdf = gdf.to_frame() if isinstance(gdf, gpd.GeoSeries) else gdf
+    q_idx, t_idx = gdf.sindex.query_bulk(gdf.geometry, predicate="within")
+    merged_idx = tlz.merge_with(
+        list, ({gdf.iloc[t].name: gdf.iloc[q].name} for q, t in zip(q_idx, t_idx) if t != q)
+    )
+    return merged_idx  # type: ignore[no-any-return]
