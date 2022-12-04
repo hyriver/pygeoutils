@@ -469,6 +469,82 @@ def xarray2geodf(
     )
 
 
+def geodf2xarray(
+    geodf: gpd.GeoDataFrame,
+    resolution: float,
+    attr_col: str | None = None,
+    fill: int | float = 0,
+    projected_crs: CRSTYPE = 5070,
+) -> xr.Dataset:
+    """Convert a GeoDataFrame to an xarray Dataset with a single variable.
+
+    Parameters
+    ----------
+    geodf : gpd.GeoDataFrame
+        GeoDataFrame to rasterize.
+    resolution : float
+        Resolution of the output raster.
+    attr_col : str, optional
+        Column name of the attribute to use as the variable., defaults to ``None``,
+        i.e., the variable will be a boolean mask where 1 indicates the presence of
+        a polygon. Also, note that the attribute must be numeric and have one of the
+        following ``numpy`` types: ``int16``, ``int32``, ``uint8``, ``uint16``,
+        ``uint32``, ``float32``, and ``float64``.
+    fill : int or float, optional
+        Value to use for filling the missing values of the output raster,
+        defaults to ``0``.
+    projected_crs : int, str, or pyproj.CRS, optional
+        A projected CRS to use for the output raster, defaults to ``EPSG:5070``.
+
+    Returns
+    -------
+    xarray.Dataset
+        The xarray Dataset with a single variable.
+    """
+    if not pyproj.CRS(projected_crs).is_projected:
+        raise InputTypeError("projected_crs", "a projected CRS")
+
+    gdf = geodf.to_crs(projected_crs) if geodf.crs != pyproj.CRS(projected_crs) else geodf
+    west, south, east, north = gdf.total_bounds
+    width = np.ceil(abs(west - east) / resolution).astype(int)
+    height = np.ceil(abs(north - south) / resolution).astype(int)
+    affine = rio.transform.from_bounds(west, south, east, north, width, height)
+
+    if attr_col:
+        _types = ["int16", "int32", "uint8", "uint16", "uint32", "float32", "float64"]
+        valid_types = [np.dtype(t) for t in _types]
+        dtype = geodf[attr_col].dtype
+        if dtype not in valid_types:
+            raise InputTypeError("attr_col", ", ".join(_types))
+
+        ds = xr.DataArray(
+            rio.features.rasterize(
+                shapes=zip(gdf.geometry, gdf[attr_col]),
+                out_shape=(height, width),
+                transform=affine,
+                dtype=dtype,
+                fill=fill,
+            ),
+            coords={"x": np.linspace(west, east, width), "y": np.linspace(north, south, height)},
+            dims=("y", "x"),
+            name=attr_col,
+        )
+    else:
+        ds = xr.DataArray(
+            rio.features.rasterize(
+                shapes=gdf.geometry,
+                out_shape=(height, width),
+                transform=affine,
+            ),
+            coords={"x": np.linspace(west, east, width), "y": np.linspace(north, south, height)},
+            dims=("y", "x"),
+        )
+    ds = ds.rio.write_transform(affine)
+    ds = ds.rio.write_crs(projected_crs)
+    ds = ds.rio.write_coordinate_system()
+    return ds
+
+
 @dataclass
 class Coordinates:
     """Generate validated and normalized coordinates in WGS84.
