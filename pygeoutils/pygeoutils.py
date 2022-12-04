@@ -54,6 +54,7 @@ __all__ = [
     "xarray_geomask",
     "gtiff2xarray",
     "xarray2geodf",
+    "geodf2xarray",
     "Coordinates",
     "GeoBSpline",
     "nested_polygons",
