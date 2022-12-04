@@ -9,6 +9,8 @@ New Features
 ~~~~~~~~~~~~
 - Add a new function called ``nested_polygons`` for determining nested
   (multi)polygons in a ``gepandas.GeoDataFrame`` or ``geopandas.GeoSeries``.
+- Add a new function called ``geodf2xarray`` for rasterizing a
+  ``geopandas.GeoDataFrame`` to a ``xarray.DataArray``.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
