@@ -471,28 +471,28 @@ def xarray2geodf(
 
 
 def geodf2xarray(
-    geodf: gpd.GeoDataFrame,
+    geodf: GDF,
     resolution: float,
     attr_col: str | None = None,
     fill: int | float = 0,
     projected_crs: CRSTYPE = 5070,
 ) -> xr.Dataset:
-    """Convert a GeoDataFrame to an xarray Dataset with a single variable.
+    """Rasterize a ``geopandas.GeoDataFrame`` to ``xarray.DataArray``.
 
     Parameters
     ----------
-    geodf : gpd.GeoDataFrame
-        GeoDataFrame to rasterize.
+    geodf : geopandas.GeoDataFrame or geopandas.GeoSeries
+        GeoDataFrame or GeoSeries to rasterize.
     resolution : float
-        Resolution of the output raster.
+        Target resolution of the output raster.
     attr_col : str, optional
-        Column name of the attribute to use as the variable., defaults to ``None``,
+        Column name of the attribute to use as variable., defaults to ``None``,
         i.e., the variable will be a boolean mask where 1 indicates the presence of
-        a polygon. Also, note that the attribute must be numeric and have one of the
+        a geometry. Also, note that the attribute must be numeric and have one of the
         following ``numpy`` types: ``int16``, ``int32``, ``uint8``, ``uint16``,
         ``uint32``, ``float32``, and ``float64``.
     fill : int or float, optional
-        Value to use for filling the missing values of the output raster,
+        Value to use for filling the missing values (mask) of the output raster,
         defaults to ``0``.
     projected_crs : int, str, or pyproj.CRS, optional
         A projected CRS to use for the output raster, defaults to ``EPSG:5070``.
