@@ -2,14 +2,15 @@
 import io
 
 import geopandas as gpd
+import numpy as np
 from pygeoogc import ArcGISRESTful, ServiceURL
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 
 import pygeoutils as geoutils
 from pygeoutils import Coordinates, GeoBSpline
 
-DEF_CRS = "epsg:4326"
-ALT_CRS = "epsg:4269"
+DEF_CRS = 4326
+ALT_CRS = 4269
 GEO_URB = Polygon(
     [
         [-118.72, 34.118],
@@ -22,7 +23,10 @@ GEO_URB = Polygon(
 GEO_NAT = Polygon(
     [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
 )
-SMALL = 1e-3
+
+
+def assert_close(a: float, b: float, rtol: float = 1e-3) -> bool:
+    assert np.isclose(a, b, rtol=rtol).all()
 
 
 def test_geom_list():
@@ -43,11 +47,11 @@ def test_break_line():
     pt = Point(0.5, 1.5)
     points = gpd.GeoDataFrame({"direction": ["up"]}, geometry=[pt], crs=crs_proj, index=[0])
     lb_w_tol = geoutils.break_lines(lines, points, tol=0.5)
-    assert abs(lb_wo_tol.length.sum() - lb_w_tol.length.sum()) < SMALL
+    assert_close(lb_wo_tol.length.sum(), lb_w_tol.length.sum())
 
     lines = gpd.GeoDataFrame({"id": [0]}, geometry=[LineString([[0, 0], [2, 2]])], crs=crs_proj)
     lb_w_df = geoutils.break_lines(lines, points, tol=0.5)
-    assert abs(lb_wo_tol.length.sum() - lb_w_df.length.sum()) < SMALL
+    assert_close(lb_wo_tol.length.sum(), lb_w_df.length.sum())
 
 
 def test_snap():
@@ -74,12 +78,10 @@ def test_bspline():
     )
     pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs="epsg:4326")).to_crs("epsg:3857")
     sp = GeoBSpline(pts, 10).spline
-    assert (
-        len(sp.x) == 10
-        and abs(sum(sp.y) - 38734230.680) < SMALL
-        and abs(sp.phi.max() - (-1.527)) < SMALL
-        and abs(sp.radius.min() - 9618.943) < SMALL
-    )
+    assert len(sp.x) == 10
+    assert_close(sum(sp.y), 38734230.680)
+    assert_close(sp.phi.max(), (-1.527))
+    assert_close(sp.radius.min(), 9618.943)
 
 
 def test_json2geodf():
@@ -97,24 +99,31 @@ def test_json2geodf():
     rjosn = service.get_features(oids, return_m=True)
     flw = geoutils.json2geodf(rjosn * 2, ALT_CRS, DEF_CRS)
 
-    assert abs(flw["LENGTHKM"].sum() - 8.917 * 2) < SMALL
+    assert_close(flw["LENGTHKM"].sum(), 8.917 * 2)
 
 
 def test_gtiff2array(wms_resp, cover_resp):
     canopy_box = geoutils.gtiff2xarray(wms_resp, GEO_NAT.bounds, DEF_CRS)
     canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS, drop=False)
     cover = geoutils.gtiff2xarray(cover_resp, GEO_NAT, DEF_CRS)
+    expected = 72.436
+
+    assert_close(canopy_box.mean().values.item(), expected)
+    assert_close(canopy.mean().values.item(), expected)
+    assert cover.rio.nodata == 0
+
+
+def test_xarray_geodf(wms_resp):
+    canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS, drop=False)
 
     mask = canopy > 60
     vec = geoutils.xarray2geodf(canopy, "float32", mask)
+    ras = geoutils.geodf2xarray(vec, 1e3)
+    ras_col = geoutils.geodf2xarray(vec, 1e3, attr_col=canopy.name, fill=np.nan)
 
-    expected = 72.436
-    assert (
-        abs(canopy_box.mean().values.item() - expected) < SMALL
-        and abs(canopy.mean().values.item() - expected) < SMALL
-        and vec.shape[0] == 1065
-        and cover.rio.nodata == 0
-    )
+    assert vec.shape[0] == 1065
+    assert ras.sum().compute().item() == 1395
+    assert_close(ras_col.mean().compute().item(), 75.8803)
 
 
 def test_envelope():
