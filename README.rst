@@ -122,6 +122,7 @@ These utilities are:
 - ``json2geodf``: Create ``geopandas.GeoDataFrame`` from (Geo)JSON responses
 - ``snap2nearest``: Find the nearest points on a line to a set of points.
 - ``xarray2geodf``: Vectorize a ``xarray.DataArray`` to a ``geopandas.GeoDataFrame``.
+- ``geodf2xarray``: Rasterize a ``geopandas.GeoDataFrame`` to a ``xarray.DataArray``.
 - ``xarray_geomask``: Mask a ``xarray.Dataset`` based on a geometry.
 - ``nested_polygons``: Determining nested (multi)polygons in a ``geopandas.GeoDataFrame``.
 
