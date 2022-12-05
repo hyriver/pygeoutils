@@ -16,6 +16,8 @@ Internal Changes
 ~~~~~~~~~~~~~~~~
 - Modify the codebase based on `Refurb <https://github.com/dosisod/refurb>`__
   suggestions.
+- In ``xarray_geomask``, if ``drop=True`` recalculate its transform to ensure
+  the correct geo references are set if the shape of the dataset changes.
 
 0.13.8 (2022-11-04)
 -------------------
