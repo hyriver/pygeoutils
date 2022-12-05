@@ -165,6 +165,20 @@ def geo2polygon(
     return geom
 
 
+def _write_crs(ds: XD)->XD:
+    """Write geo reference info into a dataset or dataarray."""
+    ds = ds.rio.write_transform()
+    if ds.rio.grid_mapping and ds.rio.grid_mapping != "spatial_ref":
+        ds = ds.rio.write_crs(ds.rio.crs, grid_mapping_name=ds.rio.grid_mapping)
+        if "spatial_ref" in ds:
+            ds = ds.drop_vars(["spatial_ref"])
+    else:
+        ds = ds.rio.write_crs(ds.rio.crs)
+    ds = ds.rio.write_coordinate_system()
+    return ds
+
+
+
 def xarray_geomask(
     ds: XD,
     geometry: GTYPE,
@@ -209,15 +223,13 @@ def xarray_geomask(
         raise MissingCRSError
 
     geom = geo2polygon(geometry, crs, ds.rio.crs)
-    if ds.rio.grid_mapping and ds.rio.grid_mapping != "spatial_ref":
-        ds = ds.rio.write_crs(ds.rio.crs, grid_mapping_name=ds.rio.grid_mapping)
-        ds = ds.drop_vars(["spatial_ref"])
-    else:
-        ds = ds.rio.write_crs(ds.rio.crs)
+    ds = _write_crs(ds)
     ds = ds.rio.clip_box(*geom.bounds)
     if isinstance(geometry, (Polygon, MultiPolygon)):
         ds = ds.rio.clip([geom], all_touched=all_touched, drop=drop, from_disk=from_disk)
 
+    if drop:
+        ds = _write_crs(ds)
     ds.rio.update_attrs(ds_attrs, inplace=True)
     if isinstance(ds, xr.Dataset):
         _ = [ds[v].rio.update_attrs(da_attrs[v], inplace=True) for v in ds]
@@ -379,10 +391,14 @@ def gtiff2xarray(
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
             ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
 
+    ds = ds.rio.write_transform()
+    ds = ds.rio.write_crs(attrs.crs)
+    ds = ds.rio.write_coordinate_system()
+
     if isinstance(geometry, (Polygon, MultiPolygon)):
         if geo_crs is None:
             raise MissingCRSError
-        return xarray_geomask(ds, geometry, geo_crs, all_touched, drop, from_disk=True)
+        return xarray_geomask(ds, geometry, geo_crs, all_touched, drop)
     return ds
 
 
