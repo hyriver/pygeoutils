@@ -209,6 +209,11 @@ def xarray_geomask(
         raise MissingCRSError
 
     geom = geo2polygon(geometry, crs, ds.rio.crs)
+    if ds.rio.grid_mapping and ds.rio.grid_mapping != "spatial_ref":
+        ds = ds.rio.write_crs(ds.rio.crs, grid_mapping_name=ds.rio.grid_mapping)
+        ds = ds.drop_vars(["spatial_ref"])
+    else:
+        ds = ds.rio.write_crs(ds.rio.crs)
     ds = ds.rio.clip_box(*geom.bounds)
     if isinstance(geometry, (Polygon, MultiPolygon)):
         ds = ds.rio.clip([geom], all_touched=all_touched, drop=drop, from_disk=from_disk)
