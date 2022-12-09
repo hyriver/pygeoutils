@@ -505,7 +505,9 @@ def geodf2xarray(
     geodf : geopandas.GeoDataFrame or geopandas.GeoSeries
         GeoDataFrame or GeoSeries to rasterize.
     resolution : float
-        Target resolution of the output raster.
+        Target resolution of the output raster in the ``projected_crs`` unit. Since
+        the default ``projected_crs`` is ``EPSG:5070``, the default unit for the
+        resolution is meters.
     attr_col : str, optional
         Column name of the attribute to use as variable., defaults to ``None``,
         i.e., the variable will be a boolean mask where 1 indicates the presence of
