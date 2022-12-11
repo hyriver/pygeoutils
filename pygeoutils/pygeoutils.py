@@ -122,7 +122,7 @@ def json2geodf(
     if len(content) > 1:
         geodf = gpd.GeoDataFrame(pd.concat(gpd.GeoDataFrame.from_features(c) for c in content))
 
-    if "geometry" in geodf and len(geodf) > 0:
+    if "geometry" in geodf and not geodf.geometry.is_empty.all():
         geodf = geodf.set_crs(in_crs)
         if in_crs != crs:
             geodf = geodf.to_crs(crs)
@@ -224,7 +224,7 @@ def xarray_geomask(
 
     geom = geo2polygon(geometry, crs, ds.rio.crs)
     ds = _write_crs(ds)
-    ds = ds.rio.clip_box(*geom.bounds)
+    ds = ds.rio.clip_box(*geom.bounds, auto_expand=True)
     if isinstance(geometry, (Polygon, MultiPolygon)):
         ds = ds.rio.clip([geom], all_touched=all_touched, drop=drop, from_disk=from_disk)
 
