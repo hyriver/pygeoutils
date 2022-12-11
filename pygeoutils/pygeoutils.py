@@ -165,7 +165,7 @@ def geo2polygon(
     return geom
 
 
-def _write_crs(ds: XD)->XD:
+def _write_crs(ds: XD) -> XD:
     """Write geo reference info into a dataset or dataarray."""
     ds = ds.rio.write_transform()
     if ds.rio.grid_mapping and ds.rio.grid_mapping != "spatial_ref":
@@ -176,7 +176,6 @@ def _write_crs(ds: XD)->XD:
         ds = ds.rio.write_crs(ds.rio.crs)
     ds = ds.rio.write_coordinate_system()
     return ds
-
 
 
 def xarray_geomask(
