@@ -2,6 +2,15 @@
 History
 =======
 
+0.13.11 (unreleased)
+--------------------
+
+Bug Fixes
+~~~~~~~~~
+- Fix an in issue ``xarray_geomask`` where for geometries that are smaller
+  than a single pixel, the bbox clipping operation fails. This is fixed by
+  using the ``auto_expand`` option of ``rioxarray.clip_box``.
+
 0.13.10 (2022-12-09)
 --------------------
 
