@@ -1,11 +1,12 @@
 """Some utilities for manipulating GeoSpatial data."""
 from __future__ import annotations
 
+import itertools
 import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence, Tuple, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Sequence, Tuple, TypeVar, Union
 
 import cytoolz as tlz
 import dask
@@ -37,11 +38,12 @@ from .exceptions import (
 )
 
 BOX_ORD = "(west, south, east, north)"
-GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
-GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
-XD = TypeVar("XD", xr.Dataset, xr.DataArray)
-CRSTYPE = Union[int, str, pyproj.CRS]
 NUMBER = Union[int, float, np.number]
+if TYPE_CHECKING:
+    GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
+    GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
+    XD = TypeVar("XD", xr.Dataset, xr.DataArray)
+    CRSTYPE = Union[int, str, pyproj.CRS]
 
 __all__ = [
     "snap2nearest",
@@ -365,7 +367,7 @@ def gtiff2xarray(
 
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
         ds = xr.open_mfdataset(
-            (to_dataset(lyr, resp) for lyr, resp in r_dict.items()),
+            itertools.starmap(to_dataset, r_dict.items()),
             chunks="auto",
             parallel=True,
             engine="rasterio",
