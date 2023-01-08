@@ -99,7 +99,7 @@ def test_json2geodf():
     rjosn = service.get_features(oids, return_m=True)
     flw = geoutils.json2geodf(rjosn * 2, ALT_CRS, DEF_CRS)
 
-    assert_close(flw["LENGTHKM"].sum(), 8.917 * 2)
+    assert_close(flw["lengthkm"].sum(), 8.917 * 2)
 
 
 def test_gtiff2array(wms_resp, cover_resp):
