@@ -24,9 +24,9 @@ from scipy.interpolate import BSpline
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
 
-from . import _utils as utils
-from ._utils import Attrs
-from .exceptions import (
+from pygeoutils import _utils as utils
+from pygeoutils._utils import Attrs
+from pygeoutils.exceptions import (
     EmptyResponseError,
     InputRangeError,
     InputTypeError,

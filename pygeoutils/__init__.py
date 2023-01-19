@@ -6,8 +6,8 @@ if int(version("shapely").split(".")[0]) > 1:
 
     os.environ["USE_PYGEOS"] = "0"
 
-from ._utils import transform2tuple
-from .exceptions import (
+from pygeoutils._utils import transform2tuple
+from pygeoutils.exceptions import (
     EmptyResponseError,
     InputRangeError,
     InputTypeError,
@@ -17,8 +17,8 @@ from .exceptions import (
     MissingCRSError,
     UnprojectedCRSError,
 )
-from .print_versions import show_versions
-from .pygeoutils import (
+from pygeoutils.print_versions import show_versions
+from pygeoutils.pygeoutils import (
     Coordinates,
     GeoBSpline,
     arcgis2geojson,
