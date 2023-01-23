@@ -6,12 +6,13 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence, Tuple, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Sequence, Tuple, TypeVar, Union, cast
 
 import cytoolz as tlz
-import dask
+import dask.config
 import geopandas as gpd
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import pyproj
 import rasterio as rio
@@ -20,6 +21,7 @@ import rioxarray as rxr
 import shapely.geometry as sgeom
 import ujson as json
 import xarray as xr
+from pyproj.exceptions import CRSError as ProjCRSError
 from scipy.interpolate import BSpline
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
@@ -38,7 +40,7 @@ from pygeoutils.exceptions import (
 )
 
 BOX_ORD = "(west, south, east, north)"
-NUMBER = Union[int, float, np.number]
+NUMBER = Union[int, float, np.number[Any]]
 if TYPE_CHECKING:
     GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
     GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
@@ -217,8 +219,7 @@ def xarray_geomask(
         The input dataset with a mask applied (np.nan)
     """
     ds_attrs = ds.attrs
-    if isinstance(ds, xr.Dataset):
-        da_attrs = {v: ds[v].attrs for v in ds}
+    da_attrs = {v: ds[v].attrs for v in ds} if isinstance(ds, xr.Dataset) else {}
 
     if ds.rio.crs is None:
         raise MissingCRSError
@@ -272,11 +273,13 @@ def get_gtiff_attrs(
             r_crs = pyproj.CRS(src.crs)
             _nodata = utils.get_nodata(src) if nodata is None else nodata
 
-            ds = rxr.open_rasterio(src)
+            ds = rxr.open_rasterio(src)  # type: ignore
+            ds = cast("xr.Dataset", ds)
             if ds_dims is None:
                 ds_dims = utils.get_dim_names(ds)
 
             valid_dims = list(ds.sizes)
+            valid_dims = cast("list[str]", valid_dims)
             if ds_dims is None or any(d not in valid_dims for d in ds_dims):
                 raise MissingAttributeError("ds_dims", valid_dims)
             if isinstance(src.transform, rio.Affine):
@@ -354,7 +357,8 @@ def gtiff2xarray(
         with rio.MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
-                ds = rxr.open_rasterio(vrt)
+                ds = rxr.open_rasterio(vrt)  # type: ignore
+                ds = cast("xr.Dataset", ds)
                 if "band" in ds.dims:
                     ds = ds.squeeze("band", drop=True)
                 ds.name = var_name[lyr]
@@ -367,7 +371,7 @@ def gtiff2xarray(
 
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
         ds = xr.open_mfdataset(
-            itertools.starmap(to_dataset, r_dict.items()),
+            itertools.starmap(to_dataset, r_dict.items()),  # type: ignore
             chunks="auto",
             parallel=True,
             engine="rasterio",
@@ -377,13 +381,15 @@ def gtiff2xarray(
         ds = ds.squeeze("band", drop=True)
 
     variables = list(ds)
+    variables = cast("str", variables)
 
     if len(variables) == 1:
         ds = ds[variables[0]].copy()
         ds = ds.astype(dtypes[variables[0]])
+        name = cast("str", ds.name)
         ds.attrs["crs"] = attrs.crs.to_string()
-        ds.attrs["nodatavals"] = (nodata_dict[ds.name],)
-        ds = ds.rio.write_nodata(nodata_dict[ds.name])
+        ds.attrs["nodatavals"] = (nodata_dict[name],)
+        ds = ds.rio.write_nodata(nodata_dict[name])
     else:
         ds.attrs["crs"] = attrs.crs.to_string()
         for v in variables:
@@ -599,14 +605,15 @@ class Coordinates:
     @staticmethod
     def __box_geo(bounds: tuple[float, float, float, float] | None) -> sgeom.Polygon:
         """Get EPSG:4326 CRS."""
+        wgs84_bounds = pyproj.CRS(4326).area_of_use.bounds  # type: ignore
         if bounds is None:
-            return sgeom.box(*pyproj.CRS(4326).area_of_use.bounds)
+            return sgeom.box(*wgs84_bounds)
 
         if not isinstance(bounds, (tuple, list)) or len(bounds) != 4:
             raise InputTypeError("bounds", "tuple of length 4")
 
         bbox = sgeom.box(*bounds)
-        if not bbox.within(sgeom.box(*pyproj.CRS(4326).area_of_use.bounds)):
+        if not bbox.within(sgeom.box(*wgs84_bounds)):
             raise InputRangeError("bounds", "within EPSG:4326")
         return bbox
 
@@ -617,8 +624,15 @@ class Coordinates:
 
     def __post_init__(self) -> None:
         """Normalize the longitude value within [-180, 180)."""
-        _lon = [self.lon] if isinstance(self.lon, (int, float)) else list(self.lon)
-        lat = [self.lat] if isinstance(self.lat, (int, float)) else list(self.lat)
+        if isinstance(self.lon, (int, float, np.number)):
+            _lon = np.array([self.lon], "f8")
+        else:
+            _lon = np.array(self.lon, "f8")
+
+        if isinstance(self.lat, (int, float, np.number)):
+            lat = np.array([self.lat], "f8")
+        else:
+            lat = np.array(self.lat, "f8")
 
         lon = np.mod(np.mod(_lon, 360.0) + 540.0, 360.0) - 180.0
         pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs=4326)
@@ -645,7 +659,7 @@ def validate_crs(crs: CRSTYPE) -> str:
     """
     try:
         return pyproj.CRS(crs).to_string()  # type: ignore
-    except pyproj.exceptions.CRSError as ex:
+    except ProjCRSError as ex:
         raise InputTypeError("crs", "a valid CRS") from ex
 
 
@@ -667,11 +681,11 @@ class Spline:
         Total distance of each point along the B-spline from the start point.
     """
 
-    x: np.ndarray
-    y: np.ndarray
-    phi: np.ndarray
-    radius: np.ndarray
-    distance: np.ndarray
+    x: npt.NDArray[np.float64]
+    y: npt.NDArray[np.float64]
+    phi: npt.NDArray[np.float64]
+    radius: npt.NDArray[np.float64]
+    distance: npt.NDArray[np.float64]
 
 
 class GeoBSpline:
@@ -713,8 +727,8 @@ class GeoBSpline:
 
     @staticmethod
     def __curvature(
-        xs: Sequence[float] | np.ndarray, ys: Sequence[float] | np.ndarray, l_tot: float
-    ) -> tuple[np.ndarray, np.ndarray]:
+        xs: npt.NDArray[np.float64], ys: npt.NDArray[np.float64], l_tot: float
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """Compute the curvature of a B-spline curve.
 
         Notes
@@ -778,6 +792,8 @@ class GeoBSpline:
         spl = BSpline(konts, np.column_stack([self.x_ln, self.y_ln]), degree)
 
         x_sp, y_sp = spl(np.linspace(0, self.npts_ln - degree, max(npts_sp, 3), endpoint=False)).T
+        x_sp = cast("npt.NDArray[np.float64]", x_sp)
+        y_sp = cast("npt.NDArray[np.float64]", y_sp)
         phi_sp, rad_sp = self.__curvature(x_sp, y_sp, self.l_ln)
         geom = (
             LineString([(x1, y1), (x2, y2)])
@@ -948,7 +964,7 @@ def geometry_list(
         return [geometry]
 
     if isinstance(geometry, (sgeom.MultiPolygon, sgeom.MultiLineString, sgeom.MultiPoint)):
-        return list(geometry.geoms)
+        return list(geometry.geoms)  # type: ignore
 
     if isinstance(geometry, (tuple, list)) and len(geometry) == 4:
         return [sgeom.box(*geometry)]

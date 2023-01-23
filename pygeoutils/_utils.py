@@ -6,7 +6,7 @@ import os
 import sys
 from dataclasses import dataclass
 from numbers import Number
-from typing import Any, NamedTuple, Union
+from typing import Any, NamedTuple, cast
 
 import numpy as np
 import pyproj
@@ -15,8 +15,6 @@ import ujson as json
 import xarray as xr
 from loguru import logger
 from shapely.geometry import LineString, Point
-
-NUMBER = Union[int, float, np.number]
 
 logger.configure(
     handlers=[
@@ -244,21 +242,22 @@ def convert(arcgis: dict[str, Any], id_attr: str | None = None) -> dict[str, Any
 class Attrs(NamedTuple):
     """Attributes of a GTiff byte response."""
 
-    nodata: NUMBER
+    nodata: int | float | np.number[Any]
     crs: pyproj.CRS
     dims: tuple[str, str]
     transform: tuple[float, float, float, float, float, float]
 
 
-def get_nodata(src: Any) -> NUMBER:
+def get_nodata(src: Any) -> np.number[Any]:
     """Get the nodata value of a GTiff byte response."""
     if src.nodata is None:
         try:
-            nodata: NUMBER = np.iinfo(src.dtypes[0]).max
+            nodata = np.iinfo(src.dtypes[0]).max
         except ValueError:
             nodata = np.nan
     else:
         nodata = np.dtype(src.dtypes[0]).type(src.nodata)
+    nodata = cast("np.number[Any]", nodata)
     return nodata
 
 
@@ -268,7 +267,9 @@ def get_dim_names(ds: xr.DataArray | xr.Dataset) -> tuple[str, str] | None:
     x_dims = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
     try:
         y_dim = list(set(ds.coords).intersection(y_dims))[0]
+        y_dim = cast("str", y_dim)
         x_dim = list(set(ds.coords).intersection(x_dims))[0]
+        x_dim = cast("str", x_dim)
     except IndexError:
         return None
     else:
