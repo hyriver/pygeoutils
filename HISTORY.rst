@@ -7,6 +7,11 @@ History
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
+- Simplify ``geo2polygon`` by making the two CRS arguments optional
+  and only reproject if CRSs are given and different.
+- Apply the geometry mask in ``gtiff2xarray`` even if the input geometry
+  is a bounding box since the mask might not be the same geometry as the
+  one that was used during data query.
 - Fully migrate ``setup.cfg`` and ``setup.py`` to ``pyproject.toml``.
 - Convert relative imports to absolute with ``absolufy-imports``.
 
