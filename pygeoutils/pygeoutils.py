@@ -136,36 +136,40 @@ def json2geodf(
 
 def geo2polygon(
     geometry: GTYPE,
-    geo_crs: CRSTYPE,
-    crs: CRSTYPE,
-) -> Polygon:
+    geo_crs: CRSTYPE | None = None,
+    crs: CRSTYPE | None = None,
+) -> Polygon | MultiPolygon:
     """Convert a geometry to a Shapely's Polygon and transform to any CRS.
 
     Parameters
     ----------
     geometry : Polygon or tuple of length 4
         Polygon or bounding box (west, south, east, north).
-    geo_crs : int, str, or pyproj.CRS
-        Spatial reference of the input geometry
+    geo_crs : int, str, or pyproj.CRS, optional
+        Spatial reference of the input geometry, defaults to ``None``.
     crs : int, str, or pyproj.CRS
-        Target spatial reference.
+        Target spatial reference, defaults to ``None``.
 
     Returns
     -------
-    Polygon
-        A Polygon in the target CRS.
+    shapely.Polygon or shapely.MultiPolygon
+        A (Multi)Polygon in the target CRS, if different from the input CRS.
     """
-    if not isinstance(geometry, (Polygon, MultiPolygon, Sequence)):
-        raise InputTypeError("geometry", "Polygon or tuple of length 4")
+    if isinstance(geometry, (Polygon, MultiPolygon)):
+        geom = geometry
+    elif isinstance(geometry, (tuple, list)) and len(geometry) == 4:
+        geom = sgeom.box(*geometry)
+    else:
+        raise InputTypeError("geometry", "(Multi)Polygon or tuple of length 4")
 
-    if isinstance(geometry, Sequence) and len(geometry) != 4:
-        raise InputTypeError("geometry", "tuple of length 4")
+    if geo_crs and crs and pyproj.CRS(geo_crs) != pyproj.CRS(crs):
+        project = pyproj.Transformer.from_crs(geo_crs, crs, always_xy=True).transform
+        geom = ops.transform(project, geom)
+        geom = cast("Polygon | MultiPolygon", geom)
 
-    geom = sgeom.box(*geometry) if isinstance(geometry, Sequence) else geometry
-    project = pyproj.Transformer.from_crs(geo_crs, crs, always_xy=True).transform
-    geom = ops.transform(project, geom)
-    if not geom.is_valid:
-        geom = geom.buffer(0.0)
+    if not geom.is_valid:  # type: ignore
+        geom = geom.buffer(0.0)  # type: ignore
+        geom = cast("Polygon | MultiPolygon", geom)
     return geom
 
 
@@ -402,7 +406,7 @@ def gtiff2xarray(
     ds = ds.rio.write_crs(attrs.crs)
     ds = ds.rio.write_coordinate_system()
 
-    if isinstance(geometry, (Polygon, MultiPolygon)):
+    if geometry:
         if geo_crs is None:
             raise MissingCRSError
         return xarray_geomask(ds, geometry, geo_crs, all_touched, drop)
