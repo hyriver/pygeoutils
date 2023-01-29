@@ -3,7 +3,11 @@ import textwrap
 from pathlib import Path
 
 import nox
-import tomli
+
+try:
+    import tomllib as tomli
+except ImportError:
+    import tomli
 
 
 def get_package_name() -> str:
@@ -112,7 +116,7 @@ def pre_commit(session: nox.Session) -> None:
 @nox.session(name="type-check", python="3.11")
 def type_check(session: nox.Session) -> None:
     "Run Pyright."
-    install_deps(session)
+    install_deps(session, "nhdplus")
     session.install("pyright")
     session.run("pyright")
 
