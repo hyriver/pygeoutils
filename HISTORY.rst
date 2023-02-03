@@ -5,6 +5,19 @@ History
 0.13.12 (unreleased)
 --------------------
 
+New Features
+~~~~~~~~~~~~
+- Significant improvements in the accuracy and performance of
+  ``nested_polygons`` by changing the logic. Now, the function first
+  determines the nested polygons by comparing the centroids of the
+  geometries with their geometry and then picks the largest geometry
+  from each group of nested geometries.
+- Add a new function called ``query_indicies`` which is a wrapper around
+  ``geopandas.sindex.query_bulk``. However, instead of returning an array of
+  positional indices, it returns a dictionary of indices where keys are the
+  indices of the input geometry and values are a list of indices of the
+  tree geometries that intersect with the input geometry.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Simplify ``geo2polygon`` by making the two CRS arguments optional
