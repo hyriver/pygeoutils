@@ -353,7 +353,8 @@ def test_path():
 
 def test_nested():
     gdf = gpd.GeoSeries(
-        [box(6, 6, 8, 8), box(3, 3, 4, 4), box(2, 2, 5, 5), box(5, 5, 6, 6), box(6, 6, 7, 7)]
+        [box(6, 6, 8, 8), box(3, 3, 4, 4), box(2, 2, 5, 5), box(5, 5, 6, 6), box(6, 6, 7, 7)],
+        crs=5070,
     )
     assert geoutils.nested_polygons(gdf) == {2: [1], 0: [4]}
 
