@@ -63,7 +63,7 @@ __all__ = [
     "geodf2xarray",
     "Coordinates",
     "GeoBSpline",
-    "query_indicies",
+    "query_indices",
     "nested_polygons",
 ]
 
@@ -987,7 +987,7 @@ def geometry_list(
     raise InputTypeError("geometry", ", ".join(valid_geoms))
 
 
-def query_indicies(
+def query_indices(
     tree_gdf: gpd.GeoDataFrame,
     input_gdf: gpd.GeoDataFrame,
     predicate: str = "intersects",
@@ -1042,7 +1042,7 @@ def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, li
         raise UnprojectedCRSError
 
     centroid = gdf.centroid
-    nested_idx = query_indicies(centroid, gdf, "contains")
+    nested_idx = query_indices(centroid, gdf, "contains")
     nested_idx = {k: list(set(v).difference({k})) for k, v in nested_idx.items()}
     nested_idx = {k: v for k, v in nested_idx.items() if v}
     nidx = np.unique([list(set(v + [k])) for k, v in nested_idx.items()], axis=0)  # type: ignore
