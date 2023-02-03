@@ -4,6 +4,7 @@ from __future__ import annotations
 import itertools
 import tempfile
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence, Tuple, TypeVar, Union, cast
@@ -33,6 +34,7 @@ from pygeoutils.exceptions import (
     InputRangeError,
     InputTypeError,
     InputValueError,
+    MatchingCRSError,
     MissingAttributeError,
     MissingColumnError,
     MissingCRSError,
@@ -61,6 +63,7 @@ __all__ = [
     "geodf2xarray",
     "Coordinates",
     "GeoBSpline",
+    "query_indicies",
     "nested_polygons",
 ]
 
@@ -984,6 +987,39 @@ def geometry_list(
     raise InputTypeError("geometry", ", ".join(valid_geoms))
 
 
+def query_indicies(
+    tree_gdf: gpd.GeoDataFrame,
+    input_gdf: gpd.GeoDataFrame,
+    predicate: str = "intersects",
+) -> dict[int | str, list[int | str]]:
+    """Find the indices of the input_geo that intersect with the tree_geo.
+
+    Parameters
+    ----------
+    tree_gdf : gpd.GeoDataFrame
+        The tree geodataframe.
+    input_gdf : gpd.GeoDataFrame
+        The input geodataframe.
+    predicate : str, optional
+        The predicate to use for the query operation, defaults to ``intesects``.
+
+    Returns
+    -------
+    dict
+        A dictionary of the indices of the ``input_gdf`` that intersect with the
+        ``tree_gdf``. Keys are the index of ``input_gdf`` and values are a list
+        of indices of the intersecting ``tree_gdf``.
+    """
+    if input_gdf.crs != tree_gdf.crs:
+        raise MatchingCRSError
+
+    in_iloc, tr_iloc = tree_gdf.sindex.query_bulk(input_gdf.geometry, predicate=predicate)
+    idx_dict = defaultdict(set)
+    for ii, it in zip(input_gdf.iloc[in_iloc].index, tree_gdf.iloc[tr_iloc].index):
+        idx_dict[ii].add(it)
+    return {k: list(v) for k, v in idx_dict.items()}
+
+
 def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, list[int | str]]:
     """Get nested polygons in a GeoDataFrame.
 
@@ -999,12 +1035,18 @@ def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, li
         values are a list of indices of smaller polygons that are
         contained within the larger polygons.
     """
-    if gdf.geom_type.str.contains("Polygon").sum() != len(gdf):
+    if not gdf.geom_type.str.contains("Polygon").all():
         raise InputTypeError("gdf", "dataframe with (Multi)Polygons")
 
-    gdf = gdf.to_frame() if isinstance(gdf, gpd.GeoSeries) else gdf
-    q_idx, t_idx = gdf.sindex.query_bulk(gdf.geometry, predicate="within")
-    merged_idx = tlz.merge_with(
-        list, ({gdf.iloc[t].name: gdf.iloc[q].name} for q, t in zip(q_idx, t_idx) if t != q)
-    )
-    return merged_idx  # type: ignore[no-any-return]
+    if gdf.crs is None or not gdf.crs.is_projected:
+        raise UnprojectedCRSError
+
+    centroid = gdf.centroid
+    nested_idx = query_indicies(centroid, gdf, "contains")
+    nested_idx = {k: list(set(v).difference({k})) for k, v in nested_idx.items()}
+    nested_idx = {k: v for k, v in nested_idx.items() if v}
+    nidx = np.unique([list(set(v + [k])) for k, v in nested_idx.items()], axis=0)  # type: ignore
+    area = gdf.area
+    nested_keys = [area.loc[i].idxmax() for i in nidx]
+    nested_idx = {k: v for k, v in nested_idx.items() if k in nested_keys}
+    return nested_idx
