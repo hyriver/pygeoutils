@@ -32,6 +32,17 @@ class MissingCRSError(Exception):
         return self.message
 
 
+class MatchingCRSError(Exception):
+    """Exception raised when CRS is not given."""
+
+    def __init__(self) -> None:
+        self.message = "Input dataframes must have the same CRS."
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class UnprojectedCRSError(Exception):
     """Exception raised when CRS is not given."""
 
