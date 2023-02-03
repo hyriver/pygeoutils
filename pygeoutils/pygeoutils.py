@@ -1045,8 +1045,8 @@ def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, li
     nested_idx = query_indices(centroid, gdf, "contains")
     nested_idx = {k: list(set(v).difference({k})) for k, v in nested_idx.items()}
     nested_idx = {k: v for k, v in nested_idx.items() if v}
-    nidx = np.unique([list(set(v + [k])) for k, v in nested_idx.items()], axis=0)  # type: ignore
+    nidx = {tuple(set(v + [k])) for k, v in nested_idx.items()}
     area = gdf.area
-    nested_keys = [area.loc[i].idxmax() for i in nidx]
+    nested_keys = [area.loc[list(i)].idxmax() for i in nidx]
     nested_idx = {k: v for k, v in nested_idx.items() if k in nested_keys}
     return nested_idx
