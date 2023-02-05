@@ -28,14 +28,12 @@ from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
 
 from pygeoutils import _utils as utils
-from pygeoutils._utils import Attrs
 from pygeoutils.exceptions import (
     EmptyResponseError,
     InputRangeError,
     InputTypeError,
     InputValueError,
     MatchingCRSError,
-    MissingAttributeError,
     MissingColumnError,
     MissingCRSError,
     UnprojectedCRSError,
@@ -176,19 +174,6 @@ def geo2polygon(
     return geom
 
 
-def _write_crs(ds: XD) -> XD:
-    """Write geo reference info into a dataset or dataarray."""
-    ds = ds.rio.write_transform()
-    if ds.rio.grid_mapping and ds.rio.grid_mapping != "spatial_ref":
-        ds = ds.rio.write_crs(ds.rio.crs, grid_mapping_name=ds.rio.grid_mapping)
-        if "spatial_ref" in ds:
-            ds = ds.drop_vars(["spatial_ref"])
-    else:
-        ds = ds.rio.write_crs(ds.rio.crs)
-    ds = ds.rio.write_coordinate_system()
-    return ds
-
-
 def xarray_geomask(
     ds: XD,
     geometry: GTYPE,
@@ -232,68 +217,18 @@ def xarray_geomask(
         raise MissingCRSError
 
     geom = geo2polygon(geometry, crs, ds.rio.crs)
-    ds = _write_crs(ds)
+    ds = utils.write_crs(ds)
     ds = ds.rio.clip_box(*geom.bounds, auto_expand=True)
     if isinstance(geometry, (Polygon, MultiPolygon)):
         ds = ds.rio.clip([geom], all_touched=all_touched, drop=drop, from_disk=from_disk)
 
     if drop:
-        ds = _write_crs(ds)
+        ds = utils.write_crs(ds)
     ds.rio.update_attrs(ds_attrs, inplace=True)
     if isinstance(ds, xr.Dataset):
         _ = [ds[v].rio.update_attrs(da_attrs[v], inplace=True) for v in ds]
     ds.rio.update_encoding(ds.encoding, inplace=True)
     return ds
-
-
-def get_gtiff_attrs(
-    resp: bytes,
-    ds_dims: tuple[str, str] | None = None,
-    driver: str | None = None,
-    nodata: NUMBER | None = None,
-) -> Attrs:
-    """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
-
-    Parameters
-    ----------
-    resp : bytes
-        Raster response returned from a wed service request such as WMS
-    ds_dims : tuple of str, optional
-        The names of the vertical and horizontal dimensions (in that order)
-        of the target dataset, default to None. If None, dimension names are determined
-        from a list of common names.
-    driver : str, optional
-        A GDAL driver for reading the content, defaults to automatic detection. A list of
-        the drivers can be found here: https://gdal.org/drivers/raster/index.html
-    nodata : float or int, optional
-        The nodata value of the raster, defaults to None, i.e., is determined from the raster.
-
-    Returns
-    -------
-    Attrs
-        No data, CRS, and dimension names for vertical and horizontal directions or
-        a list of the existing dimensions if they are not in a list of common names.
-    """
-    with rio.MemoryFile() as memfile:
-        memfile.write(resp)
-        with memfile.open(driver=driver) as src:
-            r_crs = pyproj.CRS(src.crs)
-            _nodata = utils.get_nodata(src) if nodata is None else nodata
-
-            ds = rxr.open_rasterio(src)  # type: ignore
-            ds = cast("xr.Dataset", ds)
-            if ds_dims is None:
-                ds_dims = utils.get_dim_names(ds)
-
-            valid_dims = list(ds.sizes)
-            valid_dims = cast("list[str]", valid_dims)
-            if ds_dims is None or any(d not in valid_dims for d in ds_dims):
-                raise MissingAttributeError("ds_dims", valid_dims)
-            if isinstance(src.transform, rio.Affine):
-                transform = utils.transform2tuple(src.transform)
-            else:
-                transform = tuple(src.transform)  # type: ignore
-    return Attrs(_nodata, r_crs, ds_dims, transform)
 
 
 def gtiff2xarray(
@@ -354,7 +289,7 @@ def gtiff2xarray(
     if "_dd_" in key1:
         var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
 
-    attrs = get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
+    attrs = utils.get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: dict[str, type] = {}
     nodata_dict: dict[str, NUMBER] = {}
 
@@ -975,7 +910,7 @@ def geometry_list(
 
     if isinstance(geometry, (tuple, list)) and len(geometry) == 4:
         return [sgeom.box(*geometry)]
-    valid_geoms = [
+    valid_geoms = (
         "Polygon",
         "MultiPolygon",
         "tuple/list of length 4",
@@ -983,7 +918,7 @@ def geometry_list(
         "MultiPoint",
         "LineString",
         "MultiLineString",
-    ]
+    )
     raise InputTypeError("geometry", ", ".join(valid_geoms))
 
 

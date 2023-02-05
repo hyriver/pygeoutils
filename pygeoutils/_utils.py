@@ -6,15 +6,22 @@ import os
 import sys
 from dataclasses import dataclass
 from numbers import Number
-from typing import Any, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, Union, cast
 
 import numpy as np
 import pyproj
 import rasterio as rio
+import rioxarray as rxr
 import ujson as json
 import xarray as xr
 from loguru import logger
 from shapely.geometry import LineString, Point
+
+from pygeoutils.exceptions import MissingAttributeError
+
+if TYPE_CHECKING:
+    NUMBER = Union[int, float, np.number[Any]]
+    XD = TypeVar("XD", xr.Dataset, xr.DataArray)
 
 logger.configure(
     handlers=[
@@ -315,3 +322,66 @@ def transform2tuple(transform: rio.Affine) -> tuple[float, float, float, float, 
         The affine transform as a tuple (a, b, c, d, e, f)
     """
     return (transform.a, transform.b, transform.c, transform.d, transform.e, transform.f)
+
+
+def write_crs(ds: XD) -> XD:
+    """Write geo reference info into a dataset or dataarray."""
+    ds = ds.rio.write_transform()
+    if ds.rio.grid_mapping and ds.rio.grid_mapping != "spatial_ref":
+        ds = ds.rio.write_crs(ds.rio.crs, grid_mapping_name=ds.rio.grid_mapping)
+        if "spatial_ref" in ds:
+            ds = ds.drop_vars(["spatial_ref"])
+    else:
+        ds = ds.rio.write_crs(ds.rio.crs)
+    ds = ds.rio.write_coordinate_system()
+    return ds
+
+
+def get_gtiff_attrs(
+    resp: bytes,
+    ds_dims: tuple[str, str] | None = None,
+    driver: str | None = None,
+    nodata: NUMBER | None = None,
+) -> Attrs:
+    """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
+
+    Parameters
+    ----------
+    resp : bytes
+        Raster response returned from a wed service request such as WMS
+    ds_dims : tuple of str, optional
+        The names of the vertical and horizontal dimensions (in that order)
+        of the target dataset, default to None. If None, dimension names are determined
+        from a list of common names.
+    driver : str, optional
+        A GDAL driver for reading the content, defaults to automatic detection. A list of
+        the drivers can be found here: https://gdal.org/drivers/raster/index.html
+    nodata : float or int, optional
+        The nodata value of the raster, defaults to None, i.e., is determined from the raster.
+
+    Returns
+    -------
+    Attrs
+        No data, CRS, and dimension names for vertical and horizontal directions or
+        a list of the existing dimensions if they are not in a list of common names.
+    """
+    with rio.MemoryFile() as memfile:
+        memfile.write(resp)
+        with memfile.open(driver=driver) as src:
+            r_crs = pyproj.CRS(src.crs)
+            _nodata = get_nodata(src) if nodata is None else nodata
+
+            ds = rxr.open_rasterio(src)  # type: ignore
+            ds = cast("xr.Dataset", ds)
+            if ds_dims is None:
+                ds_dims = get_dim_names(ds)
+
+            valid_dims = list(ds.sizes)
+            valid_dims = cast("list[str]", valid_dims)
+            if ds_dims is None or any(d not in valid_dims for d in ds_dims):
+                raise MissingAttributeError("ds_dims", valid_dims)
+            if isinstance(src.transform, rio.Affine):
+                transform = transform2tuple(src.transform)
+            else:
+                transform = tuple(src.transform)  # type: ignore
+    return Attrs(_nodata, r_crs, ds_dims, transform)
