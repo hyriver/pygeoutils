@@ -923,17 +923,17 @@ def geometry_list(
 
 
 def query_indices(
-    tree_gdf: gpd.GeoDataFrame,
-    input_gdf: gpd.GeoDataFrame,
+    tree_gdf: gpd.GeoDataFrame | gpd.GeoSeries,
+    input_gdf: gpd.GeoDataFrame | gpd.GeoSeries,
     predicate: str = "intersects",
 ) -> dict[int | str, list[int | str]]:
     """Find the indices of the input_geo that intersect with the tree_geo.
 
     Parameters
     ----------
-    tree_gdf : gpd.GeoDataFrame
+    tree_gdf : geopandas.GeoDataFrame or geopandas.GeoSeries
         The tree geodataframe.
-    input_gdf : gpd.GeoDataFrame
+    input_gdf : geopandas.GeoDataFrame or geopandas.GeoSeries
         The input geodataframe.
     predicate : str, optional
         The predicate to use for the query operation, defaults to ``intesects``.
