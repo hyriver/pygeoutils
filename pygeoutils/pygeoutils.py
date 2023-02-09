@@ -41,7 +41,7 @@ from pygeoutils.exceptions import (
 )
 
 BOX_ORD = "(west, south, east, north)"
-NUMBER = Union[int, float, np.number[Any]]
+NUMBER = Union[int, float, np.number]  # type: ignore
 if TYPE_CHECKING:
     from rasterio import Affine
 

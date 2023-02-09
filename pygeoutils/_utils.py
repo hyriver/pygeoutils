@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import itertools
-import os
-import sys
 from dataclasses import dataclass
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, Union, cast
@@ -11,37 +9,16 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, Union, cast
 import numpy as np
 import pyproj
 import rasterio as rio
-import rioxarray as rxr
+import rioxarray._io as rxr
 import ujson as json
 import xarray as xr
-from loguru import logger
 from shapely.geometry import LineString, Point
 
 from pygeoutils.exceptions import MissingAttributeError
 
 if TYPE_CHECKING:
-    NUMBER = Union[int, float, np.number[Any]]
+    NUMBER = Union[int, float, np.number]  # type: ignore
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
-
-logger.configure(
-    handlers=[
-        {
-            "sink": sys.stdout,
-            "colorize": True,
-            "format": " | ".join(
-                [
-                    "{time:YYYY-MM-DD at HH:mm:ss}",  # noqa: FS003
-                    "{name: ^15}.{function: ^15}:{line: >3}",  # noqa: FS003
-                    "{message}",  # noqa: FS003
-                ]
-            ),
-        }
-    ]
-)
-if os.environ.get("HYRIVER_VERBOSE", "false").lower() == "true":
-    logger.enable("pygeoutils")
-else:
-    logger.disable("pygeoutils")
 
 
 @dataclass
@@ -135,15 +112,11 @@ class Convert:
                 "curveRings": "Curved Polygon",
                 "curvePaths": "Curved Polyline",
                 "a": "Elliptic Arc",
-                "b": "Bézier Curve",
+                "b": "Bezier Curve",
                 "c": "Circular Arc",
             }
             not_supported = [v for k, v in curves.items() if k in arcgis["geometry"]]
             if not_supported:
-                logger.warning(
-                    "Elements of type {} can not be converted. Converting to null geometry",
-                    ", ".join(not_supported),
-                )
                 geojson["geometry"] = None
             else:
                 geojson["geometry"] = convert(arcgis["geometry"])
@@ -249,13 +222,13 @@ def convert(arcgis: dict[str, Any], id_attr: str | None = None) -> dict[str, Any
 class Attrs(NamedTuple):
     """Attributes of a GTiff byte response."""
 
-    nodata: int | float | np.number[Any]
+    nodata: NUMBER
     crs: pyproj.CRS
     dims: tuple[str, str]
     transform: tuple[float, float, float, float, float, float]
 
 
-def get_nodata(src: Any) -> np.number[Any]:
+def get_nodata(src: Any) -> np.number:  # type: ignore
     """Get the nodata value of a GTiff byte response."""
     if src.nodata is None:
         try:
@@ -264,7 +237,7 @@ def get_nodata(src: Any) -> np.number[Any]:
             nodata = np.nan
     else:
         nodata = np.dtype(src.dtypes[0]).type(src.nodata)
-    nodata = cast("np.number[Any]", nodata)
+    nodata = cast("np.number", nodata)  # type: ignore
     return nodata
 
 
@@ -371,17 +344,18 @@ def get_gtiff_attrs(
             r_crs = pyproj.CRS(src.crs)
             _nodata = get_nodata(src) if nodata is None else nodata
 
-            ds = rxr.open_rasterio(src)  # type: ignore
+            ds = rxr.open_rasterio(src)
             ds = cast("xr.Dataset", ds)
             if ds_dims is None:
                 ds_dims = get_dim_names(ds)
-
             valid_dims = list(ds.sizes)
+            ds.close()
+
             valid_dims = cast("list[str]", valid_dims)
             if ds_dims is None or any(d not in valid_dims for d in ds_dims):
                 raise MissingAttributeError("ds_dims", valid_dims)
             if isinstance(src.transform, rio.Affine):
                 transform = transform2tuple(src.transform)
             else:
-                transform = tuple(src.transform)  # type: ignore
+                transform = tuple(src.transform)
     return Attrs(_nodata, r_crs, ds_dims, transform)
