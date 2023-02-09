@@ -5,6 +5,11 @@ History
 0.13.12 (unreleased)
 --------------------
 
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- The input geo-dataframes to ``break_lines`` now should be in
+  a projected CRS.
+
 New Features
 ~~~~~~~~~~~~
 - Significant improvements in the accuracy and performance of
