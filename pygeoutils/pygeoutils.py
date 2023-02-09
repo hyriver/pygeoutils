@@ -9,20 +9,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence, Tuple, TypeVar, Union, cast
 
-import cytoolz as tlz
+import cytoolz.curried as tlz
 import dask.config
 import geopandas as gpd
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import pyproj
-import rasterio as rio
+import rasterio.features as rio_features
 import rasterio.transform as rio_transform
 import rioxarray as rxr
 import shapely.geometry as sgeom
 import ujson as json
 import xarray as xr
 from pyproj.exceptions import CRSError as ProjCRSError
+from rasterio import MemoryFile
 from scipy.interpolate import BSpline
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
@@ -42,6 +43,8 @@ from pygeoutils.exceptions import (
 BOX_ORD = "(west, south, east, north)"
 NUMBER = Union[int, float, np.number[Any]]
 if TYPE_CHECKING:
+    from rasterio import Affine
+
     GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
     GDF = TypeVar("GDF", gpd.GeoDataFrame, gpd.GeoSeries)
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
@@ -131,7 +134,7 @@ def json2geodf(
         geodf = geodf.set_crs(in_crs)
         if in_crs != crs:
             geodf = geodf.to_crs(crs)
-
+    geodf = cast("gpd.GeoDataFrame", geodf)
     return geodf
 
 
@@ -166,10 +169,10 @@ def geo2polygon(
     if geo_crs and crs and pyproj.CRS(geo_crs) != pyproj.CRS(crs):
         project = pyproj.Transformer.from_crs(geo_crs, crs, always_xy=True).transform
         geom = ops.transform(project, geom)
-        geom = cast("Polygon | MultiPolygon", geom)
 
-    if not geom.is_valid:  # type: ignore
-        geom = geom.buffer(0.0)  # type: ignore
+    geom = cast("Polygon | MultiPolygon", geom)
+    if not geom.is_valid:
+        geom = geom.buffer(0.0)
         geom = cast("Polygon | MultiPolygon", geom)
     return geom
 
@@ -296,7 +299,7 @@ def gtiff2xarray(
     tmp_dir = tempfile.gettempdir()
 
     def to_dataset(lyr: str, resp: bytes) -> Path:
-        with rio.MemoryFile() as memfile:
+        with MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
                 ds = rxr.open_rasterio(vrt)  # type: ignore
@@ -354,7 +357,7 @@ def gtiff2xarray(
 def get_transform(
     ds: xr.Dataset | xr.DataArray,
     ds_dims: tuple[str, str] = ("y", "x"),
-) -> tuple[rio.Affine, int, int]:
+) -> tuple[Affine, int, int]:
     """Get transform of a ``xarray.Dataset`` or ``xarray.DataArray``.
 
     Parameters
@@ -419,23 +422,23 @@ def xarray2geodf(
     valid_types = ["int16", "int32", "uint8", "uint16", "float32"]
     if dtype not in valid_types:
         raise InputValueError("dtype", valid_types)
-    _dtype = getattr(np, dtype)
 
     crs = da.rio.crs if da.attrs.get("crs") is None else da.crs
     if crs is None:
         raise MissingCRSError
 
     mask = None if mask_da is None else mask_da.to_numpy()
-    shapes = rio.features.shapes(
-        source=da.to_numpy().astype(_dtype),
+    shapes = rio_features.shapes(
+        source=da.to_numpy().astype(dtype),
         transform=da.rio.transform(),
         mask=mask,
         connectivity=connectivity,
     )
-    geometry, values = zip(*shapes)
+    geojsons, values = zip(*shapes)
+    geojsons = cast("tuple[dict[str, Any], ...]", geojsons)
     return gpd.GeoDataFrame(
-        data={da.name: _dtype(values)},
-        geometry=[sgeom.shape(g) for g in geometry],
+        data={str(da.name): np.array(values, dtype)},
+        geometry=[sgeom.shape(g) for g in geojsons],
         crs=crs,
     )
 
@@ -478,10 +481,11 @@ def geodf2xarray(
         raise InputTypeError("projected_crs", "a projected CRS")
 
     gdf = geodf.to_crs(projected_crs) if geodf.crs != pyproj.CRS(projected_crs) else geodf
+    gdf = cast("gpd.GeoDataFrame", gdf)
     west, south, east, north = gdf.total_bounds
     width = np.ceil(abs(west - east) / resolution).astype(int)
     height = np.ceil(abs(north - south) / resolution).astype(int)
-    affine = rio.transform.from_bounds(west, south, east, north, width, height)
+    affine = rio_transform.from_bounds(west, south, east, north, width, height)
 
     if attr_col:
         _types = ["int16", "int32", "uint8", "uint16", "uint32", "float32", "float64"]
@@ -491,7 +495,7 @@ def geodf2xarray(
             raise InputTypeError("attr_col", ", ".join(_types))
 
         ds = xr.DataArray(
-            rio.features.rasterize(
+            rio_features.rasterize(
                 shapes=zip(gdf.geometry, gdf[attr_col]),
                 out_shape=(height, width),
                 transform=affine,
@@ -504,7 +508,7 @@ def geodf2xarray(
         )
     else:
         ds = xr.DataArray(
-            rio.features.rasterize(
+            rio_features.rasterize(
                 shapes=gdf.geometry,
                 out_shape=(height, width),
                 transform=affine,
@@ -577,7 +581,8 @@ class Coordinates:
             lat = np.array(self.lat, "f8")
 
         lon = np.mod(np.mod(_lon, 360.0) + 540.0, 360.0) - 180.0
-        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)], crs=4326)
+        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)])
+        pts = cast("gpd.GeoSeries", pts.set_crs(4326))
         self._points = self.__validate(pts, self.__box_geo(self.bounds))
 
     @property
@@ -741,7 +746,7 @@ class GeoBSpline:
             LineString([(x1, y1), (x2, y2)])
             for x1, y1, x2, y2 in zip(x_sp[:-1], y_sp[:-1], x_sp[1:], y_sp[1:])
         )
-        d_sp = gpd.GeoSeries(geom, crs=self.crs).length.cumsum().values
+        d_sp = gpd.GeoSeries(geom).set_crs(self.crs).length.cumsum().values
         if npts_sp < 3:
             idx = np.r_[:npts_sp]
             return Spline(x_sp[idx], y_sp[idx], phi_sp[idx], rad_sp[idx], d_sp[idx])
@@ -803,17 +808,18 @@ def snap2nearest(lines: GDF, points: GDF, tol: float) -> GDF:
         raise UnprojectedCRSError
 
     if isinstance(points, gpd.GeoSeries):
-        pts: gpd.GeoDataFrame = points.to_frame("geometry").reset_index()
+        pts = points.to_frame("geometry").reset_index()
     else:
         pts = points.copy()
 
+    pts = cast("gpd.GeoDataFrame", pts)
     cols = list(pts.columns)
     cols.remove("geometry")
     pts_idx, ln_idx = lines.sindex.query_bulk(pts.buffer(tol))
     merged_idx = tlz.merge_with(list, ({p: f} for p, f in zip(pts_idx, ln_idx)))
     _pts = {
         pi: (
-            *pts.iloc[pi][cols],  # type: ignore[has-type]
+            *pts.iloc[pi][cols],
             ops.nearest_points(lines.iloc[fi].geometry.unary_union, pts.iloc[pi].geometry)[0],
         )
         for pi, fi in merged_idx.items()
@@ -821,6 +827,7 @@ def snap2nearest(lines: GDF, points: GDF, tol: float) -> GDF:
     pts = gpd.GeoDataFrame.from_dict(_pts, orient="index")
     pts.columns = cols + ["geometry"]
     pts = pts.set_geometry("geometry", crs=points.crs)
+    pts = cast("gpd.GeoDataFrame", pts)
 
     if isinstance(points, gpd.GeoSeries):
         return pts.geometry
@@ -851,6 +858,9 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
     if lines.crs is None or points.crs is None:
         raise MissingCRSError
 
+    if lines.crs != points.crs or not lines.crs.is_projected or not points.crs.is_projected:
+        raise UnprojectedCRSError
+
     if "direction" not in points.columns:
         raise MissingColumnError(["direction"])
 
@@ -860,31 +870,23 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
     if not lines.geom_type.isin(["LineString", "MultiLineString"]).all():
         raise InputTypeError("geometry", "LineString or MultiLineString")
 
-    if lines.crs != points.crs or not lines.crs.is_projected or not points.crs.is_projected:
-        crs_proj = "epsg:3857"
-        lns = lines.to_crs(crs_proj)
-        pts = points.to_crs(crs_proj)
-    else:
-        crs_proj = lines.crs
-        lns = lines.copy()
-        pts = points.copy()
-
+    crs_proj = lines.crs
     if tol > 0.0:
-        pts = snap2nearest(lns, pts, tol)
+        points = snap2nearest(lines, points, tol)
 
-    mlines = lns.geom_type == "MultiLineString"
+    mlines = lines.geom_type == "MultiLineString"
     if mlines.any():
-        lns.loc[mlines, "geometry"] = lns.loc[mlines, "geometry"].apply(lambda g: list(g.geoms))
-        lns = lns.explode("geometry").set_crs(crs_proj)
+        lines.loc[mlines, "geometry"] = lines.loc[mlines, "geometry"].apply(lambda g: list(g.geoms))
+        lines = lines.explode("geometry").set_crs(crs_proj)
 
-    pts_idx, flw_idx = lns.sindex.query_bulk(pts.geometry)
+    pts_idx, flw_idx = lines.sindex.query_bulk(points.geometry)
     if len(pts_idx) == 0:
         raise ValueError("No intersection between lines and points")  # noqa: TC003
 
-    flw_geom = lns.iloc[flw_idx].geometry
-    pts_geom = pts.iloc[pts_idx].geometry
-    pts_dir = pts.iloc[pts_idx].direction
-    idx = lns.iloc[flw_idx].index
+    flw_geom = lines.iloc[flw_idx].geometry
+    pts_geom = points.iloc[pts_idx].geometry
+    pts_dir = points.iloc[pts_idx].direction
+    idx = lines.iloc[flw_idx].index
     broken_lines = gpd.GeoSeries(
         [
             ops.substring(fl, *((0, fl.project(pt)) if d == "up" else (fl.project(pt), fl.length)))
@@ -893,7 +895,7 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
         crs=crs_proj,
         index=idx,
     )
-    out = lns.loc[idx].drop(columns="geometry")
+    out = lines.loc[idx].drop(columns="geometry")
     out = gpd.GeoDataFrame(out, geometry=broken_lines, crs=crs_proj)
     return out.to_crs(lines.crs)
 
@@ -926,7 +928,7 @@ def query_indices(
     tree_gdf: gpd.GeoDataFrame | gpd.GeoSeries,
     input_gdf: gpd.GeoDataFrame | gpd.GeoSeries,
     predicate: str = "intersects",
-) -> dict[int | str, list[int | str]]:
+) -> dict[Any, list[Any]]:
     """Find the indices of the input_geo that intersect with the tree_geo.
 
     Parameters
