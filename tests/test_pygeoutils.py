@@ -39,7 +39,7 @@ def test_geom_list():
 
 
 def test_break_line():
-    crs_proj = "epsg:3857"
+    crs_proj = 3857
     lines = gpd.GeoSeries([LineString([[0, 0], [2, 2]])], crs=crs_proj)
     pt = Point(1, 1)
     points = gpd.GeoDataFrame({"direction": ["down"]}, geometry=[pt], crs=crs_proj, index=[0])
