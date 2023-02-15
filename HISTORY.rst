@@ -2,12 +2,20 @@
 History
 =======
 
+0.13.13 (2023-02-10)
+--------------------
+
+New Features
+~~~~~~~~~~~~
+- Ignore index when concatenating multiple responses in ``json2geodf``
+  to ensure indices are unique
+
 0.13.12 (2023-02-10)
 --------------------
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
-- The input geo-dataframes to ``break_lines`` now should be in
+- The input ``GeoDataFrame`` to ``break_lines`` now should be in
   a projected CRS.
 
 New Features
