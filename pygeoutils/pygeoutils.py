@@ -128,7 +128,9 @@ def json2geodf(
         raise EmptyResponseError from ex
 
     if len(content) > 1:
-        geodf = gpd.GeoDataFrame(pd.concat(gpd.GeoDataFrame.from_features(c) for c in content))
+        geodf = gpd.GeoDataFrame(
+            pd.concat((gpd.GeoDataFrame.from_features(c) for c in content), ignore_index=True)
+        )
 
     if "geometry" in geodf and not geodf.geometry.is_empty.all():
         geodf = geodf.set_crs(in_crs)
