@@ -359,6 +359,20 @@ def test_nested():
     assert geoutils.nested_polygons(gdf) == {2: [1], 0: [4]}
 
 
+def test_coords():
+    coords = (1, 2)
+    clist = geoutils.coords_list(coords)
+    assert isinstance(clist, list) and all(len(c) == 2 for c in clist)
+
+    coords = ((1, 2), (1, 2, 4))
+    clist = geoutils.coords_list(coords)
+    assert isinstance(clist, list) and all(len(c) == 2 for c in clist)
+
+    coords = np.array(((1, 2), (1, 3)))
+    clist = geoutils.coords_list(coords)
+    assert isinstance(clist, list) and all(len(c) == 2 for c in clist)
+
+
 def test_show_versions():
     f = io.StringIO()
     geoutils.show_versions(file=f)
