@@ -66,6 +66,7 @@ __all__ = [
     "GeoBSpline",
     "query_indices",
     "nested_polygons",
+    "coords_list",
 ]
 
 
@@ -904,7 +905,7 @@ def break_lines(lines: GDF, points: gpd.GeoDataFrame, tol: float = 0.0) -> GDF:
 
 def geometry_list(
     geometry: GTYPE | sgeom.Point | sgeom.MultiPoint | sgeom.LineString | sgeom.MultiLineString,
-) -> list[sgeom.Polygon | sgeom.Point | sgeom.LineString]:
+) -> list[sgeom.Polygon] | list[sgeom.Point] | list[sgeom.LineString]:
     """Get a list of polygons, points, and lines from a geometry."""
     if isinstance(geometry, (sgeom.Polygon, sgeom.LineString, sgeom.Point)):
         return [geometry]
@@ -989,3 +990,31 @@ def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, li
     nested_keys = [area.loc[list(i)].idxmax() for i in nidx]
     nested_idx = {k: v for k, v in nested_idx.items() if k in nested_keys}
     return nested_idx
+
+
+def coords_list(
+    coords: tuple[float, float] | list[tuple[float, float]] | npt.NDArray[np.float64]
+) -> list[tuple[float, float]]:
+    """Convert a single coordinate or list of coordinates to a list of coordinates.
+
+    Parameters
+    ----------
+    coords : tuple of list of tuple
+        Input coordinates
+
+    Returns
+    -------
+    list of tuple
+        List of coordinates as ``[(x1, y1), ...]``.
+    """
+    try:
+        point = sgeom.Point(coords)
+    except (ValueError, TypeError):
+        try:
+            points = sgeom.MultiPoint(coords)
+        except (ValueError, TypeError) as ex:
+            raise InputTypeError("coords", "tuple or list of tuples") from ex
+        else:
+            return [(float(p.x), float(p.y)) for p in points.geoms]
+    else:
+        return [(float(point.x), float(point.y))]
