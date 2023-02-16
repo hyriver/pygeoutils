@@ -2,13 +2,16 @@
 History
 =======
 
-0.13.13 (2023-02-10)
+0.13.13 (unreleased)
 --------------------
 
 New Features
 ~~~~~~~~~~~~
 - Ignore index when concatenating multiple responses in ``json2geodf``
   to ensure indices are unique
+- Add a new function called ``coords_list`` for converting/validating input
+  coordinates of any type to a ``list`` of ``tuple``, i.e.,
+  ``[(x1, y1), (x2, y2), ...]``.
 
 0.13.12 (2023-02-10)
 --------------------
