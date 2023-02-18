@@ -52,13 +52,6 @@ test = [
   "pytest-cov",
   "pytest-xdist[psutil]",
 ]
-typeguard = [
-  "coverage[toml]",
-  "pygments",
-  "pytest-cov",
-  "pytest-xdist[psutil]",
-  "typeguard",
-]
 [project.urls]
 CI = "https://github.com/hyriver/pygeoutils/actions"
 Changelog = "https://docs.hyriver.io/changelogs/pygeoutils.html"
