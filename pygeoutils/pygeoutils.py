@@ -223,13 +223,13 @@ def xarray_geomask(
         raise MissingCRSError
 
     geom = geo2polygon(geometry, crs, ds.rio.crs)
-    ds = utils.write_crs(ds)
+    ds = utils.xd_write_crs(ds)
     ds = ds.rio.clip_box(*geom.bounds, auto_expand=True)
     if isinstance(geometry, (Polygon, MultiPolygon)):
         ds = ds.rio.clip([geom], all_touched=all_touched, drop=drop, from_disk=from_disk)
 
     if drop:
-        ds = utils.write_crs(ds)
+        ds = utils.xd_write_crs(ds)
     ds.rio.update_attrs(ds_attrs, inplace=True)
     if isinstance(ds, xr.Dataset):
         _ = [ds[v].rio.update_attrs(da_attrs[v], inplace=True) for v in ds]

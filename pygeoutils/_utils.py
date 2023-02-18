@@ -19,6 +19,9 @@ from pygeoutils.exceptions import MissingAttributeError
 if TYPE_CHECKING:
     NUMBER = Union[int, float, np.number]  # type: ignore
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
+    CRSTYPE = Union[int, str, pyproj.CRS]
+
+__all__ = ["xd_write_crs", "get_gtiff_attrs", "transform2tuple"]
 
 
 @dataclass
@@ -297,15 +300,32 @@ def transform2tuple(transform: rio.Affine) -> tuple[float, float, float, float, 
     return (transform.a, transform.b, transform.c, transform.d, transform.e, transform.f)
 
 
-def write_crs(ds: XD) -> XD:
-    """Write geo reference info into a dataset or dataarray."""
+def xd_write_crs(ds: XD, crs: CRSTYPE | None = None, grid_mapping_name: str | None = None) -> XD:
+    """Write geo reference info into a dataset or dataarray.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset or xarray.DataArray
+        The dataset(array) to be written
+    crs : pyproj.CRS or str or int, optional
+        The CRS to be written, defaults to ``ds.rio.crs``
+    grid_mapping_name : str, optional
+        The name of the grid mapping variable, defaults to ``ds.rio.grid_mapping``
+
+    Returns
+    -------
+    xarray.Dataset or xarray.DataArray
+        The dataset(array) with CRS info written.
+    """
     ds = ds.rio.write_transform()
-    if ds.rio.grid_mapping and ds.rio.grid_mapping != "spatial_ref":
-        ds = ds.rio.write_crs(ds.rio.crs, grid_mapping_name=ds.rio.grid_mapping)
+    crs = crs or ds.rio.crs
+    grid_mapping_name = grid_mapping_name or ds.rio.grid_mapping
+    if grid_mapping_name and grid_mapping_name != "spatial_ref":
+        ds = ds.rio.write_crs(crs, grid_mapping_name=grid_mapping_name)
         if "spatial_ref" in ds:
             ds = ds.drop_vars(["spatial_ref"])
     else:
-        ds = ds.rio.write_crs(ds.rio.crs)
+        ds = ds.rio.write_crs(crs)
     ds = ds.rio.write_coordinate_system()
     return ds
 

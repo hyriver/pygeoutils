@@ -6,7 +6,7 @@ if int(version("shapely").split(".")[0]) > 1:
 
     os.environ["USE_PYGEOS"] = "0"
 
-from pygeoutils._utils import get_gtiff_attrs, transform2tuple
+from pygeoutils._utils import get_gtiff_attrs, transform2tuple, xd_write_crs
 from pygeoutils.exceptions import (
     EmptyResponseError,
     InputRangeError,
@@ -56,6 +56,7 @@ __all__ = [
     "geodf2xarray",
     "json2geodf",
     "transform2tuple",
+    "xd_write_crs",
     "xarray_geomask",
     "coords_list",
     "Coordinates",
