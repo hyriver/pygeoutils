@@ -12,6 +12,7 @@ New Features
 - Add a new function called ``coords_list`` for converting/validating input
   coordinates of any type to a ``list`` of ``tuple``, i.e.,
   ``[(x1, y1), (x2, y2), ...]``.
+- Make ``xd_write_crs`` function public.
 
 0.13.12 (2023-02-10)
 --------------------
