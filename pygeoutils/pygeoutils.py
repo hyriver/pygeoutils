@@ -348,7 +348,7 @@ def gtiff2xarray(
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
             ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
 
-    ds = utils.xd_write_crs(ds)
+    ds = utils.xd_write_crs(ds)  # type: ignore
     if geometry is not None:
         if geo_crs is None:
             raise MissingCRSError
