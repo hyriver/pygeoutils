@@ -13,6 +13,8 @@ New Features
   coordinates of any type to a ``list`` of ``tuple``, i.e.,
   ``[(x1, y1), (x2, y2), ...]``.
 - Make ``xd_write_crs`` function public.
+- In ``xarray_geomask`` if the input geometry is very small return at least
+  one pixel.
 
 0.13.12 (2023-02-10)
 --------------------
