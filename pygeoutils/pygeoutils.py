@@ -24,6 +24,7 @@ import ujson as json
 import xarray as xr
 from pyproj.exceptions import CRSError as ProjCRSError
 from rasterio import MemoryFile
+from rioxarray.exceptions import OneDimensionalRaster
 from scipy.interpolate import BSpline
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
@@ -224,9 +225,12 @@ def xarray_geomask(
 
     geom = geo2polygon(geometry, crs, ds.rio.crs)
     ds = utils.xd_write_crs(ds)
-    ds = ds.rio.clip_box(*geom.bounds, auto_expand=True)
-    if isinstance(geometry, (Polygon, MultiPolygon)):
-        ds = ds.rio.clip([geom], all_touched=all_touched, drop=drop, from_disk=from_disk)
+    try:
+        ds = ds.rio.clip_box(*geom.bounds, auto_expand=True)
+        if isinstance(geometry, (Polygon, MultiPolygon)):
+            ds = ds.rio.clip([geom], all_touched=all_touched, drop=drop, from_disk=from_disk)
+    except OneDimensionalRaster:
+        ds = ds.rio.clip([geom], all_touched=True, drop=drop, from_disk=from_disk)
 
     if drop:
         ds = utils.xd_write_crs(ds)
