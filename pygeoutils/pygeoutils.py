@@ -302,19 +302,18 @@ def gtiff2xarray(
     attrs = utils.get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: dict[str, type] = {}
     nodata_dict: dict[str, NUMBER] = {}
-
-    tmp_dir = tempfile.gettempdir()
+    tmp_dir = tempfile.mkdtemp()
 
     def to_dataset(lyr: str, resp: bytes) -> Path:
         with MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
                 ds = rxr.open_rasterio(vrt)  # type: ignore
-                ds = cast("xr.Dataset", ds)
+                ds = cast("xr.DataArray", ds)
                 if "band" in ds.dims:
                     ds = ds.squeeze("band", drop=True)
                 ds.name = var_name[lyr]
-                dtypes[ds.name] = ds.dtype
+                dtypes[ds.name] = ds.dtype  # type: ignore
                 nodata_dict[ds.name] = utils.get_nodata(vrt) if nodata is None else nodata
                 ds = ds.rio.write_nodata(nodata_dict[ds.name])
                 fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
@@ -332,9 +331,7 @@ def gtiff2xarray(
     if "band" in ds.dims:
         ds = ds.squeeze("band", drop=True)
 
-    variables = list(ds)
-    variables = cast("str", variables)
-
+    variables = cast("str", list(ds))
     if len(variables) == 1:
         ds = ds[variables[0]].copy()
         ds = ds.astype(dtypes[variables[0]])
@@ -342,6 +339,7 @@ def gtiff2xarray(
         ds.attrs["crs"] = attrs.crs.to_string()
         ds.attrs["nodatavals"] = (nodata_dict[name],)
         ds = ds.rio.write_nodata(nodata_dict[name])
+        ds = cast("xr.DataArray", ds)
     else:
         ds.attrs["crs"] = attrs.crs.to_string()
         for v in variables:
@@ -350,11 +348,8 @@ def gtiff2xarray(
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
             ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
 
-    ds = ds.rio.write_transform()
-    ds = ds.rio.write_crs(attrs.crs)
-    ds = ds.rio.write_coordinate_system()
-
-    if geometry:
+    ds = utils.xd_write_crs(ds)
+    if geometry is not None:
         if geo_crs is None:
             raise MissingCRSError
         return xarray_geomask(ds, geometry, geo_crs, all_touched, drop)
