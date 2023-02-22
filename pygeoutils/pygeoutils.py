@@ -1,6 +1,7 @@
 """Some utilities for manipulating GeoSpatial data."""
 from __future__ import annotations
 
+import contextlib
 import itertools
 import tempfile
 import uuid
@@ -308,9 +309,8 @@ def gtiff2xarray(
         with MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
-                ds = rxr.open_rasterio(vrt)  # type: ignore
-                ds = cast("xr.DataArray", ds)
-                if "band" in ds.dims:
+                ds = cast("xr.DataArray", rxr.open_rasterio(vrt))  # noqa: FURB127
+                with contextlib.suppress(ValueError, KeyError):
                     ds = ds.squeeze("band", drop=True)
                 ds.name = var_name[lyr]
                 dtypes[ds.name] = ds.dtype  # type: ignore
@@ -328,7 +328,7 @@ def gtiff2xarray(
             engine="rasterio",
         )
 
-    if "band" in ds.dims:
+    with contextlib.suppress(ValueError, KeyError):
         ds = ds.squeeze("band", drop=True)
 
     variables = cast("str", list(ds))
