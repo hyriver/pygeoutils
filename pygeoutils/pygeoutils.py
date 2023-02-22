@@ -19,7 +19,7 @@ import pandas as pd
 import pyproj
 import rasterio.features as rio_features
 import rasterio.transform as rio_transform
-import rioxarray as rxr
+import rioxarray._io as rxr
 import shapely.geometry as sgeom
 import ujson as json
 import xarray as xr
