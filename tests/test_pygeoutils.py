@@ -76,7 +76,7 @@ def test_bspline():
             (-97.06127, 32.832),
         ]
     )
-    pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs="epsg:4326")).to_crs("epsg:3857")
+    pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs=4326)).to_crs("epsg:3857")
     sp = GeoBSpline(pts, 10).spline
     assert len(sp.x) == 10
     assert_close(sum(sp.y), 38734230.680)

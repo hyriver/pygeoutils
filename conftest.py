@@ -4,7 +4,7 @@ import pytest
 from pygeoogc import WMS, ServiceURL
 from shapely.geometry import Polygon
 
-DEF_CRS = "epsg:4326"
+DEF_CRS = 4326
 GEO_NAT = Polygon(
     [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
 )

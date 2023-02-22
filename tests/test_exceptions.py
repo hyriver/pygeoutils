@@ -8,7 +8,7 @@ from pygeoutils import EmptyResponseError, InputTypeError, InputValueError
 
 has_typeguard = True if sys.modules.get("typeguard") else False
 
-DEF_CRS = "epsg:4326"
+DEF_CRS = 4326
 GEO_URB = Polygon(
     [
         [-118.72, 34.118],
@@ -22,7 +22,7 @@ GEO_URB = Polygon(
 GEO_NAT = Polygon(
     [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
 )
-DEF_CRS = "epsg:4326"
+DEF_CRS = 4326
 
 
 @pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")

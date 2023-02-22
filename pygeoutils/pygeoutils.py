@@ -665,7 +665,7 @@ class GeoBSpline:
     >>> pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs=4326))
     >>> sp = GeoBSpline(pts.to_crs("epsg:3857"), 5).spline
     >>> pts_sp = gpd.GeoSeries(gpd.points_from_xy(sp.x, sp.y, crs="epsg:3857"))
-    >>> pts_sp = pts_sp.to_crs("epsg:4326")
+    >>> pts_sp = pts_sp.to_crs(4326)
     >>> list(zip(pts_sp.x, pts_sp.y))
     [(-97.06138, 32.837),
     (-97.06135, 32.83629),
