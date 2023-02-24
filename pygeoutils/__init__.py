@@ -1,11 +1,6 @@
 """Top-level package for PyGeoUtils."""
 from importlib.metadata import PackageNotFoundError, version
 
-if int(version("shapely").split(".")[0]) > 1:
-    import os
-
-    os.environ["USE_PYGEOS"] = "0"
-
 from pygeoutils._utils import get_gtiff_attrs, transform2tuple, xd_write_crs
 from pygeoutils.exceptions import (
     EmptyResponseError,
