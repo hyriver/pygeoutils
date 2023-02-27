@@ -586,13 +586,17 @@ def multi2poly(gdf: GDFTYPE) -> GDFTYPE:
     Parameters
     ----------
     gdf : geopandas.GeoDataFrame or geopandas.GeoSeries
-        A GeoDataFrame or GeoSeries with (multi)polygons.
+        A GeoDataFrame or GeoSeries with (multi)polygons in a projected
+        coordinate system.
 
     Returns
     -------
     geopandas.GeoDataFrame or geopandas.GeoSeries
         A GeoDataFrame or GeoSeries with polygons.
     """
+    if not isinstance(gdf, (gpd.GeoDataFrame, gpd.GeoSeries)):
+        raise InputTypeError("gdf", "GeoDataFrame or GeoSeries")
+
     if gdf.crs is None:
         raise MatchingCRSError
 
@@ -604,11 +608,15 @@ def multi2poly(gdf: GDFTYPE) -> GDFTYPE:
         gdf_prj = gpd.GeoDataFrame(gdf_prj.to_frame("geometry"))
 
     mp_idx = gdf_prj[gdf_prj.geom_type == "MultiPolygon"].index
-    geo_mp = gdf_prj.loc[mp_idx, "geometry"]
-    area_rng = geo_mp.map(_get_area_range)
-    mp_idx = area_rng[(area_rng == 0) | (area_rng >= 0.99)].index
-    gdf_prj.loc[mp_idx, "geometry"] = geo_mp.map(_get_larges)
-    gdf_prj = cast("gpd.GeoDataFrame", gdf_prj.to_crs(gdf.crs))
+    if mp_idx.size > 0:
+        geo_mp = gdf_prj.loc[mp_idx, "geometry"]
+        idx = {i: g.geoms[0] for i, g in geo_mp.geometry.items() if len(g.geoms) == 1}
+        gdf_prj.loc[list(idx), "geometry"] = list(idx.values())
+        if len(idx) < len(geo_mp):
+            area_rng = geo_mp.map(_get_area_range)
+            mp_idx = area_rng[area_rng >= 0.99].index
+            if mp_idx.size > 0:
+                gdf_prj.loc[mp_idx, "geometry"] = geo_mp.map(_get_larges)
 
     if isinstance(gdf, gpd.GeoSeries):
         return gdf_prj.geometry
