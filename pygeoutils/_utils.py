@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, Union, cast
 import numpy as np
 import pyproj
 import rasterio as rio
+import rasterio.transform as rio_transform
 import rioxarray._io as rxr
 import ujson as json
 import xarray as xr
@@ -17,11 +18,13 @@ from shapely.geometry import LineString, Point
 from pygeoutils.exceptions import MissingAttributeError
 
 if TYPE_CHECKING:
+    from rasterio import Affine
+
     NUMBER = Union[int, float, np.number]  # type: ignore
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
     CRSTYPE = Union[int, str, pyproj.CRS]
 
-__all__ = ["xd_write_crs", "get_gtiff_attrs", "transform2tuple"]
+__all__ = ["xd_write_crs", "get_gtiff_attrs", "transform2tuple", "get_transform"]
 
 
 @dataclass
@@ -387,3 +390,39 @@ def get_gtiff_attrs(
             else:
                 transform = tuple(src.transform)
     return Attrs(_nodata, r_crs, ds_dims, transform)
+
+
+def get_transform(
+    ds: xr.Dataset | xr.DataArray,
+    ds_dims: tuple[str, str] = ("y", "x"),
+) -> tuple[Affine, int, int]:
+    """Get transform of a ``xarray.Dataset`` or ``xarray.DataArray``.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset or xarray.DataArray
+        The dataset(array) to be masked
+    ds_dims : tuple, optional
+        Names of the coordinames in the dataset, defaults to ``("y", "x")``.
+        The order of the dimension names must be (vertical, horizontal).
+
+    Returns
+    -------
+    rasterio.Affine, int, int
+        The affine transform, width, and height
+    """
+    ydim, xdim = ds_dims
+    height, width = ds.sizes[ydim], ds.sizes[xdim]
+
+    left, bottom, right, top = get_bounds(ds, ds_dims)
+
+    x_res = abs(left - right) / width
+    y_res = abs(top - bottom) / height
+
+    left -= x_res * 0.5
+    right += x_res * 0.5
+    top += y_res * 0.5
+    bottom -= y_res * 0.5
+
+    transform = rio_transform.from_bounds(left, bottom, right, top, width, height)
+    return transform, width, height

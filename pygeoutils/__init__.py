@@ -1,7 +1,7 @@
 """Top-level package for PyGeoUtils."""
 from importlib.metadata import PackageNotFoundError, version
 
-from pygeoutils._utils import get_gtiff_attrs, transform2tuple, xd_write_crs
+from pygeoutils._utils import get_gtiff_attrs, get_transform, transform2tuple, xd_write_crs
 from pygeoutils.exceptions import (
     EmptyResponseError,
     InputRangeError,
@@ -13,22 +13,24 @@ from pygeoutils.exceptions import (
     MissingCRSError,
     UnprojectedCRSError,
 )
-from pygeoutils.print_versions import show_versions
-from pygeoutils.pygeoutils import (
+from pygeoutils.geotools import (
     Coordinates,
     GeoBSpline,
-    arcgis2geojson,
     break_lines,
     coords_list,
     geo2polygon,
-    geodf2xarray,
     geometry_list,
-    get_transform,
-    gtiff2xarray,
-    json2geodf,
+    multi2poly,
     nested_polygons,
     query_indices,
     snap2nearest,
+)
+from pygeoutils.print_versions import show_versions
+from pygeoutils.pygeoutils import (
+    arcgis2geojson,
+    geodf2xarray,
+    gtiff2xarray,
+    json2geodf,
     xarray2geodf,
     xarray_geomask,
 )
@@ -48,6 +50,7 @@ __all__ = [
     "gtiff2xarray",
     "snap2nearest",
     "xarray2geodf",
+    "multi2poly",
     "geodf2xarray",
     "json2geodf",
     "transform2tuple",

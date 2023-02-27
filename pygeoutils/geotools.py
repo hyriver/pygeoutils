@@ -1,38 +1,21 @@
 """Some utilities for manipulating GeoSpatial data."""
 from __future__ import annotations
 
-import contextlib
-import itertools
-import tempfile
-import uuid
 from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence, Tuple, TypeVar, Union, cast
 
 import cytoolz.curried as tlz
-import dask.config
 import geopandas as gpd
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 import pyproj
-import rasterio.features as rio_features
-import rasterio.transform as rio_transform
-import rioxarray._io as rxr
 import shapely.geometry as sgeom
-import ujson as json
-import xarray as xr
-from pyproj.exceptions import CRSError as ProjCRSError
-from rasterio import MemoryFile
-from rioxarray.exceptions import OneDimensionalRaster
 from scipy.interpolate import BSpline
 from shapely import ops
 from shapely.geometry import LineString, MultiPolygon, Polygon
 
-from pygeoutils import _utils as utils
 from pygeoutils.exceptions import (
-    EmptyResponseError,
     InputRangeError,
     InputTypeError,
     InputValueError,
@@ -61,8 +44,6 @@ __all__ = [
     "coords_list",
     "multi2poly",
 ]
-
-
 
 
 @dataclass
@@ -614,7 +595,7 @@ def multi2poly(gdf: GDFTYPE) -> GDFTYPE:
     """
     if gdf.crs is None:
         raise MatchingCRSError
-    
+
     if not gdf.crs.is_projected:
         raise UnprojectedCRSError
 
