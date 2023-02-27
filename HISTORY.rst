@@ -9,12 +9,20 @@ New Features
 ~~~~~~~~~~~~
 - Ignore index when concatenating multiple responses in ``json2geodf``
   to ensure indices are unique
-- Add a new function called ``coords_list`` for converting/validating input
+- Add a new function, called ``coords_list``, for converting/validating input
   coordinates of any type to a ``list`` of ``tuple``, i.e.,
   ``[(x1, y1), (x2, y2), ...]``.
 - Make ``xd_write_crs`` function public.
 - In ``xarray_geomask`` if the input geometry is very small return at least
   one pixel.
+- Add a new function, called ``multi2poly``, for converting a ``MultiPolygon``
+  to a ``Polygon`` in a ``GeoDataFrame``. 
+  This function tries to convert ``MultiPolygon`` to ``Polygon`` by
+  first checking if ``MultiPolygon`` can be directly converted using
+  their exterior boundaries. If not, will try to remove those small
+  sub-``Polygon`` that their area is less than 1% of the total area
+  of the ``MultiPolygon``. If this fails, the original ``MultiPolygon`` will
+  be returned.
 
 0.13.12 (2023-02-10)
 --------------------
@@ -27,8 +35,8 @@ Breaking Changes
 New Features
 ~~~~~~~~~~~~
 - Significant improvements in the accuracy and performance of
-  ``nested_polygons`` by changing the logic. Now, the function first
-  determines the nested polygons by comparing the centroids of the
+  ``nested_``Polygon```` by changing the logic. Now, the function first
+  determines the nested ``Polygon`` by comparing the centroids of the
   geometries with their geometry and then picks the largest geometry
   from each group of nested geometries.
 - Add a new function called ``query_indicies`` which is a wrapper around
@@ -62,8 +70,8 @@ Bug Fixes
 
 New Features
 ~~~~~~~~~~~~
-- Add a new function called ``nested_polygons`` for determining nested
-  (multi)polygons in a ``gepandas.GeoDataFrame`` or ``geopandas.GeoSeries``.
+- Add a new function called ``nested_``Polygon```` for determining nested
+  (multi)``Polygon`` in a ``gepandas.GeoDataFrame`` or ``geopandas.GeoSeries``.
 - Add a new function called ``geodf2xarray`` for rasterizing a
   ``geopandas.GeoDataFrame`` to a ``xarray.DataArray``.
 
@@ -83,7 +91,7 @@ Internal Changes
   clipping the data to the geometry's bounding box, then if the geometry
   is a polygon, masking the data with the polygon. This is much faster
   than directly masking the data with the polygon. Also, support passing
-  a bounding box to ``xarray_geomask`` in addition to polygon and multipolygon.
+  a bounding box to ``xarray_geomask`` in addition to polygon and ``MultiPolygon``.
 - Fix deprecation warning of ``pandas`` when changing the geometry column
   of a ``GeoDataFrame`` in then ``break_lines`` function.
 
@@ -355,7 +363,7 @@ Internal Changes
 
 - Added checking the validity of input arguments in ``gtiff2xarray`` function and provide
   useful messages for debugging.
-- Add support for multipolygon.
+- Add support for ``MultiPolygon``.
 - Remove the ``fill_hole`` argument.
 - Fixed a bug in ``xarray_geomask`` for getting the transform.
 
