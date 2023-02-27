@@ -381,6 +381,24 @@ def test_mp2p():
     gdf = geoutils.multi2poly(gdf)
     assert (gdf.geometry.geom_type == "Polygon").all() and gdf.shape[0] == 2
 
+    gdf = gpd.GeoDataFrame(
+        geometry=[MultiPolygon([box(3, 3, 5, 5), box(6, 6, 8, 8)]), box(2, 2, 5, 5)],
+        crs=5070,
+    )
+    gdf = geoutils.multi2poly(gdf)
+    assert (gdf.geometry.geom_type == "MultiPolygon").sum() == 1
+
+    gdf = gpd.GeoDataFrame(
+        geometry=[
+            MultiPolygon([box(3, 3, 5, 5), box(6, 6, 8, 8)]),
+            box(8, 8, 9, 9),
+            MultiPolygon([box(2, 2, 5, 5)]),
+        ],
+        crs=5070,
+    )
+    gdf = geoutils.multi2poly(gdf)
+    assert (gdf.geometry.geom_type == "Polygon").sum() == 2
+
 
 def test_show_versions():
     f = io.StringIO()
