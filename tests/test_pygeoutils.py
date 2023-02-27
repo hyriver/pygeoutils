@@ -373,6 +373,15 @@ def test_coords():
     assert isinstance(clist, list) and all(len(c) == 2 for c in clist)
 
 
+def test_mp2p():
+    gdf = gpd.GeoDataFrame(
+        geometry=[MultiPolygon([box(6, 6, 8, 8), box(6, 6, 6.01, 6.01)]), box(2, 2, 5, 5)],
+        crs=5070,
+    )
+    gdf = geoutils.multi2poly(gdf)
+    assert (gdf.geometry.geom_type == "Polygon").all() and gdf.shape[0] == 2
+
+
 def test_show_versions():
     f = io.StringIO()
     geoutils.show_versions(file=f)
