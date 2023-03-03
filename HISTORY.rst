@@ -2,8 +2,8 @@
 History
 =======
 
-0.13.13 (unreleased)
---------------------
+0.14.0 (unreleased)
+-------------------
 
 New Features
 ~~~~~~~~~~~~
@@ -16,13 +16,22 @@ New Features
 - In ``xarray_geomask`` if the input geometry is very small return at least
   one pixel.
 - Add a new function, called ``multi2poly``, for converting a ``MultiPolygon``
-  to a ``Polygon`` in a ``GeoDataFrame``. 
+  to a ``Polygon`` in a ``GeoDataFrame``.
   This function tries to convert ``MultiPolygon`` to ``Polygon`` by
   first checking if ``MultiPolygon`` can be directly converted using
   their exterior boundaries. If not, will try to remove those small
   sub-``Polygon`` that their area is less than 1% of the total area
   of the ``MultiPolygon``. If this fails, the original ``MultiPolygon`` will
   be returned.
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Bump the minimum required version of ``shapely`` to 2.0,
+  and use its new API.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Sync all minor versions of HyRiver packages to 0.14.0.
 
 0.13.12 (2023-02-10)
 --------------------
