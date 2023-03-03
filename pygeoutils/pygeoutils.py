@@ -22,7 +22,7 @@ import xarray as xr
 from pyproj.exceptions import CRSError as ProjCRSError
 from rasterio import MemoryFile
 from rioxarray.exceptions import OneDimensionalRaster
-from shapely.geometry import MultiPolygon, Polygon
+from shapely import MultiPolygon, Polygon
 
 from pygeoutils import _utils as utils
 from pygeoutils import geotools

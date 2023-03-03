@@ -13,7 +13,7 @@ import rasterio.transform as rio_transform
 import rioxarray._io as rxr
 import ujson as json
 import xarray as xr
-from shapely.geometry import LineString, Point
+from shapely import LineString, Point
 
 from pygeoutils.exceptions import MissingAttributeError
 

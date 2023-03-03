@@ -12,8 +12,7 @@ import numpy.typing as npt
 import pyproj
 import shapely.geometry as sgeom
 from scipy.interpolate import BSpline
-from shapely import ops
-from shapely.geometry import LineString, MultiPolygon, Polygon
+from shapely import LineString, MultiPolygon, Polygon, ops
 
 from pygeoutils.exceptions import (
     InputRangeError,
