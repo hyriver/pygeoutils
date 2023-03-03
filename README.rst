@@ -138,7 +138,7 @@ These utilities are:
 - ``nested_polygons``: Determining nested (multi)polygons in a
   ``geopandas.GeoDataFrame``.
 - ``multi2poly``, for converting a ``MultiPolygon`` to a ``Polygon``
-  in a ``geopandas.GeoDataFrame``. 
+  in a ``geopandas.GeoDataFrame``.
 
 All these functions handle all necessary CRS transformations.
 
