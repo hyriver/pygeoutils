@@ -326,7 +326,7 @@ def xd_write_crs(ds: XD, crs: CRSTYPE | None = None, grid_mapping_name: str | No
 
     if grid_mapping_name and grid_mapping_name != "spatial_ref":
         ds = ds.rio.write_crs(crs, grid_mapping_name=grid_mapping_name)
-        if "spatial_ref" in ds:
+        if "spatial_ref" in ds.coords:
             ds = ds.drop_vars(["spatial_ref"])
         if isinstance(ds, xr.DataArray):
             if "grid_mapping" in ds.attrs:
