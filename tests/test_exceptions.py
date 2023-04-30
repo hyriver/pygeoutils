@@ -1,7 +1,7 @@
 import sys
 
 import pytest
-from shapely import Polygon
+from shapely.geometry import Polygon
 
 import pygeoutils as geoutils
 from pygeoutils import EmptyResponseError, InputTypeError, InputValueError

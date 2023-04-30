@@ -4,7 +4,7 @@ import io
 import geopandas as gpd
 import numpy as np
 from pygeoogc import ArcGISRESTful, ServiceURL
-from shapely import LineString, MultiPolygon, Point, Polygon, box
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 
 import pygeoutils as geoutils
 from pygeoutils import Coordinates, GeoBSpline
