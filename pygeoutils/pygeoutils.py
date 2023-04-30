@@ -322,7 +322,7 @@ def xarray2geodf(
     if not isinstance(da, xr.DataArray):
         raise InputTypeError("da", "xarray.DataArray")
 
-    if not isinstance(mask_da, (xr.DataArray, type(None))):
+    if mask_da is not None and not isinstance(mask_da, xr.DataArray):
         raise InputTypeError("da", "xarray.DataArray or None")
 
     valid_types = ["int16", "int32", "uint8", "uint16", "float32"]
