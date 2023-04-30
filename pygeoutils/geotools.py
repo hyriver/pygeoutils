@@ -10,10 +10,10 @@ import geopandas as gpd
 import numpy as np
 import numpy.typing as npt
 import pyproj
-import shapely.geometry as sgeom
 from scipy.interpolate import BSpline
 from shapely import ops
-from shapely.geometry import LineString, MultiPolygon, Polygon
+from shapely.geometry import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon
+from shapely.geometry import box as shapely_box
 
 from pygeoutils.exceptions import (
     InputRangeError,
@@ -73,22 +73,22 @@ class Coordinates:
     bounds: tuple[float, float, float, float] | None = None
 
     @staticmethod
-    def __box_geo(bounds: tuple[float, float, float, float] | None) -> sgeom.Polygon:
+    def __box_geo(bounds: tuple[float, float, float, float] | None) -> Polygon:
         """Get EPSG:4326 CRS."""
         wgs84_bounds = pyproj.CRS(4326).area_of_use.bounds  # type: ignore
         if bounds is None:
-            return sgeom.box(*wgs84_bounds)
+            return shapely_box(*wgs84_bounds)
 
         if not isinstance(bounds, (tuple, list)) or len(bounds) != 4:
             raise InputTypeError("bounds", "tuple of length 4")
 
-        bbox = sgeom.box(*bounds)
-        if not bbox.within(sgeom.box(*wgs84_bounds)):
+        bbox = shapely_box(*bounds)
+        if not bbox.within(shapely_box(*wgs84_bounds)):
             raise InputRangeError("bounds", "within EPSG:4326")
         return bbox
 
     @staticmethod
-    def __validate(pts: gpd.GeoSeries, bbox: sgeom.Polygon) -> gpd.GeoSeries:
+    def __validate(pts: gpd.GeoSeries, bbox: Polygon) -> gpd.GeoSeries:
         """Create a ``geopandas.GeoSeries`` from valid coords within a bounding box."""
         return pts[pts.sindex.query(bbox)].sort_index()
 
@@ -105,7 +105,7 @@ class Coordinates:
             lat = np.array(self.lat, "f8")
 
         lon = np.mod(np.mod(_lon, 360.0) + 540.0, 360.0) - 180.0
-        pts = gpd.GeoSeries([sgeom.Point(xy) for xy in zip(lon, lat)])
+        pts = gpd.GeoSeries([Point(xy) for xy in zip(lon, lat)])
         pts = cast("gpd.GeoSeries", pts.set_crs(4326))
         self._points = self.__validate(pts, self.__box_geo(self.bounds))
 
@@ -139,7 +139,7 @@ def geo2polygon(
     if isinstance(geometry, (Polygon, MultiPolygon)):
         geom = geometry
     elif isinstance(geometry, (tuple, list)) and len(geometry) == 4:
-        geom = sgeom.box(*geometry)
+        geom = shapely_box(*geometry)
     else:
         raise InputTypeError("geometry", "(Multi)Polygon or tuple of length 4")
 
@@ -445,17 +445,17 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
 
 
 def geometry_list(
-    geometry: GTYPE | sgeom.Point | sgeom.MultiPoint | sgeom.LineString | sgeom.MultiLineString,
-) -> list[sgeom.Polygon] | list[sgeom.Point] | list[sgeom.LineString]:
+    geometry: GTYPE | Point | MultiPoint | LineString | MultiLineString,
+) -> list[Polygon] | list[Point] | list[LineString]:
     """Get a list of polygons, points, and lines from a geometry."""
-    if isinstance(geometry, (sgeom.Polygon, sgeom.LineString, sgeom.Point)):
+    if isinstance(geometry, (Polygon, LineString, Point)):
         return [geometry]
 
-    if isinstance(geometry, (sgeom.MultiPolygon, sgeom.MultiLineString, sgeom.MultiPoint)):
+    if isinstance(geometry, (MultiPolygon, MultiLineString, MultiPoint)):
         return list(geometry.geoms)  # type: ignore
 
     if isinstance(geometry, (tuple, list)) and len(geometry) == 4:
-        return [sgeom.box(*geometry)]
+        return [shapely_box(*geometry)]
     valid_geoms = (
         "Polygon",
         "MultiPolygon",
@@ -549,16 +549,16 @@ def coords_list(
         List of coordinates as ``[(x1, y1), ...]``.
     """
     try:
-        point = sgeom.Point(coords)
+        points = MultiPoint(coords)
     except (ValueError, TypeError, AttributeError):
         try:
-            points = sgeom.MultiPoint(coords)
+            point = Point(coords)
         except (ValueError, TypeError, AttributeError) as ex:
             raise InputTypeError("coords", "tuple or list of tuples") from ex
         else:
-            return [(float(p.x), float(p.y)) for p in points.geoms]
+            return [(float(point.x), float(point.y))]
     else:
-        return [(float(point.x), float(point.y))]
+        return [(float(p.x), float(p.y)) for p in points.geoms]
 
 
 def _get_area_range(mp: MultiPolygon) -> float:
@@ -568,7 +568,7 @@ def _get_area_range(mp: MultiPolygon) -> float:
 
 def _get_larges(mp: MultiPolygon) -> Polygon:
     """Get the largest polygon from a multipolygon."""
-    return sgeom.Polygon(mp.geoms[np.argmax([g.area for g in mp.geoms])].exterior)  # type: ignore
+    return Polygon(mp.geoms[np.argmax([g.area for g in mp.geoms])].exterior)  # type: ignore
 
 
 def multi2poly(gdf: GDFTYPE) -> GDFTYPE:
