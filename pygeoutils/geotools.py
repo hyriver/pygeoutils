@@ -550,10 +550,10 @@ def coords_list(
     """
     try:
         point = sgeom.Point(coords)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, AttributeError):
         try:
             points = sgeom.MultiPoint(coords)
-        except (ValueError, TypeError) as ex:
+        except (ValueError, TypeError, AttributeError) as ex:
             raise InputTypeError("coords", "tuple or list of tuples") from ex
         else:
             return [(float(p.x), float(p.y)) for p in points.geoms]
