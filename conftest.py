@@ -23,7 +23,7 @@ def wms_resp():
     """Return a WMS response."""
     wms = WMS(
         ServiceURL().wms.mrlc,
-        layers="NLCD_2011_Tree_Canopy_L48",
+        layers="nlcd_tcc_conus_2011_v2021-4",
         outformat="image/geotiff",
         crs=DEF_CRS,
         validation=False,

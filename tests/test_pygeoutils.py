@@ -106,7 +106,7 @@ def test_gtiff2array(wms_resp, cover_resp):
     canopy_box = geoutils.gtiff2xarray(wms_resp, GEO_NAT.bounds, DEF_CRS)
     canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS, drop=False)
     cover = geoutils.gtiff2xarray(cover_resp, GEO_NAT, DEF_CRS)
-    expected = 72.436
+    expected = 71.9547
 
     assert_close(canopy_box.mean().values.item(), expected)
     assert_close(canopy.mean().values.item(), expected)
@@ -121,9 +121,9 @@ def test_xarray_geodf(wms_resp):
     ras = geoutils.geodf2xarray(vec, 1e3)
     ras_col = geoutils.geodf2xarray(vec, 1e3, attr_col=canopy.name, fill=np.nan)
 
-    assert vec.shape[0] == 1065
-    assert ras.sum().compute().item() == 1395
-    assert_close(ras_col.mean().compute().item(), 75.8803)
+    assert vec.shape[0] == 1081
+    assert ras.sum().compute().item() == 1326
+    assert_close(ras_col.mean().compute().item(), 79.6538)
 
 
 def test_envelope():
