@@ -280,7 +280,7 @@ class GeoBSpline:
         """
         degree = np.clip(degree, 1, self.npts_ln - 1)
         konts = np.clip(np.arange(self.npts_ln + degree + 1) - degree, 0, self.npts_ln - degree)
-        spl = BSpline(konts, np.column_stack([self.x_ln, self.y_ln]), degree)
+        spl = BSpline(konts, np.column_stack([self.x_ln, self.y_ln]), degree, extrapolate=False)
 
         x_sp, y_sp = spl(np.linspace(0, self.npts_ln - degree, max(npts_sp, 3), endpoint=False)).T
         x_sp = cast("npt.NDArray[np.float64]", x_sp)
@@ -359,7 +359,7 @@ def snap2nearest(lines: GDFTYPE, points: GDFTYPE, tol: float) -> GDFTYPE:
     pts = cast("gpd.GeoDataFrame", pts)
     cols = list(pts.columns)
     cols.remove("geometry")
-    pts_idx, ln_idx = lines.sindex.query_bulk(pts.buffer(tol))
+    pts_idx, ln_idx = lines.sindex.query(pts.buffer(tol))
     merged_idx = tlz.merge_with(list, ({p: f} for p, f in zip(pts_idx, ln_idx)))
     _pts = {
         pi: (
@@ -423,7 +423,7 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
         lines.loc[mlines, "geometry"] = lines.loc[mlines, "geometry"].apply(lambda g: list(g.geoms))
         lines = lines.explode("geometry").set_crs(crs_proj)
 
-    pts_idx, flw_idx = lines.sindex.query_bulk(points.geometry)
+    pts_idx, flw_idx = lines.sindex.query(points.geometry)
     if len(pts_idx) == 0:
         raise ValueError("No intersection between lines and points")  # noqa: TC003
 
@@ -494,7 +494,7 @@ def query_indices(
     if input_gdf.crs != tree_gdf.crs:
         raise MatchingCRSError
 
-    in_iloc, tr_iloc = tree_gdf.sindex.query_bulk(input_gdf.geometry, predicate=predicate)
+    in_iloc, tr_iloc = tree_gdf.sindex.query(input_gdf.geometry, predicate=predicate)
     idx_dict = defaultdict(set)
     for ii, it in zip(input_gdf.iloc[in_iloc].index, tree_gdf.iloc[tr_iloc].index):
         idx_dict[ii].add(it)
