@@ -2,6 +2,13 @@
 History
 =======
 
+0.15.1 (2023-0X-XX)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Remove dependency on ``dask``.
+
 0.15.0 (2023-05-07)
 -------------------
 From release 0.15 onward, all minor versions of HyRiver packages
