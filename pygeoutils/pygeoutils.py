@@ -3,12 +3,8 @@ from __future__ import annotations
 
 import contextlib
 import itertools
-import tempfile
-import uuid
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Tuple, TypeVar, Union, cast
 
-import dask.config
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -226,7 +222,7 @@ def gtiff2xarray(
     Returns
     -------
     xarray.Dataset or xarray.DataAraay
-        Parallel (with dask) dataset or dataarray.
+        Requested dataset or dataarray.
     """
     if not isinstance(r_dict, dict):
         raise InputTypeError("r_dict", "dict", '{"name": bytes}')  # noqa: FS003
@@ -243,30 +239,22 @@ def gtiff2xarray(
     attrs = utils.get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: dict[str, type] = {}
     nodata_dict: dict[str, NUMBER] = {}
-    tmp_dir = tempfile.mkdtemp()
 
-    def to_dataset(lyr: str, resp: bytes) -> Path:
+    def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
         with MemoryFile() as memfile:
             memfile.write(resp)
             with memfile.open(driver=driver) as vrt:
-                ds = cast("xr.DataArray", rxr.open_rasterio(vrt))  # noqa: FURB127
+                ds = cast("xr.DataArray", rxr.open_rasterio(vrt))
                 with contextlib.suppress(ValueError, KeyError):
                     ds = ds.squeeze("band", drop=True)
                 ds.name = var_name[lyr]
-                dtypes[ds.name] = ds.dtype  # type: ignore
+                dtypes[ds.name] = ds.dtype
                 nodata_dict[ds.name] = utils.get_nodata(vrt) if nodata is None else nodata
                 ds = ds.rio.write_nodata(nodata_dict[ds.name])
-                fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.nc")
-                ds.to_netcdf(fpath)
-                return fpath
+                ds = cast("xr.DataArray", ds)
+                return ds
 
-    with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        ds = xr.open_mfdataset(
-            itertools.starmap(to_dataset, r_dict.items()),  # type: ignore
-            chunks="auto",
-            parallel=True,
-            engine="rasterio",
-        )
+    ds = xr.merge(itertools.starmap(to_dataset, r_dict.items()))
 
     with contextlib.suppress(ValueError, KeyError):
         ds = ds.squeeze("band", drop=True)
