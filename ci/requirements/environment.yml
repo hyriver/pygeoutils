@@ -3,33 +3,36 @@ channels:
 - conda-forge
 - nodefaults
 dependencies:
-  # async-retriever deps
+# async-retriever deps
 - aiodns
-- aiosqlite
-- aiohttp >=3.8.3
+- aiohttp-client-cache >=0.8.1
 - brotli
 - cytoolz
 - nest-asyncio
-- aiohttp-client-cache >=0.8.1
 - ujson
 
-  # pygeoogc deps
-  # - async-retriever >=0.3.5
+# pygeoogc deps
+# - async-retriever>=0.15,<0.16
 - cytoolz
 - defusedxml
-- owslib >=0.27.2
-- pyproj >=2.2
+- joblib
+- multidict
+- owslib>=0.27.2
+- pyproj>=3.0.1
 - requests
-- requests-cache >=0.9.6
-- shapely >=2.0
+- requests-cache>=0.9.6
+- shapely>=1.8.5
+- ujson
+- url-normalize>=1.4
 - urllib3
+- yarl
 
-  # pygeoutils deps
+# pygeoutils deps
 - cytoolz
-- dask-core
-- geopandas >=0.7
+- geopandas-base >=0.7
+- fiona
 - netcdf4
-- numpy >=1.17
+- numpy >=1.21
 - pyproj >=2.2
 - rasterio >=1.2
 - rioxarray >=0.11
