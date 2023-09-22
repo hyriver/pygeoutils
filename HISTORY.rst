@@ -2,8 +2,22 @@
 History
 =======
 
-0.15.1 (2023-0X-XX)
+0.15.2 (2023-0X-XX)
 -------------------
+
+New Features
+~~~~~~~~~~~~
+- Add ``geometry_reproject`` function for reprojecting a geometry
+  (bounding box, list of coordinates, or any ``shapely.geometry``) to
+  a new CRS.
+- Add ``smooth_linestring`` function for smoothing a ``LineString``
+  using B-splines.
+- Make ``make_bspline`` and ``bspline_curvature`` functions public.
+  The ``make_bspline`` function uses ``scipy`` to generate a ``BSplines``
+  object and the ``bspline_curvature`` function calculates the tangent
+  angles, curvature, and radius of curvature of a B-spline at any point
+  along the B-spline.
+- Improve the accuracy and performance of B-spline generation functions.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
