@@ -43,17 +43,6 @@ class MatchingCRSError(Exception):
         return self.message
 
 
-class UnprojectedCRSError(Exception):
-    """Exception raised when CRS is not given."""
-
-    def __init__(self) -> None:
-        self.message = "CRS must be projected."
-        super().__init__(self.message)
-
-    def __str__(self) -> str:
-        return self.message
-
-
 class EmptyResponseError(Exception):
     """Exception raised when the input response is empty."""
 
