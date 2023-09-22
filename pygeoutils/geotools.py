@@ -274,7 +274,7 @@ def _adjust_boundaries(arr: FloatArray) -> FloatArray:
     return arr
 
 
-def bspline_curvature(bspline: BSpline, konts: float) -> tuple[FloatArray, FloatArray, FloatArray]:
+def bspline_curvature(bspline: BSpline, konts: FloatArray) -> tuple[FloatArray, FloatArray, FloatArray]:
     r"""Compute the curvature of a B-spline curve.
 
     Notes
@@ -297,8 +297,9 @@ def bspline_curvature(bspline: BSpline, konts: float) -> tuple[FloatArray, Float
     ----------
     bspline : scipy.interpolate.BSpline
         B-spline curve.
-    konts : float
-        Knots of the B-spline curve to compute the curvature at.
+    konts : numpy.ndarray
+        Knots along the B-spline curve to compute the curvature at. The knots
+        must be strictly increasing.
 
     Returns
     -------
@@ -342,7 +343,7 @@ def make_bspline(x: FloatArray, y: FloatArray, n_pts: int, k: int = 3) -> Spline
 
     Returns
     -------
-    Spline
+    :class:`Spline`
         A Spline object with ``x``, ``y``, ``phi``, ``radius``, ``distance``,
         and ``line`` attributes. The ``line`` attribute returns the B-spline
         as a shapely.LineString.
@@ -444,10 +445,10 @@ def smooth_linestring(line: LineString, crs: CRSTYPE, n_pts: int, degree: int = 
 
     Returns
     -------
-    Spline
-        A Spline object with ``x``, ``y``, ``phi``, ``radius``, ``distance``,
-        and ``line`` attributes. The ``line`` attribute returns the B-spline
-        as a shapely.LineString.
+    :class:`Spline`
+        A :class:`Spline` object with ``x``, ``y``, ``phi``, ``radius``,
+        ``distance``, and ``line`` attributes. The ``line`` attribute
+        returns the B-spline as a shapely.LineString.
 
     Examples
     --------
