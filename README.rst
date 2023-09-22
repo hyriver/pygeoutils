@@ -72,11 +72,11 @@ PyGeoUtils_      Utilities for manipulating geospatial, (Geo)JSON, and (Geo)TIFF
 PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
 ------------------------------------------------------------
 
-.. image:: https://img.shields.io/pypi/v/pygeoutils.svg
+.. image:: https://img.shields.io/pypi/v/pypgu.svg
     :target: https://pypi.python.org/pypi/pygeoutils
     :alt: PyPi
 
-.. image:: https://img.shields.io/conda/vn/conda-forge/pygeoutils.svg
+.. image:: https://img.shields.io/conda/vn/conda-forge/pypgu.svg
     :target: https://anaconda.org/conda-forge/pygeoutils
     :alt: Conda Version
 
@@ -84,7 +84,7 @@ PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
     :target: https://codecov.io/gh/hyriver/pygeoutils
     :alt: CodeCov
 
-.. image:: https://img.shields.io/pypi/pyversions/pygeoutils.svg
+.. image:: https://img.shields.io/pypi/pyversions/pypgu.svg
     :target: https://pypi.python.org/pypi/pygeoutils
     :alt: Python Versions
 
@@ -122,6 +122,9 @@ These utilities are:
 
 - ``Coordinates``: Generate validated and normalized coordinates in WGS84.
 - ``GeoBSpline``: Create B-spline from a ``geopandas.GeoDataFrame`` of points.
+- ``smooth_linestring``: Smooth a ``shapely.geometry.LineString`` using B-spline.
+- ``bspline_curvature``: Compute tangent angles, curvature, and radius of curvature
+  of a B-Spline at any points along the curve.
 - ``arcgis2geojson``: Convert ESRIGeoJSON format to GeoJSON.
 - ``break_lines``: Break lines at specified points in a given direction.
 - ``gtiff2xarray``: Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
@@ -130,16 +133,18 @@ These utilities are:
 - ``xarray2geodf``: Vectorize a ``xarray.DataArray`` to a ``geopandas.GeoDataFrame``.
 - ``geodf2xarray``: Rasterize a ``geopandas.GeoDataFrame`` to a ``xarray.DataArray``.
 - ``xarray_geomask``: Mask a ``xarray.Dataset`` based on a geometry.
-- ``query_indices``: a wrapper around
+- ``query_indices``: A wrapper around
   ``geopandas.sindex.query_bulk``. However, instead of returning an array of
   positional indices, it returns a dictionary of indices where keys are the
   indices of the input geometry and values are a list of indices of the
   tree geometries that intersect with the input geometry.
 - ``nested_polygons``: Determining nested (multi)polygons in a
   ``geopandas.GeoDataFrame``.
-- ``multi2poly``, for converting a ``MultiPolygon`` to a ``Polygon``
+- ``multi2poly``: For converting a ``MultiPolygon`` to a ``Polygon``
   in a ``geopandas.GeoDataFrame``.
-
+- ``geometry_reproject``: For reprojecting a geometry
+  (bounding box, list of coordinates, or any ``shapely.geometry``) to
+  a new CRS.
 All these functions handle all necessary CRS transformations.
 
 You can find some example notebooks `here <https://github.com/hyriver/HyRiver-examples>`__.
@@ -190,7 +195,26 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 Quick start
 -----------
 
-To demonstrate the capabilities of PyGeoUtils let's use
+We start by smoothing a ``shapely.geometry.LineString`` using B-spline:
+
+.. code-block:: python
+
+    import pygeoutils as pgu
+    from shapely import LineString
+
+    line = LineString(
+       [
+           (-97.06138, 32.837),
+           (-97.06133, 32.836),
+           (-97.06124, 32.834),
+           (-97.06127, 32.832),
+       ]
+    )
+    line = pgu.geometry_reproject(line, 4326, 5070)
+    sp = pgu.smooth_linestring(line, 5070, 5)
+    line_sp = pgu.geometry_reproject(sp.line, 5070, 4326)
+
+Next, we use
 `PyGeoOGC <https://github.com/hyriver/pygeoogc>`__ to access
 `National Wetlands Inventory <https://www.fws.gov/wetlands/>`__ from WMS, and
 `FEMA National Flood Hazard <https://www.fema.gov/national-flood-hazard-layer-nfhl>`__
@@ -198,7 +222,6 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
 
 .. code-block:: python
 
-    import pygeoutils as geoutils
     from pygeoogc import WFS, WMS, ServiceURL
     from shapely.geometry import Polygon
 
@@ -225,10 +248,10 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
         1e3,
         box_crs=crs,
     )
-    canopy = geoutils.gtiff2xarray(r_dict, geometry, crs)
+    canopy = pgu.gtiff2xarray(r_dict, geometry, crs)
 
     mask = canopy > 60
-    canopy_gdf = geoutils.xarray2geodf(canopy, "float32", mask)
+    canopy_gdf = pgu.xarray2geodf(canopy, "float32", mask)
 
     url_wfs = "https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WFSServer"
     wfs = WFS(
@@ -238,7 +261,7 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
         crs="epsg:4269",
     )
     r = wfs.getfeature_bybox(geometry.bounds, box_crs=crs)
-    flood = geoutils.json2geodf(r.json(), "epsg:4269", crs)
+    flood = pgu.json2geodf(r.json(), "epsg:4269", crs)
 
 Contributing
 ------------
