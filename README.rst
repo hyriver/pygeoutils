@@ -145,7 +145,6 @@ These utilities are:
 - ``geometry_reproject``: For reprojecting a geometry
   (bounding box, list of coordinates, or any ``shapely.geometry``) to
   a new CRS.
-All these functions handle all necessary CRS transformations.
 
 You can find some example notebooks `here <https://github.com/hyriver/HyRiver-examples>`__.
 
@@ -203,12 +202,12 @@ We start by smoothing a ``shapely.geometry.LineString`` using B-spline:
     from shapely import LineString
 
     line = LineString(
-       [
-           (-97.06138, 32.837),
-           (-97.06133, 32.836),
-           (-97.06124, 32.834),
-           (-97.06127, 32.832),
-       ]
+        [
+            (-97.06138, 32.837),
+            (-97.06133, 32.836),
+            (-97.06124, 32.834),
+            (-97.06127, 32.832),
+        ]
     )
     line = pgu.geometry_reproject(line, 4326, 5070)
     sp = pgu.smooth_linestring(line, 5070, 5)
@@ -235,7 +234,7 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
             [-118.72, 34.118],
         ]
     )
-    crs = "epsg:4326"
+    crs = 4326
 
     wms = WMS(
         ServiceURL().wms.mrlc,
