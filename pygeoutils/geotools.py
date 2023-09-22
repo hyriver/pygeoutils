@@ -22,7 +22,6 @@ from pygeoutils.exceptions import (
     InputValueError,
     MatchingCRSError,
     MissingColumnError,
-    MissingCRSError,
 )
 
 BOX_ORD = "(west, south, east, north)"
@@ -130,6 +129,71 @@ class Coordinates:
     def points(self) -> gpd.GeoSeries:
         """Get validate coordinate as a ``geopandas.GeoSeries``."""
         return self._points
+
+
+def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
+    """Reproject a geometry to another CRS.
+
+    Parameters
+    ----------
+    geom : list or tuple or any shapely.geometry
+        Input geometry could be a list of coordinates such as ``[(x1, y1), ...]``,
+        a bounding box like so ``(xmin, ymin, xmax, ymax)``, or any valid ``shapely``'s
+        geometry such as ``Polygon``, ``MultiPolygon``, etc..
+    in_crs : str, int, or pyproj.CRS
+        Spatial reference of the input geometry
+    out_crs : str, int, or pyproj.CRS
+        Target spatial reference
+
+    Returns
+    -------
+    same type as the input geometry
+        Transformed geometry in the target CRS.
+
+    Examples
+    --------
+    >>> from shapely.geometry import Point
+    >>> point = Point(-7766049.665, 5691929.739)
+    >>> geometry_reproject(point, 3857, 4326).xy
+    (array('d', [-69.7636111130079]), array('d', [45.44549114818127]))
+    >>> bbox = (-7766049.665, 5691929.739, -7763049.665, 5696929.739)
+    >>> geometry_reproject(bbox, 3857, 4326)
+    (-69.7636111130079, 45.44549114818127, -69.73666165448431, 45.47699468552394)
+    >>> coords = [(-7766049.665, 5691929.739)]
+    >>> geometry_reproject(coords, 3857, 4326)
+    [(-69.7636111130079, 45.44549114818127)]
+    """
+    if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
+        return geom
+
+    project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
+
+    if isinstance(
+        geom,
+        (
+            Polygon,
+            LineString,
+            MultiLineString,
+            MultiPolygon,
+            Point,
+            MultiPoint,
+        ),
+    ):
+        return ops.transform(project, geom)
+
+    if len(geom) == 4:
+        with contextlib.suppress(TypeError, AttributeError):
+            return ops.transform(project, shapely_box(*geom)).bounds
+
+    with contextlib.suppress(TypeError):
+        mp = cast("MultiPoint", ops.transform(project, MultiPoint(geom)))
+        return [(p.x, p.y) for p in mp.geoms]  # type: ignore
+
+    gtypes = (
+        "a list of coordinates such as [(x1, y1), ...],"
+        + "a bounding box like so (xmin, ymin, xmax, ymax), or any valid shapely's geometry."
+    )
+    raise InputTypeError("geom", gtypes)
 
 
 def geo2polygon(
@@ -695,68 +759,3 @@ def multi2poly(gdf: GDFTYPE) -> GDFTYPE:
         return gdf_prj.geometry
 
     return gdf_prj
-
-
-def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
-    """Reproject a geometry to another CRS.
-
-    Parameters
-    ----------
-    geom : list or tuple or any shapely.geometry
-        Input geometry could be a list of coordinates such as ``[(x1, y1), ...]``,
-        a bounding box like so ``(xmin, ymin, xmax, ymax)``, or any valid ``shapely``'s
-        geometry such as ``Polygon``, ``MultiPolygon``, etc..
-    in_crs : str, int, or pyproj.CRS
-        Spatial reference of the input geometry
-    out_crs : str, int, or pyproj.CRS
-        Target spatial reference
-
-    Returns
-    -------
-    same type as the input geometry
-        Transformed geometry in the target CRS.
-
-    Examples
-    --------
-    >>> from shapely.geometry import Point
-    >>> point = Point(-7766049.665, 5691929.739)
-    >>> geometry_reproject(point, 3857, 4326).xy
-    (array('d', [-69.7636111130079]), array('d', [45.44549114818127]))
-    >>> bbox = (-7766049.665, 5691929.739, -7763049.665, 5696929.739)
-    >>> geometry_reproject(bbox, 3857, 4326)
-    (-69.7636111130079, 45.44549114818127, -69.73666165448431, 45.47699468552394)
-    >>> coords = [(-7766049.665, 5691929.739)]
-    >>> geometry_reproject(coords, 3857, 4326)
-    [(-69.7636111130079, 45.44549114818127)]
-    """
-    if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
-        return geom
-
-    project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
-
-    if isinstance(
-        geom,
-        (
-            Polygon,
-            LineString,
-            MultiLineString,
-            MultiPolygon,
-            Point,
-            MultiPoint,
-        ),
-    ):
-        return ops.transform(project, geom)
-
-    if len(geom) == 4:
-        with contextlib.suppress(TypeError, AttributeError):
-            return ops.transform(project, shapely_box(*geom)).bounds
-
-    with contextlib.suppress(TypeError):
-        mp = cast("MultiPoint", ops.transform(project, MultiPoint(geom)))
-        return [(p.x, p.y) for p in mp.geoms]  # type: ignore
-
-    gtypes = (
-        "a list of coordinates such as [(x1, y1), ...],"
-        + "a bounding box like so (xmin, ymin, xmax, ymax), or any valid shapely's geometry."
-    )
-    raise InputTypeError("geom", gtypes)
