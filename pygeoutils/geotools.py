@@ -224,7 +224,8 @@ def geo2polygon(
     else:
         raise InputTypeError("geometry", "(Multi)Polygon or tuple of length 4")
 
-    geom = geometry_reproject(geom, geo_crs, crs)
+    if geo_crs is not None and crs is not None:
+        geom = geometry_reproject(geom, geo_crs, crs)
     if not geom.is_valid:
         geom = geom.buffer(0.0)
         geom = cast("Polygon | MultiPolygon", geom)
