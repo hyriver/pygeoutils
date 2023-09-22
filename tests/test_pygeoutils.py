@@ -4,6 +4,7 @@ import io
 import geopandas as gpd
 import numpy as np
 from pygeoogc import ArcGISRESTful, ServiceURL
+from scipy.interpolate import make_interp_spline
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 
 import pygeoutils as geoutils
@@ -76,12 +77,41 @@ def test_bspline():
             (-97.06127, 32.832),
         ]
     )
-    pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs=4326)).to_crs("epsg:3857")
+    pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs=4326)).to_crs(3857)
     sp = GeoBSpline(pts, 10).spline
     assert len(sp.x) == 10
     assert_close(sum(sp.y), 38734230.680)
-    assert_close(sp.phi.max(), (-1.527))
-    assert_close(sp.radius.min(), 9618.943)
+    assert_close(sp.phi.mean(), -1.552)
+    assert_close(sp.radius.mean(), 75849.471)
+
+
+def test_curvature():
+    theta = np.linspace(0, 2 * np.pi, 20)
+    rad = 10
+    x = np.cos(theta) * rad
+    y = np.sin(theta) * rad
+    bspl = make_interp_spline(theta, np.c_[x, y], k=3)
+    konts = np.linspace(0, 2 * np.pi, 100)
+    phi, curvature, radius = geoutils.bspline_curvature(bspl, konts)
+
+    # Curvature of a circle is 1/radius
+    assert_close(np.mean(curvature).round(1), 1 / rad)
+    assert_close(np.mean(radius).round(), rad)
+    assert_close(np.mean(phi).round(), 0)
+
+    x = np.linspace(0, 4 * np.pi, 100)
+    y = np.sin(x)
+    distances = np.hypot(np.diff(x), np.diff(y))
+    theta = np.insert(np.cumsum(distances), 0, 0)
+    bspl = make_interp_spline(theta, np.c_[x, y], k=3)
+
+    konts = np.linspace(theta.min(), theta.max(), 200)
+    _, curvature, _ = geoutils.bspline_curvature(bspl, konts)
+
+    # Curvatures of the sine are negative at peaks and positive at troughs
+    p = 50
+    for i in range(4):
+        assert all(np.sign(curvature)[i * p : (i + 1) * p] == (-1) ** (i + 1))
 
 
 def test_json2geodf():
