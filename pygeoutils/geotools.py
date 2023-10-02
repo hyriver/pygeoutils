@@ -43,6 +43,7 @@ if TYPE_CHECKING:
         LineString,
         MultiLineString,
         "tuple[float, float, float, float]",
+        "list[float]",
         "list[tuple[float, float]]",
     )
 
@@ -274,7 +275,9 @@ def _adjust_boundaries(arr: FloatArray) -> FloatArray:
     return arr
 
 
-def bspline_curvature(bspline: BSpline, konts: FloatArray) -> tuple[FloatArray, FloatArray, FloatArray]:
+def bspline_curvature(
+    bspline: BSpline, konts: FloatArray
+) -> tuple[FloatArray, FloatArray, FloatArray]:
     r"""Compute the curvature of a B-spline curve.
 
     Notes
@@ -319,10 +322,7 @@ def bspline_curvature(bspline: BSpline, konts: FloatArray) -> tuple[FloatArray, 
     ddx = _adjust_boundaries(ddx)
     ddy = _adjust_boundaries(ddy)
     curvature = (dx * ddy - ddx * dy) / np.float_power(np.square(dx) + np.square(dy), 1.5)
-
     radius = 1 / np.abs(curvature)
-    radius[np.isinf(radius)] = np.inf
-    curvature[np.isinf(curvature)] = 0
     return phi, curvature, radius
 
 
@@ -589,9 +589,7 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
     return out.to_crs(lines.crs)
 
 
-def geometry_list(
-    geometry: GTYPE | Point | MultiPoint | LineString | MultiLineString,
-) -> list[Polygon] | list[Point] | list[LineString]:
+def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineString]:
     """Convert input geometry to a list of polygons, points, or lines."""
     if isinstance(geometry, (Polygon, LineString, Point)):
         return [geometry]
@@ -599,12 +597,21 @@ def geometry_list(
     if isinstance(geometry, (MultiPolygon, MultiLineString, MultiPoint)):
         return list(geometry.geoms)  # type: ignore
 
-    if isinstance(geometry, (tuple, list)) and len(geometry) == 4:
+    if (
+        isinstance(geometry, (tuple, list))
+        and len(geometry) == 4
+        and all(isinstance(i, (float, int, np.number)) for i in geometry)
+    ):
         return [shapely_box(*geometry)]
+
+    with contextlib.suppress(TypeError, AttributeError):
+        return list(MultiPoint(geometry).geoms)
+
     valid_geoms = (
         "Polygon",
         "MultiPolygon",
         "tuple/list of length 4",
+        "list of tuples of length 2 or 3",
         "Point",
         "MultiPoint",
         "LineString",
