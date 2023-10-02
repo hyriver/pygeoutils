@@ -389,7 +389,7 @@ def get_gtiff_attrs(
                 transform = transform2tuple(src.transform)
             else:
                 transform = tuple(src.transform)
-    return Attrs(_nodata, r_crs, ds_dims, transform)
+    return Attrs(_nodata, r_crs, ds_dims, transform)  # pyright: ignore[reportGeneralTypeIssues]
 
 
 def get_transform(
