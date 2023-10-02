@@ -590,7 +590,20 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
 
 
 def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineString]:
-    """Convert input geometry to a list of polygons, points, or lines."""
+    """Convert input geometry to a list of Polygons, Points, or LineStrings.
+
+    Parameters
+    ----------
+    geometry : Polygon or MultiPolygon or tuple of length 4 or list of tuples of length 2 or 3
+        Input geometry could be a ``(Multi)Polygon``, ``(Multi)LineString``,
+        ``(Multi)Point``, a tuple/list of length 4 (west, south, east, north),
+        or a list of tuples of length 2 or 3.
+    
+    Returns
+    -------
+    list
+        A list of Polygons, Points, or LineStrings.
+    """
     if isinstance(geometry, (Polygon, LineString, Point)):
         return [geometry]
 
@@ -598,7 +611,7 @@ def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineStri
         return list(geometry.geoms)  # type: ignore
 
     if (
-        isinstance(geometry, (tuple, list))
+        isinstance(geometry, (tuple, list, np.ndarray))
         and len(geometry) == 4
         and all(isinstance(i, (float, int, np.number)) for i in geometry)
     ):
