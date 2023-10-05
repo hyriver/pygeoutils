@@ -1,13 +1,13 @@
-"""Tests for PyGeoUtils"""
+"""Tests for PyGeoUtils."""
 import io
 
 import geopandas as gpd
 import numpy as np
-from pygeoogc import ArcGISRESTful, ServiceURL
 from scipy.interpolate import make_interp_spline
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 
 import pygeoutils as geoutils
+from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoutils import Coordinates, GeoBSpline
 
 DEF_CRS = 4326
