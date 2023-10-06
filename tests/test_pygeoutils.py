@@ -4,7 +4,7 @@ import io
 import geopandas as gpd
 import numpy as np
 from scipy.interpolate import make_interp_spline
-from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
+from shapely import LineString, MultiPolygon, Point, Polygon, box
 
 import pygeoutils as geoutils
 from pygeoogc import ArcGISRESTful, ServiceURL
@@ -389,7 +389,7 @@ def test_nested():
     assert geoutils.nested_polygons(gdf) == {2: [1], 0: [4]}
 
 
-def test_coords():
+def test_coords_list():
     coords = (1, 2)
     clist = geoutils.coords_list(coords)
     assert isinstance(clist, list) and all(len(c) == 2 for c in clist)

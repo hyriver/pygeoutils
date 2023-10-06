@@ -1,4 +1,5 @@
 """Some utilities for manipulating GeoSpatial data."""
+# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import contextlib
@@ -12,9 +13,8 @@ import numpy as np
 import numpy.typing as npt
 import pyproj
 import scipy.interpolate as sci
-from shapely import ops
-from shapely.geometry import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon
-from shapely.geometry import box as shapely_box
+import shapely
+from shapely import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon, ops
 
 from pygeoutils.exceptions import (
     InputRangeError,
@@ -25,7 +25,6 @@ from pygeoutils.exceptions import (
 )
 
 BOX_ORD = "(west, south, east, north)"
-NUMBER = Union[int, float, np.number]  # type: ignore
 FloatArray = npt.NDArray[np.float64]
 
 if TYPE_CHECKING:
@@ -46,6 +45,7 @@ if TYPE_CHECKING:
         "list[float]",
         "list[tuple[float, float]]",
     )
+    NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
 
 __all__ = [
     "snap2nearest",
@@ -93,15 +93,21 @@ class Coordinates:
     @staticmethod
     def __box_geo(bounds: tuple[float, float, float, float] | None) -> Polygon:
         """Get EPSG:4326 CRS."""
-        wgs84_bounds = pyproj.CRS(4326).area_of_use.bounds  # type: ignore
+        wgs84_bounds = pyproj.CRS(
+            4326
+        ).area_of_use.bounds  # pyright: ignore[reportOptionalMemberAccess]
         if bounds is None:
-            return shapely_box(*wgs84_bounds)
+            return shapely.box(*wgs84_bounds)
 
-        if not isinstance(bounds, (tuple, list)) or len(bounds) != 4:
+        if len(bounds) != 4:
             raise InputTypeError("bounds", "tuple of length 4")
 
-        bbox = shapely_box(*bounds)
-        if not bbox.within(shapely_box(*wgs84_bounds)):
+        try:
+            bbox = shapely.box(*bounds)
+        except (TypeError, AttributeError, ValueError) as ex:
+            raise InputTypeError("bounds", "tuple of length 4") from ex
+
+        if not bbox.within(shapely.box(*wgs84_bounds)):
             raise InputRangeError("bounds", "within EPSG:4326")
         return bbox
 
@@ -123,7 +129,7 @@ class Coordinates:
             lat = np.array(self.lat, "f8")
 
         lon = np.mod(np.mod(_lon, 360.0) + 540.0, 360.0) - 180.0
-        pts = gpd.GeoSeries([Point(xy) for xy in zip(lon, lat)], crs=4326)
+        pts = gpd.GeoSeries(gpd.points_from_xy(lon, lat), crs=4326)
         self._points = self.__validate(pts, self.__box_geo(self.bounds))
 
     @property
@@ -153,7 +159,7 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
 
     Examples
     --------
-    >>> from shapely.geometry import Point
+    >>> from shapely import Point
     >>> point = Point(-7766049.665, 5691929.739)
     >>> geometry_reproject(point, 3857, 4326).xy
     (array('d', [-69.7636111130079]), array('d', [45.44549114818127]))
@@ -164,9 +170,6 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
     >>> geometry_reproject(coords, 3857, 4326)
     [(-69.7636111130079, 45.44549114818127)]
     """
-    if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
-        return geom
-
     project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
 
     if isinstance(
@@ -180,19 +183,39 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
             MultiPoint,
         ),
     ):
+        if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
+            return geom
         return ops.transform(project, geom)
 
-    if len(geom) == 4:
-        with contextlib.suppress(TypeError, AttributeError):
-            return ops.transform(project, shapely_box(*geom)).bounds
+    with contextlib.suppress(TypeError, AttributeError, ValueError):
+        if len(geom) > 4:
+            raise TypeError
+        if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
+            bbox = shapely.box(*geom)
+        else:
+            bbox = cast("Polygon", ops.transform(project, shapely.box(*geom)))
+        return tuple(float(p) for p in bbox.bounds)
 
-    with contextlib.suppress(TypeError):
-        mp = cast("MultiPoint", ops.transform(project, MultiPoint(geom)))
-        return [(p.x, p.y) for p in mp.geoms]  # type: ignore
+    with contextlib.suppress(TypeError, AttributeError, ValueError):
+        if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
+            point = Point(geom)
+        else:
+            point = cast("Point", ops.transform(project, Point(geom)))
+        return [(float(point.x), float(point.y))]
 
-    gtypes = (
-        "a list of coordinates such as [(x1, y1), ...],"
-        + "a bounding box like so (xmin, ymin, xmax, ymax), or any valid shapely's geometry."
+    with contextlib.suppress(TypeError, AttributeError, ValueError):
+        if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
+            mp = MultiPoint(geom)
+        else:
+            mp = cast("MultiPoint", ops.transform(project, MultiPoint(geom)))
+        return [(float(p.x), float(p.y)) for p in mp.geoms]
+
+    gtypes = " ".join(
+        (
+            "a list of coordinates such as [(x1, y1), ...],",
+            "a bounding box like so (xmin, ymin, xmax, ymax),",
+            "or any valid shapely's geometry.",
+        )
     )
     raise InputTypeError("geom", gtypes)
 
@@ -221,7 +244,7 @@ def geo2polygon(
     if isinstance(geometry, (Polygon, MultiPolygon)):
         geom = geometry
     elif isinstance(geometry, (tuple, list)) and len(geometry) == 4:
-        geom = shapely_box(*geometry)
+        geom = shapely.box(*geometry)
     else:
         raise InputTypeError("geometry", "(Multi)Polygon or tuple of length 4")
 
@@ -318,7 +341,11 @@ def bspline_curvature(
     dy = _adjust_boundaries(dy)
     phi = np.arctan2(dy, dx)
 
-    ddx, ddy = bspline.derivative(2)(konts).T
+    if bspline.k >= 2:
+        ddx, ddy = bspline.derivative(2)(konts).T
+    else:
+        ddx = np.zeros_like(dx)
+        ddy = np.zeros_like(dy)
     ddx = _adjust_boundaries(ddx)
     ddy = _adjust_boundaries(ddy)
     curvature = (dx * ddy - ddx * dy) / np.float_power(np.square(dx) + np.square(dy), 1.5)
@@ -518,7 +545,7 @@ def snap2nearest(lines: GDFTYPE, points: GDFTYPE, tol: float) -> GDFTYPE:
         for pi, fi in merged_idx.items()
     }
     pts = gpd.GeoDataFrame.from_dict(_pts, orient="index")
-    pts.columns = cols + ["geometry"]
+    pts.columns = [*cols, "geometry"]
     pts = pts.set_geometry("geometry", crs=points.crs)
     pts = cast("gpd.GeoDataFrame", pts)
 
@@ -570,7 +597,8 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
     points = points.reset_index(drop=True)
     pts_idx, flw_idx = lines.sindex.query(points.geometry, predicate="intersects")
     if len(pts_idx) == 0:
-        raise ValueError("No intersection between lines and points")  # noqa: TC003
+        msg = "No intersection between lines and points"
+        raise ValueError(msg)
 
     flw_geom = lines.iloc[flw_idx].geometry
     pts_geom = points.iloc[pts_idx].geometry
@@ -598,7 +626,7 @@ def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineStri
         Input geometry could be a ``(Multi)Polygon``, ``(Multi)LineString``,
         ``(Multi)Point``, a tuple/list of length 4 (west, south, east, north),
         or a list of tuples of length 2 or 3.
-    
+
     Returns
     -------
     list
@@ -608,14 +636,14 @@ def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineStri
         return [geometry]
 
     if isinstance(geometry, (MultiPolygon, MultiLineString, MultiPoint)):
-        return list(geometry.geoms)  # type: ignore
+        return list(geometry.geoms)
 
     if (
         isinstance(geometry, (tuple, list, np.ndarray))
         and len(geometry) == 4
         and all(isinstance(i, (float, int, np.number)) for i in geometry)
     ):
-        return [shapely_box(*geometry)]
+        return [shapely.box(*geometry)]
 
     with contextlib.suppress(TypeError, AttributeError):
         return list(MultiPoint(geometry).geoms)
@@ -677,7 +705,7 @@ def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, li
     Returns
     -------
     dict
-        A dictionary where keys are indices of larger ploygons and
+        A dictionary where keys are indices of larger polygons and
         values are a list of indices of smaller polygons that are
         contained within the larger polygons.
     """
@@ -688,7 +716,7 @@ def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, li
     nested_idx = query_indices(centroid, gdf, "contains")
     nested_idx = {k: list(set(v).difference({k})) for k, v in nested_idx.items()}
     nested_idx = {k: v for k, v in nested_idx.items() if v}
-    nidx = {tuple(set(v + [k])) for k, v in nested_idx.items()}
+    nidx = {tuple({*v, k}) for k, v in nested_idx.items()}
     area = gdf.area
     nested_keys = [area.loc[list(i)].idxmax() for i in nidx]
     nested_idx = {k: v for k, v in nested_idx.items() if k in nested_keys}
@@ -732,7 +760,8 @@ def _get_area_range(mp: MultiPolygon) -> float:
 
 def _get_larges(mp: MultiPolygon) -> Polygon:
     """Get the largest polygon from a multipolygon."""
-    return Polygon(mp.geoms[np.argmax([g.area for g in mp.geoms])].exterior)
+    argmax = np.argmax([g.area for g in mp.geoms])
+    return Polygon(mp.geoms[argmax].exterior)  # pyright: ignore[reportOptionalMemberAccess]
 
 
 def multi2poly(gdf: GDFTYPE) -> GDFTYPE:

@@ -1,8 +1,9 @@
 """Configuration for pytest."""
 
 import pytest
+from shapely import Polygon
+
 from pygeoogc import WMS, ServiceURL
-from shapely.geometry import Polygon
 
 DEF_CRS = 4326
 GEO_NAT = Polygon(

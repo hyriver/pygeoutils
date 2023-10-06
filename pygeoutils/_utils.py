@@ -13,14 +13,14 @@ import rasterio.transform as rio_transform
 import rioxarray._io as rxr
 import ujson as json
 import xarray as xr
-from shapely.geometry import LineString, Point
+from shapely import LineString, Point
 
 from pygeoutils.exceptions import MissingAttributeError
 
 if TYPE_CHECKING:
     from rasterio import Affine
 
-    NUMBER = Union[int, float, np.number]  # type: ignore
+    NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
     CRSTYPE = Union[int, str, pyproj.CRS]
 
@@ -234,17 +234,14 @@ class Attrs(NamedTuple):
     transform: tuple[float, float, float, float, float, float]
 
 
-def get_nodata(src: Any) -> np.number:  # type: ignore
+def get_nodata(src: rio.DatasetReader) -> NUMBER:
     """Get the nodata value of a GTiff byte response."""
     if src.nodata is None:
-        try:
-            nodata = np.iinfo(src.dtypes[0]).max
-        except ValueError:
-            nodata = np.nan
-    else:
-        nodata = np.dtype(src.dtypes[0]).type(src.nodata)
-    nodata = cast("np.number", nodata)  # type: ignore
-    return nodata
+        dtype = src.dtypes[0]
+        if np.issubdtype(dtype, np.integer):
+            return np.iinfo(dtype).max
+        return np.nan
+    return np.dtype(src.dtypes[0]).type(src.nodata)
 
 
 def get_dim_names(ds: xr.DataArray | xr.Dataset) -> tuple[str, str] | None:
@@ -252,9 +249,9 @@ def get_dim_names(ds: xr.DataArray | xr.Dataset) -> tuple[str, str] | None:
     y_dims = {"y", "Y", "lat", "Lat", "latitude", "Latitude"}
     x_dims = {"x", "X", "lon", "Lon", "longitude", "Longitude"}
     try:
-        y_dim = list(set(ds.coords).intersection(y_dims))[0]
+        y_dim = next(iter(set(ds.coords).intersection(y_dims)))
         y_dim = cast("str", y_dim)
-        x_dim = list(set(ds.coords).intersection(x_dims))[0]
+        x_dim = next(iter(set(ds.coords).intersection(x_dims)))
         x_dim = cast("str", x_dim)
     except IndexError:
         return None

@@ -1,4 +1,5 @@
 """Some utilities for manipulating GeoSpatial data."""
+# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import contextlib
@@ -18,7 +19,7 @@ import xarray as xr
 from pyproj.exceptions import CRSError as ProjCRSError
 from rasterio import MemoryFile
 from rioxarray.exceptions import OneDimensionalRaster
-from shapely.geometry import MultiPolygon, Polygon
+from shapely import MultiPolygon, Polygon
 
 from pygeoutils import _utils as utils
 from pygeoutils import geotools
@@ -30,7 +31,7 @@ from pygeoutils.exceptions import (
 )
 
 BOX_ORD = "(west, south, east, north)"
-NUMBER = Union[int, float, np.number]  # type: ignore
+NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
 if TYPE_CHECKING:
     GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
     GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
@@ -225,7 +226,7 @@ def gtiff2xarray(
         Requested dataset or dataarray.
     """
     if not isinstance(r_dict, dict):
-        raise InputTypeError("r_dict", "dict", '{"name": bytes}')  # noqa: FS003
+        raise InputTypeError("r_dict", "dict", '{"name": bytes}')
 
     try:
         key1 = next(iter(r_dict.keys()))
@@ -234,7 +235,7 @@ def gtiff2xarray(
 
     var_name = dict(zip(r_dict, r_dict))
     if "_dd_" in key1:
-        var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict.keys()}
+        var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict}
 
     attrs = utils.get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: dict[str, type] = {}
@@ -276,7 +277,7 @@ def gtiff2xarray(
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
             ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
 
-    ds = utils.xd_write_crs(ds)  # type: ignore
+    ds = utils.xd_write_crs(ds)
     if geometry is not None:
         if geo_crs is None:
             raise MissingCRSError
@@ -341,7 +342,7 @@ def geodf2xarray(
     geodf: GDFTYPE,
     resolution: float,
     attr_col: str | None = None,
-    fill: int | float = 0,
+    fill: float = 0,
     projected_crs: CRSTYPE = 5070,
 ) -> xr.Dataset:
     """Rasterize a ``geopandas.GeoDataFrame`` to ``xarray.DataArray``.
@@ -430,6 +431,6 @@ def validate_crs(crs: CRSTYPE) -> str:
         Validated CRS as a string.
     """
     try:
-        return pyproj.CRS(crs).to_string()  # type: ignore
+        return pyproj.CRS(crs).to_string()
     except ProjCRSError as ex:
         raise InputTypeError("crs", "a valid CRS") from ex
