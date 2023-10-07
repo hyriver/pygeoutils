@@ -392,15 +392,18 @@ def test_nested():
 def test_coords_list():
     coords = (1, 2)
     clist = geoutils.coords_list(coords)
-    assert isinstance(clist, list) and all(len(c) == 2 for c in clist)
+    assert isinstance(clist, list)
+    assert all(len(c) == 2 for c in clist)
 
     coords = ((1, 2), (1, 2, 4))
     clist = geoutils.coords_list(coords)
-    assert isinstance(clist, list) and all(len(c) == 2 for c in clist)
+    assert isinstance(clist, list)
+    assert all(len(c) == 2 for c in clist)
 
     coords = np.array(((1, 2), (1, 3)))
     clist = geoutils.coords_list(coords)
-    assert isinstance(clist, list) and all(len(c) == 2 for c in clist)
+    assert isinstance(clist, list)
+    assert all(len(c) == 2 for c in clist)
 
 
 def test_mp2p():
@@ -409,7 +412,8 @@ def test_mp2p():
         crs=5070,
     )
     gdf = geoutils.multi2poly(gdf)
-    assert (gdf.geometry.geom_type == "Polygon").all() and gdf.shape[0] == 2
+    assert (gdf.geometry.geom_type == "Polygon").all()
+    assert gdf.shape[0] == 2
 
     gdf = gpd.GeoDataFrame(
         geometry=[MultiPolygon([box(3, 3, 5, 5), box(6, 6, 8, 8)]), box(2, 2, 5, 5)],

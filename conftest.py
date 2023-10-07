@@ -12,7 +12,7 @@ GEO_NAT = Polygon(
 
 
 @pytest.fixture(autouse=True)
-def add_standard_imports(doctest_namespace):
+def _add_standard_imports(doctest_namespace):
     """Add pygeoutils namespace for doctest."""
     import pygeoutils as geoutils
 
