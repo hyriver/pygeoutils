@@ -38,7 +38,7 @@ def wms_resp():
 
 
 @pytest.fixture()
-def cover_resp():
+def gtiff_list():
     """Return a WMS response."""
     wms = WMS(
         ServiceURL().wms.mrlc,
@@ -52,4 +52,5 @@ def cover_resp():
         GEO_NAT.bounds,
         1e3,
         box_crs=DEF_CRS,
+        to_disk=True,
     )

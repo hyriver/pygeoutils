@@ -3,6 +3,7 @@ import io
 
 import geopandas as gpd
 import numpy as np
+import rioxarray as rxr
 from scipy.interpolate import make_interp_spline
 from shapely import LineString, MultiPolygon, Point, Polygon, box
 
@@ -132,10 +133,11 @@ def test_json2geodf():
     assert_close(flw["lengthkm"].sum(), 8.917 * 2)
 
 
-def test_gtiff2array(wms_resp, cover_resp):
+def test_gtiff2array(wms_resp, gtiff_list):
     canopy_box = geoutils.gtiff2xarray(wms_resp, GEO_NAT.bounds, DEF_CRS)
     canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS, drop=False)
-    cover = geoutils.gtiff2xarray(cover_resp, GEO_NAT, DEF_CRS)
+    geoutils.gtiff2vrt(gtiff_list, "cache/cover.vrt")
+    cover = rxr.open_rasterio("cache/cover.vrt").squeeze(drop=True)
     expected = 71.9547
 
     assert_close(canopy_box.mean().values.item(), expected)
