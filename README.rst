@@ -145,6 +145,7 @@ These utilities are:
 - ``geometry_reproject``: For reprojecting a geometry
   (bounding box, list of coordinates, or any ``shapely.geometry``) to
   a new CRS.
+- ``gtiff2vrt``: For converting a list of GeoTIFF files to a VRT file.
 
 You can find some example notebooks `here <https://github.com/hyriver/HyRiver-examples>`__.
 
