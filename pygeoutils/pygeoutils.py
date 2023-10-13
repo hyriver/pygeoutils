@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import contextlib
-import itertools
-from typing import TYPE_CHECKING, Any, Tuple, TypeVar, Union, cast
+import os
+import subprocess
+import uuid
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Tuple, TypeVar, Union, cast, overload
 
 import geopandas as gpd
 import numpy as np
@@ -43,6 +46,7 @@ __all__ = [
     "arcgis2geojson",
     "xarray_geomask",
     "gtiff2xarray",
+    "gtiff2vrt",
     "xarray2geodf",
     "geodf2xarray",
 ]
@@ -179,6 +183,28 @@ def xarray_geomask(
     return ds
 
 
+def _to_dataset(
+    resp: bytes,
+    var_name: str,
+    driver: str,
+    dtypes: dict[str, np.dtype],  # pyright: ignore[reportMissingTypeArgument]
+    nodata_dict: dict[str, NUMBER],
+    nodata: NUMBER | None,
+) -> xr.DataArray:
+    with MemoryFile() as memfile:
+        memfile.write(resp)
+        with memfile.open(driver=driver) as vrt:
+            ds = cast("xr.DataArray", rxr.open_rasterio(vrt))
+            with contextlib.suppress(ValueError, KeyError):
+                ds = ds.squeeze("band", drop=True)
+            ds.name = var_name
+            dtypes[ds.name] = ds.dtype
+            nodata_dict[ds.name] = utils.get_nodata(vrt) if nodata is None else nodata
+            ds = ds.rio.write_nodata(nodata_dict[ds.name])
+            ds = cast("xr.DataArray", ds)
+            return ds
+
+
 def gtiff2xarray(
     r_dict: dict[str, bytes],
     geometry: GTYPE | None = None,
@@ -194,27 +220,29 @@ def gtiff2xarray(
     Parameters
     ----------
     r_dict : dict
-        Dictionary of (Geo)Tiff byte responses where keys are some names that are used
-        for naming each responses, and values are bytes.
+        Dictionary of (Geo)Tiff byte responses where keys are some names
+        that are used for naming each responses, and values are bytes.
     geometry : Polygon, MultiPolygon, or tuple, optional
-        The geometry to mask the data that should be in the same CRS as the r_dict.
-        Defaults to ``None``.
+        The geometry to mask the data that should be in the same CRS
+        as the ``r_dict``. Defaults to ``None``.
     geo_crs : int, str, or pyproj.CRS, optional
-        The spatial reference of the input geometry, defaults to ``None``. This
-        argument should be given when ``geometry`` is given.
+        The spatial reference of the input geometry, defaults to ``None``.
+        This argument should be given when ``geometry`` is given.
     ds_dims : tuple of str, optional
         The names of the vertical and horizontal dimensions (in that order)
-        of the target dataset, default to None. If None, dimension names are determined
-        from a list of common names.
+        of the target dataset, default to None. If None, dimension names are
+        determined from a list of common names.
     driver : str, optional
-        A GDAL driver for reading the content, defaults to automatic detection. A list of
-        the drivers can be found here: https://gdal.org/drivers/raster/index.html
+        A GDAL driver for reading the content, defaults to automatic
+        detection. A list of the drivers can be found
+        `here <https://gdal.org/drivers/raster/index.html>`__.
     all_touched : bool, optional
         Include a pixel in the mask if it touches any of the shapes.
         If False (default), include a pixel only if its center is within one
         of the shapes, or if it is selected by Bresenham's line algorithm.
     nodata : float or int, optional
-        The nodata value of the raster, defaults to None, i.e., is determined from the raster.
+        The nodata value of the raster, defaults to ``None``, i.e., it is
+        determined from the raster.
     drop : bool, optional
         If True, drop the data outside of the extent of the mask geometries.
         Otherwise, it will return the same raster with the data masked.
@@ -241,21 +269,10 @@ def gtiff2xarray(
     dtypes: dict[str, type] = {}
     nodata_dict: dict[str, NUMBER] = {}
 
-    def to_dataset(lyr: str, resp: bytes) -> xr.DataArray:
-        with MemoryFile() as memfile:
-            memfile.write(resp)
-            with memfile.open(driver=driver) as vrt:
-                ds = cast("xr.DataArray", rxr.open_rasterio(vrt))
-                with contextlib.suppress(ValueError, KeyError):
-                    ds = ds.squeeze("band", drop=True)
-                ds.name = var_name[lyr]
-                dtypes[ds.name] = ds.dtype
-                nodata_dict[ds.name] = utils.get_nodata(vrt) if nodata is None else nodata
-                ds = ds.rio.write_nodata(nodata_dict[ds.name])
-                ds = cast("xr.DataArray", ds)
-                return ds
-
-    ds = xr.merge(itertools.starmap(to_dataset, r_dict.items()))
+    ds = xr.merge(
+        _to_dataset(resp, var_name[lyr], driver, dtypes, nodata_dict, nodata)
+        for lyr, resp in r_dict.items()
+    )
 
     with contextlib.suppress(ValueError, KeyError):
         ds = ds.squeeze("band", drop=True)
@@ -283,6 +300,66 @@ def gtiff2xarray(
             raise MissingCRSError
         return xarray_geomask(ds, geometry, geo_crs, all_touched, drop)
     return ds
+
+
+def _to_tiff(resp: bytes, var_name: str, driver: str, nodata: NUMBER | None, tmp_dir: Path) -> Path:
+    with MemoryFile() as memfile:
+        memfile.write(resp)
+        with memfile.open(driver=driver) as vrt:
+            ds = cast("xr.DataArray", rxr.open_rasterio(vrt))
+            with contextlib.suppress(ValueError, KeyError):
+                ds = ds.squeeze("band", drop=True)
+            ds.name = var_name
+            _nodata = utils.get_nodata(vrt) if nodata is None else nodata
+            ds = ds.rio.write_nodata(_nodata)
+            fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.tiff")
+            ds.rio.to_raster(fpath)
+            return fpath
+
+
+@overload
+def _path2str(path: Path) -> str:
+    ...
+
+
+@overload
+def _path2str(path: list[Path]) -> list[str]:
+    ...
+
+
+def _path2str(path: Path | list[Path]) -> str | list[str]:
+    if isinstance(path, list):
+        return [p.resolve().as_posix() for p in path]
+    return path.resolve().as_posix()
+
+
+def _create_vrt(tiff_files: list[Path], output_vrt: Path) -> None:
+    command = ["gdalbuildvrt", _path2str(output_vrt), *_path2str(tiff_files)]
+    subprocess.run(command, check=True, text=True, capture_output=True)  # noqa: S603
+
+
+def gtiff2vrt(
+    file_list: list[Path],
+    vrt_path: str | Path,
+) -> None:
+    """Convert (Geo)Tiff byte responses to a VRT file.
+
+    Parameters
+    ----------
+    file_list : list
+        List of paths to the GeoTiff files.
+    vrt_path : str or Path
+        Path to the output VRT file.
+    """
+    if not isinstance(file_list, (list, tuple)) and not all(isinstance(f, Path) for f in file_list):
+        raise InputTypeError("file_list", "list of pathlib.Path")
+
+    if not file_list:
+        raise EmptyResponseError
+
+    vrt_path = Path(vrt_path)
+    vrt_path.parent.mkdir(parents=True, exist_ok=True)
+    _create_vrt(file_list, vrt_path)
 
 
 def xarray2geodf(

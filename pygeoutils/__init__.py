@@ -32,6 +32,7 @@ from pygeoutils.print_versions import show_versions
 from pygeoutils.pygeoutils import (
     arcgis2geojson,
     geodf2xarray,
+    gtiff2vrt,
     gtiff2xarray,
     json2geodf,
     xarray2geodf,
@@ -51,6 +52,7 @@ __all__ = [
     "get_gtiff_attrs",
     "get_transform",
     "gtiff2xarray",
+    "gtiff2vrt",
     "snap2nearest",
     "xarray2geodf",
     "multi2poly",
