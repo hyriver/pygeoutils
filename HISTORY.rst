@@ -2,6 +2,14 @@
 History
 =======
 
+0.15.3 (2023-XX-XX)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a new function called ``gtiff2vrt`` for creating a VRT file
+  from a list of GeoTiff files.
+
 0.15.2 (2023-09-22)
 -------------------
 
