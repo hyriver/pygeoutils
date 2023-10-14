@@ -52,5 +52,5 @@ def gtiff_list():
         GEO_NAT.bounds,
         1e3,
         box_crs=DEF_CRS,
-        to_disk=True,
+        tiff_dir="cache",
     )
