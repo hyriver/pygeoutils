@@ -349,7 +349,9 @@ def bspline_curvature(
     ddx = _adjust_boundaries(ddx)
     ddy = _adjust_boundaries(ddy)
     curvature = (dx * ddy - ddx * dy) / np.float_power(np.square(dx) + np.square(dy), 1.5)
-    radius = 1 / np.abs(curvature)
+    curvature[~np.isfinite(curvature)] = 0.0
+    with np.errstate(divide="ignore"):
+        radius = np.reciprocal(np.abs(curvature))
     return phi, curvature, radius
 
 
@@ -373,7 +375,7 @@ def make_bspline(x: FloatArray, y: FloatArray, n_pts: int, k: int = 3) -> Spline
     :class:`Spline`
         A Spline object with ``x``, ``y``, ``phi``, ``radius``, ``distance``,
         and ``line`` attributes. The ``line`` attribute returns the B-spline
-        as a shapely.LineString.
+        as a ``shapely.LineString``.
     """
     k = np.clip(k, 1, x.size - 1)
     konts = np.hypot(np.diff(x), np.diff(y)).cumsum()
@@ -447,6 +449,8 @@ class GeoBSpline:
         self.x_ln = np.array(tx, dtype="f8").squeeze()
         self.y_ln = np.array(ty, dtype="f8").squeeze()
         self.npts_ln = self.x_ln.size
+        if self.npts_ln < self.degree:
+            raise InputRangeError("degree", f"< {self.npts_ln}")
         self._spline = make_bspline(self.x_ln, self.y_ln, self.n_pts, self.degree)
 
     @property
@@ -455,13 +459,17 @@ class GeoBSpline:
         return self._spline
 
 
-def smooth_linestring(line: LineString, crs: CRSTYPE, n_pts: int, degree: int = 3) -> Spline:
+def smooth_linestring(
+    line: LineString | MultiLineString, crs: CRSTYPE, n_pts: int, degree: int = 3
+) -> Spline:
     """Smooth a line using B-spline interpolation.
 
     Parameters
     ----------
-    line : shapely.LineString
-        Line to smooth. Note that ``MultiLineString`` is not supported.
+    line : shapely.LineString, shapely.MultiLineString
+        Line to smooth. Note that if ``line`` is ``MultiLineString``
+        it will be merged into a single ``LineString``. If the merge
+        fails, an exception will be raised.
     crs : int, str, or pyproj.CRS
         CRS of the input line. It must be a projected CRS.
     n_pts : int
@@ -479,10 +487,9 @@ def smooth_linestring(line: LineString, crs: CRSTYPE, n_pts: int, degree: int = 
 
     Examples
     --------
-    >>> import pygeoutils as pgu
     >>> import geopandas as gpd
     >>> import shapely
-    >>> line = shapely.geometry.LineString(
+    >>> line = shapely.LineString(
     ...     [
     ...         (-97.06138, 32.837),
     ...         (-97.06133, 32.836),
@@ -490,18 +497,18 @@ def smooth_linestring(line: LineString, crs: CRSTYPE, n_pts: int, degree: int = 
     ...         (-97.06127, 32.832),
     ...     ]
     ... )
-    >>> line = pgu.geometry_reproject(line, 4326, 5070)
-    >>> sp = pgu.smooth_linestring(line, 5070, 5)
-    >>> line_sp = pgu.geometry_reproject(sp.line, 5070, 4326)
-    >>> list(zip(*line_sp.xy))
+    >>> sp = smooth_linestring(line, 4326, 5)
+    >>> list(zip(*sp.line.xy))
     [(-97.06138, 32.837),
     (-97.06132, 32.83575),
     (-97.06126, 32.83450),
     (-97.06123, 32.83325),
     (-97.06127, 32.83200)]
     """
+    line = shapely.line_merge(line)
     if not isinstance(line, LineString):
         raise InputTypeError("line", "LineString")
+
     points = gpd.GeoSeries([Point(xy) for xy in zip(*line.xy)], crs=crs)
     return GeoBSpline(points, n_pts, degree).spline
 
