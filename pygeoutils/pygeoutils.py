@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-import os
 import subprocess
-import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Tuple, TypeVar, Union, cast, overload
 
@@ -27,6 +25,7 @@ from shapely import MultiPolygon, Polygon
 from pygeoutils import _utils as utils
 from pygeoutils import geotools
 from pygeoutils.exceptions import (
+    DependencyError,
     EmptyResponseError,
     InputTypeError,
     InputValueError,
@@ -302,35 +301,20 @@ def gtiff2xarray(
     return ds
 
 
-def _to_tiff(resp: bytes, var_name: str, driver: str, nodata: NUMBER | None, tmp_dir: Path) -> Path:
-    with MemoryFile() as memfile:
-        memfile.write(resp)
-        with memfile.open(driver=driver) as vrt:
-            ds = cast("xr.DataArray", rxr.open_rasterio(vrt))
-            with contextlib.suppress(ValueError, KeyError):
-                ds = ds.squeeze("band", drop=True)
-            ds.name = var_name
-            _nodata = utils.get_nodata(vrt) if nodata is None else nodata
-            ds = ds.rio.write_nodata(_nodata)
-            fpath = Path(tmp_dir, f"{uuid.uuid4().hex}.tiff")
-            ds.rio.to_raster(fpath)
-            return fpath
-
-
 @overload
-def _path2str(path: Path) -> str:
+def _path2str(path: Path | str) -> str:
     ...
 
 
 @overload
-def _path2str(path: list[Path]) -> list[str]:
+def _path2str(path: list[Path | str]) -> list[str]:
     ...
 
 
-def _path2str(path: Path | list[Path]) -> str | list[str]:
-    if isinstance(path, list):
-        return [p.resolve().as_posix() for p in path]
-    return path.resolve().as_posix()
+def _path2str(path: Path | str | list[Path | str]) -> str | list[str]:
+    if isinstance(path, (list, tuple)):
+        return [Path(p).resolve().as_posix() for p in path]
+    return Path(path).resolve().as_posix()
 
 
 def _create_vrt(tiff_files: list[Path], output_vrt: Path) -> None:
@@ -342,7 +326,7 @@ def gtiff2vrt(
     file_list: list[Path],
     vrt_path: str | Path,
 ) -> None:
-    """Convert (Geo)Tiff byte responses to a VRT file.
+    """Create a VRT file from a list of (Geo)Tiff files.
 
     Parameters
     ----------
@@ -351,7 +335,13 @@ def gtiff2vrt(
     vrt_path : str or Path
         Path to the output VRT file.
     """
-    if not isinstance(file_list, (list, tuple)) and not all(isinstance(f, Path) for f in file_list):
+    exit_code, _ = subprocess.getstatusoutput("gdalinfo --version")
+    if exit_code != 0:
+        raise DependencyError
+
+    if not isinstance(file_list, (list, tuple)) and not all(
+        isinstance(f, (Path, str)) for f in file_list
+    ):
         raise InputTypeError("file_list", "list of pathlib.Path")
 
     if not file_list:

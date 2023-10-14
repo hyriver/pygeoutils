@@ -147,3 +147,20 @@ class InputRangeError(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class DependencyError(ImportError):
+    """Exception raised when gdal is not installed."""
+
+    def __init__(self) -> None:
+        self.message = "\n".join(
+            (
+                "For creating VRT ``gdal`` is required.",
+                "You can install it either from binaries provided by GDAL or",
+                "conda install -c conda-forge gdal",
+            )
+        )
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
