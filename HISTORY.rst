@@ -2,13 +2,36 @@
 History
 =======
 
-0.15.3 (2023-XX-XX)
+0.16.0 (2023-XX-XX)
 -------------------
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Refactor the spline generation functions to make them more efficient,
+  more accurate, and more robust. Switched to using ``UnivariateSpline``
+  from ``scipy`` instead of ``BSpline``. This allows for more control
+  over smoothness of the spline via the ``smooth`` parameter.
+  References to BSpline has been removed from the functions and a new
+  functionality has been added. The new spline generation functions
+  are ``GeoSpline``, ``make_spline``, ``spline_linestring``,
+  ``smooth_linestring``, ``spline_curvature``, and ``line_curvature``.
+  The ``smooth_linestring`` function now returns a ``LineString`` instead
+  of a ``Spline`` object. This function is intended for smoothing a
+  ``LineString`` when curvature, radius of curvature, and tangent angles
+  are not needed. The ``spline_linestring`` function now returns a
+  ``Spline`` object that contains the smoothed ``LineString`` and
+  curvature, radius of curvature, and tangent angles. Also, ``line_curvature``
+  function can be used to compute curvature, radius of curvature, and
+  tangent angles of a ``LineString`` at all point along the ``LineString``.
 
 New Features
 ~~~~~~~~~~~~
 - Add a new function called ``gtiff2vrt`` for creating a VRT file
-  from a list of GeoTiff files.
+  from a list of GeoTiff files. Note that this new function requires
+  ``gdal`` to be installed.
+- The ``xd_write_crs`` function now keeps ``spatial_ref`` attribute
+  of the input ``xarray.DataArray`` or ``xarray.Dataset`` to retain
+  CF compliance.
 
 0.15.2 (2023-09-22)
 -------------------
