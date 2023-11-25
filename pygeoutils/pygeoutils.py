@@ -329,6 +329,7 @@ def gtiff2vrt(
     """Create a VRT file from a list of (Geo)Tiff files.
 
     .. note::
+
         This function requires ``gdal`` to be installed.
 
     Parameters
