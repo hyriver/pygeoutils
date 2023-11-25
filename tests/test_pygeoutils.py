@@ -1,15 +1,17 @@
 """Tests for PyGeoUtils."""
 import io
+import subprocess
 
 import geopandas as gpd
 import numpy as np
+import pytest
 import rioxarray as rxr
-from scipy.interpolate import make_interp_spline
+from scipy.interpolate import UnivariateSpline
 from shapely import LineString, MultiPolygon, Point, Polygon, box
 
 import pygeoutils as geoutils
 from pygeoogc import ArcGISRESTful, ServiceURL
-from pygeoutils import Coordinates, GeoBSpline
+from pygeoutils import Coordinates, GeoSpline
 
 DEF_CRS = 4326
 ALT_CRS = 4269
@@ -25,6 +27,8 @@ GEO_URB = Polygon(
 GEO_NAT = Polygon(
     [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
 )
+
+has_gdal = subprocess.getstatusoutput("gdalinfo --version")[0] == 0
 
 
 def assert_close(a: float, b: float, rtol: float = 1e-3) -> bool:
@@ -69,7 +73,7 @@ def test_coords():
     assert c.points.x.tolist() == [100.0, -30.0]
 
 
-def test_bspline():
+def test_spline():
     xl, yl = zip(
         *[
             (-97.06138, 32.837),
@@ -79,7 +83,7 @@ def test_bspline():
         ]
     )
     pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs=4326)).to_crs(3857)
-    sp = GeoBSpline(pts, 10).spline
+    sp = GeoSpline(pts, 10).spline
     assert len(sp.x) == 10
     assert_close(sum(sp.y), 38734230.680)
     assert_close(sp.phi.mean(), -1.552)
@@ -91,9 +95,11 @@ def test_curvature():
     rad = 10
     x = np.cos(theta) * rad
     y = np.sin(theta) * rad
-    bspl = make_interp_spline(theta, np.c_[x, y], k=3)
+    spl_x = UnivariateSpline(theta, x, k=3, s=0)
+    spl_y = UnivariateSpline(theta, y, k=3, s=0)
+
     konts = np.linspace(0, 2 * np.pi, 100)
-    phi, curvature, radius = geoutils.bspline_curvature(bspl, konts)
+    phi, curvature, radius = geoutils.spline_curvature(spl_x, spl_y, konts)
 
     # Curvature of a circle is 1/radius
     assert_close(np.mean(curvature).round(1), 1 / rad)
@@ -104,10 +110,11 @@ def test_curvature():
     y = np.sin(x)
     distances = np.hypot(np.diff(x), np.diff(y))
     theta = np.insert(np.cumsum(distances), 0, 0)
-    bspl = make_interp_spline(theta, np.c_[x, y], k=3)
+    spl_x = UnivariateSpline(theta, x, k=3, s=0)
+    spl_y = UnivariateSpline(theta, y, k=3, s=0)
 
     konts = np.linspace(theta.min(), theta.max(), 200)
-    _, curvature, _ = geoutils.bspline_curvature(bspl, konts)
+    _, curvature, _ = geoutils.spline_curvature(spl_x, spl_y, konts)
 
     # Curvatures of the sine are negative at peaks and positive at troughs
     p = 50
@@ -133,16 +140,19 @@ def test_json2geodf():
     assert_close(flw["lengthkm"].sum(), 8.917 * 2)
 
 
-def test_gtiff2array(wms_resp, gtiff_list):
+def test_gtiff2array(wms_resp):
     canopy_box = geoutils.gtiff2xarray(wms_resp, GEO_NAT.bounds, DEF_CRS)
     canopy = geoutils.gtiff2xarray(wms_resp, GEO_NAT, DEF_CRS, drop=False)
-    geoutils.gtiff2vrt(gtiff_list, "cache/cover.vrt")
-    cover = rxr.open_rasterio("cache/cover.vrt").squeeze(drop=True)
     expected = 71.9547
-
     assert_close(canopy_box.mean().values.item(), expected)
     assert_close(canopy.mean().values.item(), expected)
-    assert cover.rio.nodata == 0
+
+
+@pytest.mark.skipif(not has_gdal, reason="GDAL is not installed")
+def test_gtiff2vrt(gtiff_list):
+    geoutils.gtiff2vrt(gtiff_list, "cache/cover.vrt")
+    cover = rxr.open_rasterio("cache/cover.vrt").squeeze(drop=True)
+    assert assert_close(cover.mean().item(), 45.7423)
 
 
 def test_xarray_geodf(wms_resp):
