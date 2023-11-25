@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import warnings
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Sequence, Tuple, TypeVar, Union, cast
@@ -28,8 +29,6 @@ BOX_ORD = "(west, south, east, north)"
 FloatArray = npt.NDArray[np.float64]
 
 if TYPE_CHECKING:
-    from scipy.interpolate import BSpline
-
     GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
     GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
     CRSTYPE = Union[int, str, pyproj.CRS]
@@ -53,14 +52,16 @@ __all__ = [
     "geo2polygon",
     "geometry_list",
     "Coordinates",
-    "GeoBSpline",
     "query_indices",
     "nested_polygons",
     "coords_list",
     "multi2poly",
-    "bspline_curvature",
-    "make_bspline",
+    "GeoSpline",
+    "make_spline",
+    "spline_linestring",
     "smooth_linestring",
+    "line_curvature",
+    "spline_curvature",
     "geometry_reproject",
 ]
 
@@ -258,7 +259,7 @@ def geo2polygon(
 
 @dataclass
 class Spline:
-    """Provide attributes of an interpolated B-spline.
+    """Provide attributes of an interpolated Spline.
 
     Attributes
     ----------
@@ -267,15 +268,15 @@ class Spline:
     y : numpy.ndarray
         The y-coordinates of the interpolated points.
     phi : numpy.ndarray
-        Angle of the tangent of the B-spline curve.
+        Angle of the tangent of the Spline curve.
     curvature : numpy.ndarray
-        Curvature of the B-spline curve.
+        Curvature of the Spline curve.
     radius : numpy.ndarray
-        Radius of curvature of the B-spline.
+        Radius of curvature of the Spline.
     distance : numpy.ndarray
-        Total distance of each point along the B-spline from the start point.
+        Total distance of each point along the Spline from the start point.
     line : shapely.LineString
-        The B-spline as a shapely.LineString.
+        The Spline as a shapely.LineString.
     """
 
     x: FloatArray
@@ -287,33 +288,26 @@ class Spline:
 
     @property
     def line(self) -> LineString:
-        """Convert the B-spline to shapely.LineString."""
+        """Convert the Spline to shapely.LineString."""
         return LineString(zip(self.x, self.y))
 
 
-def _adjust_boundaries(arr: FloatArray) -> FloatArray:
-    """Adjust the boundaries of an array."""
-    arr[0] = arr[1]
-    arr[-1] = arr[-2]
-    return arr
-
-
-def bspline_curvature(
-    bspline: BSpline, konts: FloatArray
+def spline_curvature(
+    spline_x: sci.UnivariateSpline, spline_y: sci.UnivariateSpline, konts: FloatArray
 ) -> tuple[FloatArray, FloatArray, FloatArray]:
-    r"""Compute the curvature of a B-spline curve.
+    r"""Compute the curvature of a Spline curve.
 
     Notes
     -----
-    The formula for the curvature of a B-spline curve is:
+    The formula for the curvature of a Spline curve is:
 
     .. math::
 
         \kappa = \frac{\dot{x}\ddot{y} - \ddot{x}\dot{y}}{(\dot{x}^2 + \dot{y}^2)^{3/2}}
 
     where :math:`\dot{x}` and :math:`\dot{y}` are the first derivatives of the
-    B-spline curve and :math:`\ddot{x}` and :math:`\ddot{y}` are the second
-    derivatives of the B-spline curve. Also, the radius of curvature is:
+    Spline curve and :math:`\ddot{x}` and :math:`\ddot{y}` are the second
+    derivatives of the Spline curve. Also, the radius of curvature is:
 
     .. math::
 
@@ -321,42 +315,120 @@ def bspline_curvature(
 
     Parameters
     ----------
-    bspline : scipy.interpolate.BSpline
-        B-spline curve.
+    spline_x : scipy.interpolate.UnivariateSpline
+        Spline curve for the x-coordinates of the points.
+    spline_y : scipy.interpolate.UnivariateSpline
+        Spline curve for the y-coordinates of the points.
     konts : numpy.ndarray
-        Knots along the B-spline curve to compute the curvature at. The knots
+        Knots along the Spline curve to compute the curvature at. The knots
         must be strictly increasing.
 
     Returns
     -------
     phi : numpy.ndarray
-        Angle of the tangent of the B-spline curve.
+        Angle of the tangent of the Spline curve.
     curvature : numpy.ndarray
-        Curvature of the B-spline curve.
+        Curvature of the Spline curve.
     radius : numpy.ndarray
-        Radius of curvature of the B-spline curve.
+        Radius of curvature of the Spline curve.
     """
-    dx, dy = bspline.derivative(1)(konts).T
-    dx = _adjust_boundaries(dx)
-    dy = _adjust_boundaries(dy)
+    if not isinstance(spline_x, sci.UnivariateSpline) or not isinstance(
+        spline_y, sci.UnivariateSpline
+    ):
+        raise InputTypeError("spline_x/y", "scipy.interpolate.UnivariateSpline")
+
+    dx = spline_x.derivative(1)(konts)
+    dx = cast("FloatArray", dx)
+    # Impose symmetric boundary conditions
+    dx[0], dx[-1] = dx[1], dx[-2]
+    dy = spline_y.derivative(1)(konts)
+    dy = cast("FloatArray", dy)
+    dy[0], dy[-1] = dy[1], dy[-2]
+
     phi = np.arctan2(dy, dx)
 
-    if bspline.k >= 2:
-        ddx, ddy = bspline.derivative(2)(konts).T
+    # Check if the spline degree is high enough to compute the second derivative
+    if spline_x._data[5] > 2:  # pyright: ignore[reportPrivateUsage]
+        ddx = spline_x.derivative(2)(konts)
+        ddx = cast("FloatArray", ddx)
+        ddx[0], ddx[-1] = ddx[1], ddx[-2]
+        ddy = spline_y.derivative(2)(konts)
+        ddy = cast("FloatArray", ddy)
+        ddy[0], ddy[-1] = ddy[1], ddy[-2]
     else:
         ddx = np.zeros_like(dx)
         ddy = np.zeros_like(dy)
-    ddx = _adjust_boundaries(ddx)
-    ddy = _adjust_boundaries(ddy)
-    curvature = (dx * ddy - ddx * dy) / np.float_power(np.square(dx) + np.square(dy), 1.5)
-    curvature[~np.isfinite(curvature)] = 0.0
+    denom = np.float_power(np.square(dx) + np.square(dy), 1.5)
+    denom = np.where(denom == 0, 1, denom)
+    curvature = (dx * ddy - ddx * dy) / denom
     with np.errstate(divide="ignore"):
         radius = np.reciprocal(np.abs(curvature))
     return phi, curvature, radius
 
 
-def make_bspline(x: FloatArray, y: FloatArray, n_pts: int, k: int = 3) -> Spline:
-    """Create a B-spline curve from a set of points.
+def line_curvature(line: LineString) -> tuple[FloatArray, FloatArray, FloatArray]:
+    r"""Compute the curvature of a Spline curve.
+
+    Notes
+    -----
+    The formula for the curvature of a Spline curve is:
+
+    .. math::
+
+        \kappa = \frac{\dot{x}\ddot{y} - \ddot{x}\dot{y}}{(\dot{x}^2 + \dot{y}^2)^{3/2}}
+
+    where :math:`\dot{x}` and :math:`\dot{y}` are the first derivatives of the
+    Spline curve and :math:`\ddot{x}` and :math:`\ddot{y}` are the second
+    derivatives of the Spline curve. Also, the radius of curvature is:
+
+    .. math::
+
+        \rho = \frac{1}{|\kappa|}
+
+    Parameters
+    ----------
+    line : shapely.LineString
+        Line to compute the curvature at.
+
+    Returns
+    -------
+    phi : numpy.ndarray
+        Angle of the tangent of the Spline curve.
+    curvature : numpy.ndarray
+        Curvature of the Spline curve.
+    radius : numpy.ndarray
+        Radius of curvature of the Spline curve.
+    """
+    if not isinstance(line, LineString):
+        raise InputTypeError("line", "shapely.LineString")
+
+    x, y = shapely.get_coordinates(line).T
+    dx = np.diff(x)
+    # Impose symmetric boundary conditions
+    dx[0], dx[-1] = dx[1], dx[-2]
+    dy = np.diff(y)
+    dy[0], dy[-1] = dy[1], dy[-2]
+    phi = np.arctan2(dy, dx)
+
+    ddx = np.diff(dx)
+    ddx = np.insert(ddx, 0, ddx[0])
+    ddx[-1] = ddx[-2]
+    ddy = np.diff(dy)
+    ddy = np.insert(ddy, 0, ddy[0])
+    ddy[-1] = ddy[-2]
+
+    denom = np.float_power(np.square(dx) + np.square(dy), 1.5)
+    denom = np.where(denom == 0, 1, denom)
+    curvature = (dx * ddy - ddx * dy) / denom
+    with np.errstate(divide="ignore"):
+        radius = np.reciprocal(np.abs(curvature))
+    return phi, curvature, radius
+
+
+def make_spline(
+    x: FloatArray, y: FloatArray, n_pts: int, k: int = 3, s: float | None = None
+) -> Spline:
+    """Create a parametric spline from a set of points.
 
     Parameters
     ----------
@@ -367,27 +439,35 @@ def make_bspline(x: FloatArray, y: FloatArray, n_pts: int, k: int = 3) -> Spline
     n_pts : int
         Number of points in the output spline curve.
     k : int, optional
-        Degree of the spline. Should be an odd number less than the number of
-        points and greater than 1. Default is 3.
+        Degree of the smoothing spline. Must be
+        1 <= ``k`` <= 5. Default to 3 which is a cubic spline.
+    s : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``s`` means more smoothing while smaller values of ``s`` indicates
+        less smoothing. If None (default), smoothing is done with all data points.
 
     Returns
     -------
     :class:`Spline`
         A Spline object with ``x``, ``y``, ``phi``, ``radius``, ``distance``,
-        and ``line`` attributes. The ``line`` attribute returns the B-spline
+        and ``line`` attributes. The ``line`` attribute returns the Spline
         as a ``shapely.LineString``.
     """
     k = np.clip(k, 1, x.size - 1)
     konts = np.hypot(np.diff(x), np.diff(y)).cumsum()
     konts = np.insert(konts, 0, 0)
-    spl = sci.make_interp_spline(konts, np.c_[x, y], k)
-    spl = cast("BSpline", spl)
+    konts /= konts[-1]
 
-    konts = np.linspace(konts[0], konts[-1], n_pts)
-    x_sp, y_sp = spl(konts).T
+    spl_x = sci.UnivariateSpline(konts, x, k=k, s=s, check_finite=True)
+    spl_y = sci.UnivariateSpline(konts, y, k=k, s=s, check_finite=True)
+
+    konts = np.linspace(0, 1, n_pts)
+    x_sp = spl_x(konts)
+    y_sp = spl_y(konts)
     x_sp = cast("FloatArray", x_sp)
     y_sp = cast("FloatArray", y_sp)
-    phi_sp, curv_sp, rad_sp = bspline_curvature(spl, konts)
+    phi_sp, curv_sp, rad_sp = spline_curvature(spl_x, spl_y, konts)
     d_sp = np.hypot(np.diff(x_sp), np.diff(y_sp)).cumsum()
     d_sp = np.insert(d_sp, 0, 0)
     if n_pts < 3:
@@ -397,8 +477,8 @@ def make_bspline(x: FloatArray, y: FloatArray, n_pts: int, k: int = 3) -> Spline
     return Spline(x_sp, y_sp, phi_sp, curv_sp, rad_sp, d_sp)
 
 
-class GeoBSpline:
-    """Create B-spline from a GeoDataFrame of points.
+class GeoSpline:
+    """Create a parametric spline from a GeoDataFrame of points.
 
     Parameters
     ----------
@@ -408,8 +488,14 @@ class GeoBSpline:
     npts_sp : int
         Number of points in the output spline curve.
     degree : int, optional
-        Degree of the spline. Should be less than the number of points and
-        greater than 1. Default is 3.
+        Degree of the smoothing spline. Must be
+        1 <= ``degree`` <= 5. Default to 3 which is a cubic spline.
+    smoothing : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``smoothing`` means more smoothing while smaller values of
+        ``smoothing`` indicates less smoothing. If None (default), smoothing
+        is done with all points.
 
     Examples
     --------
@@ -423,7 +509,7 @@ class GeoBSpline:
     ...     ]
     ... )
     >>> pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs=4326))
-    >>> sp = GeoBSpline(pts.to_crs(3857), 5).spline
+    >>> sp = GeoSpline(pts.to_crs(3857), 5).spline
     >>> pts_sp = gpd.GeoSeries(gpd.points_from_xy(sp.x, sp.y, crs=3857))
     >>> pts_sp = pts_sp.to_crs(4326)
     >>> list(zip(pts_sp.x, pts_sp.y))
@@ -434,8 +520,14 @@ class GeoBSpline:
     (-97.06127, 32.83200)]
     """
 
-    def __init__(self, points: GDFTYPE, n_pts: int, degree: int = 3) -> None:
+    def __init__(
+        self, points: GDFTYPE, n_pts: int, degree: int = 3, smoothing: float | None = None
+    ) -> None:
         self.degree = degree
+        if not (1 <= degree <= 5):
+            raise InputRangeError("degree", "1 <= degree <= 5")
+
+        self.smoothing = smoothing
 
         if any(points.geom_type != "Point"):
             raise InputTypeError("points.geom_type", "Point")
@@ -445,13 +537,12 @@ class GeoBSpline:
             raise InputRangeError("n_pts", ">= 1")
         self.n_pts = n_pts
 
-        tx, ty = zip(*(g.xy for g in points.geometry))
-        self.x_ln = np.array(tx, dtype="f8").squeeze()
-        self.y_ln = np.array(ty, dtype="f8").squeeze()
+        self.x_ln = points.geometry.x.to_numpy("f8")
+        self.y_ln = points.geometry.y.to_numpy("f8")
         self.npts_ln = self.x_ln.size
         if self.npts_ln < self.degree:
             raise InputRangeError("degree", f"< {self.npts_ln}")
-        self._spline = make_bspline(self.x_ln, self.y_ln, self.n_pts, self.degree)
+        self._spline = make_spline(self.x_ln, self.y_ln, self.n_pts, self.degree, self.smoothing)
 
     @property
     def spline(self) -> Spline:
@@ -459,10 +550,14 @@ class GeoBSpline:
         return self._spline
 
 
-def smooth_linestring(
-    line: LineString | MultiLineString, crs: CRSTYPE, n_pts: int, degree: int = 3
+def spline_linestring(
+    line: LineString | MultiLineString,
+    crs: CRSTYPE,
+    n_pts: int,
+    degree: int = 3,
+    smoothing: float | None = None,
 ) -> Spline:
-    """Smooth a line using B-spline interpolation.
+    """Generate a parametric spline from a LineString.
 
     Parameters
     ----------
@@ -475,15 +570,21 @@ def smooth_linestring(
     n_pts : int
         Number of points in the output spline curve.
     degree : int, optional
-        Degree of the spline. Should be less than the number of points and
-        greater than 1. Default is 3.
+        Degree of the smoothing spline. Must be
+        1 <= ``degree`` <= 5. Default to 3 which is a cubic spline.
+    smoothing : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``smoothing`` means more smoothing while smaller values of
+        ``smoothing`` indicates less smoothing. If None (default), smoothing
+        is done with all points.
 
     Returns
     -------
     :class:`Spline`
         A :class:`Spline` object with ``x``, ``y``, ``phi``, ``radius``,
         ``distance``, and ``line`` attributes. The ``line`` attribute
-        returns the B-spline as a shapely.LineString.
+        returns the Spline as a shapely.LineString.
 
     Examples
     --------
@@ -497,7 +598,7 @@ def smooth_linestring(
     ...         (-97.06127, 32.832),
     ...     ]
     ... )
-    >>> sp = smooth_linestring(line, 4326, 5)
+    >>> sp = spline_linestring(line, 4326, 5)
     >>> list(zip(*sp.line.xy))
     [(-97.06138, 32.837),
     (-97.06132, 32.83575),
@@ -505,12 +606,78 @@ def smooth_linestring(
     (-97.06123, 32.83325),
     (-97.06127, 32.83200)]
     """
-    line = shapely.line_merge(line)
+    if isinstance(line, MultiLineString):
+        line = shapely.line_merge(line)
+
     if not isinstance(line, LineString):
         raise InputTypeError("line", "LineString")
 
     points = gpd.GeoSeries([Point(xy) for xy in zip(*line.xy)], crs=crs)
-    return GeoBSpline(points, n_pts, degree).spline
+    return GeoSpline(points, n_pts, degree, smoothing).spline
+
+
+def smooth_linestring(
+    line: LineString, smoothing: float | None = None, npts: int | None = None
+) -> LineString:
+    """Smooth a LineString using ``UnivariateSpline`` from ``scipy``.
+
+    Parameters
+    ----------
+    line : shapely.LineString
+        Centerline to be smoothed.
+    smoothing : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``smoothing`` means more smoothing while smaller values of
+        ``smoothing`` indicates less smoothing. If None (default), smoothing
+        is done with all points.
+    npts : int, optional
+        Number of points in the output smoothed line. Defaults to 5 times
+        the number of points in the input line.
+
+    Returns
+    -------
+    shapely.LineString
+        Smoothed line with uniform spacing.
+
+    Examples
+    --------
+    >>> import geopandas as gpd
+    >>> import shapely
+    >>> line = shapely.LineString(
+    ...     [
+    ...         (-97.06138, 32.837),
+    ...         (-97.06133, 32.836),
+    ...         (-97.06124, 32.834),
+    ...         (-97.06127, 32.832),
+    ...     ]
+    ... )
+    >>> line_smooth = smooth_linestring(line, 4326, 5)
+    >>> list(zip(*line_smooth.xy))
+    [(-97.06138, 32.837),
+    (-97.06132, 32.83575),
+    (-97.06126, 32.83450),
+    (-97.06123, 32.83325),
+    (-97.06127, 32.83200)]
+    """
+    if isinstance(line, MultiLineString):
+        line = shapely.line_merge(line)
+
+    if not isinstance(line, LineString):
+        raise InputTypeError("line", "LineString")
+
+    x, y = shapely.get_coordinates(line).T
+    konts = np.hypot(np.diff(x), np.diff(y)).cumsum()
+    konts = np.insert(konts, 0, 0)
+    konts /= konts[-1]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        spl_x = sci.UnivariateSpline(konts, x, k=3, s=smoothing)
+        spl_y = sci.UnivariateSpline(konts, y, k=3, s=smoothing)
+    _npts = npts if npts is not None else 5 * len(x)
+    konts = np.linspace(0, 1, _npts)
+    return LineString(np.c_[spl_x(konts), spl_y(konts)])
 
 
 def snap2nearest(lines: GDFTYPE, points: GDFTYPE, tol: float) -> GDFTYPE:
