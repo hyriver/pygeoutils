@@ -264,10 +264,10 @@ via WFS, then convert the output to ``xarray.Dataset`` and ``GeoDataFrame``, res
         url_wfs,
         layer="public_NFHL:Base_Flood_Elevations",
         outformat="esrigeojson",
-        crs="epsg:4269",
+        crs=4269,
     )
     r = wfs.getfeature_bybox(geometry.bounds, box_crs=crs)
-    flood = pgu.json2geodf(r.json(), "epsg:4269", crs)
+    flood = pgu.json2geodf(r.json(), 4269, crs)
 
 Contributing
 ------------

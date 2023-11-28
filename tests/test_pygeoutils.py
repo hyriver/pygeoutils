@@ -61,7 +61,7 @@ def test_break_line():
 
 
 def test_snap():
-    crs_proj = "epsg:3857"
+    crs_proj = 3857
     lines = gpd.GeoSeries([LineString([[0, 0], [2, 2]])], crs=crs_proj)
     points = gpd.GeoSeries([Point(0.5, 1.5)], crs=crs_proj)
     pts = geoutils.snap2nearest(lines, points, tol=0.5)
