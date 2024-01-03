@@ -786,9 +786,9 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
         crs=crs_proj,
         index=idx,
     )
-    out = lines.loc[idx].drop(columns="geometry")
-    out = gpd.GeoDataFrame(out, geometry=broken_lines, crs=crs_proj)
-    return out.to_crs(lines.crs)
+    return gpd.GeoDataFrame(
+        lines.loc[idx].drop(columns="geometry"), geometry=broken_lines, crs=crs_proj
+    ).to_crs(lines.crs)
 
 
 def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineString]:
