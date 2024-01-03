@@ -78,11 +78,11 @@ PyGeoUtils_      Utilities for manipulating geospatial, (Geo)JSON, and (Geo)TIFF
 PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
 ------------------------------------------------------------
 
-.. image:: https://img.shields.io/pypi/v/pypgu.svg
+.. image:: https://img.shields.io/pypi/v/pygeoutils.svg
     :target: https://pypi.python.org/pypi/pygeoutils
     :alt: PyPi
 
-.. image:: https://img.shields.io/conda/vn/conda-forge/pypgu.svg
+.. image:: https://img.shields.io/conda/vn/conda-forge/pygeoutils.svg
     :target: https://anaconda.org/conda-forge/pygeoutils
     :alt: Conda Version
 
@@ -90,7 +90,7 @@ PyGeoUtils: Utilities for (Geo)JSON and (Geo)TIFF Conversion
     :target: https://codecov.io/gh/hyriver/pygeoutils
     :alt: CodeCov
 
-.. image:: https://img.shields.io/pypi/pyversions/pypgu.svg
+.. image:: https://img.shields.io/pypi/pyversions/pygeoutils.svg
     :target: https://pypi.python.org/pypi/pygeoutils
     :alt: Python Versions
 
