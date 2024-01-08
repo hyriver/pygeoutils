@@ -1,10 +1,11 @@
 """Some utilities for manipulating GeoSpatial data."""
+
 from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
 from numbers import Number
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 import numpy as np
 import pyproj
@@ -225,7 +226,8 @@ def convert(arcgis: dict[str, Any], id_attr: str | None = None) -> dict[str, Any
     return geojson
 
 
-class Attrs(NamedTuple):
+@dataclass(frozen=True)
+class Attrs:
     """Attributes of a GTiff byte response."""
 
     nodata: NUMBER
