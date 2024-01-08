@@ -91,7 +91,6 @@ __all__ = [
     "MissingColumnError",
     "MissingCRSError",
     "MatchingCRSError",
-    "UnprojectedCRSError",
     "EmptyResponseError",
     "show_versions",
 ]
