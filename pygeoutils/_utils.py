@@ -330,7 +330,8 @@ def xd_write_crs(ds: XD, crs: CRSTYPE | None = None, grid_mapping_name: str | No
         for v in ds:
             if "grid_mapping" in ds[v].attrs:
                 _ = ds[v].attrs.pop("grid_mapping")
-
+    if "spatial_ref" in ds and grid_mapping_name != "spatial_ref":
+        ds = ds.drop_vars("spatial_ref")
     ds = ds.rio.write_crs(crs, grid_mapping_name=grid_mapping_name)
     ds = ds.rio.write_coordinate_system()
     return ds
