@@ -308,11 +308,11 @@ def xd_write_crs(ds: XD, crs: CRSTYPE | None = None, grid_mapping_name: str | No
     Parameters
     ----------
     ds : xarray.Dataset or xarray.DataArray
-        The dataset(array) to be written
+        Input dataset(array)
     crs : pyproj.CRS or str or int, optional
-        The CRS to be written, defaults to ``ds.rio.crs``
+        Target CRS to be written, defaults to ``ds.rio.crs``
     grid_mapping_name : str, optional
-        The name of the grid mapping variable, defaults to ``ds.rio.grid_mapping``
+        Target grid mapping, defaults to ``ds.rio.grid_mapping``
 
     Returns
     -------
@@ -321,18 +321,17 @@ def xd_write_crs(ds: XD, crs: CRSTYPE | None = None, grid_mapping_name: str | No
     """
     ds = ds.rio.write_transform()
     crs = crs or ds.rio.crs
+    grid_mapping_name = grid_mapping_name or ds.rio.grid_mapping
 
-    if grid_mapping_name:
-        ds = ds.rio.write_crs(crs, grid_mapping_name=grid_mapping_name)
-        if isinstance(ds, xr.DataArray):
-            if "grid_mapping" in ds.attrs:
-                _ = ds.attrs.pop("grid_mapping")
-        elif isinstance(ds, xr.Dataset):
-            for v in ds:
-                if "grid_mapping" in ds[v].attrs:
-                    _ = ds[v].attrs.pop("grid_mapping")
-    else:
-        ds = ds.rio.write_crs(crs)
+    if isinstance(ds, xr.DataArray):
+        if "grid_mapping" in ds.attrs:
+            _ = ds.attrs.pop("grid_mapping")
+    elif isinstance(ds, xr.Dataset):
+        for v in ds:
+            if "grid_mapping" in ds[v].attrs:
+                _ = ds[v].attrs.pop("grid_mapping")
+
+    ds = ds.rio.write_crs(crs, grid_mapping_name=grid_mapping_name)
     ds = ds.rio.write_coordinate_system()
     return ds
 
