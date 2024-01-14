@@ -2,9 +2,9 @@
 # pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
-import warnings
 import contextlib
 import subprocess
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Tuple, TypeVar, Union, cast, overload
 
