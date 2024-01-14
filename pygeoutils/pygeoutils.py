@@ -2,6 +2,7 @@
 # pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
+import warnings
 import contextlib
 import subprocess
 from pathlib import Path
@@ -110,9 +111,12 @@ def json2geodf(
         raise EmptyResponseError from ex
 
     if len(content) > 1:
-        geodf = gpd.GeoDataFrame(
-            pd.concat((gpd.GeoDataFrame.from_features(c) for c in content), ignore_index=True)
-        )
+        with warnings.catch_warnings():
+            # Ignore FutureWarning of pandas 2.1.0 for all-NaN columns
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            geodf = gpd.GeoDataFrame(
+                pd.concat((gpd.GeoDataFrame.from_features(c) for c in content), ignore_index=True)
+            )
 
     if "geometry" in geodf and not geodf.geometry.is_empty.all():
         geodf = geodf.set_crs(in_crs)
