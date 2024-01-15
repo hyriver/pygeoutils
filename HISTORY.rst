@@ -12,7 +12,7 @@ Bug Fixes
   when using DOI SSL certification file. This release uses
   ``pyproj.network.set_ca_bundle_path`` for setting the SSL certification file
   given by the user via ``HYRIVER_SSL_CERT`` env variable.
-- Ignore FutureWarning of pandas 2.1.0 for all-NaN columns in ``json2geodf``.
+- Ignore ``FutureWarning`` of pandas 2.1.0 for all-NaN columns in ``json2geodf``.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
