@@ -932,7 +932,7 @@ def _get_area_range(mp: MultiPolygon) -> float:
     return np.ptp([g.area for g in mp.geoms]) / mp.area
 
 
-def _get_larges(mp: MultiPolygon) -> Polygon:
+def _get_largest(mp: MultiPolygon) -> Polygon:
     """Get the largest polygon from a multipolygon."""
     argmax = np.argmax([g.area for g in mp.geoms])
     return Polygon(mp.geoms[argmax].exterior)  # pyright: ignore[reportOptionalMemberAccess]
@@ -977,7 +977,7 @@ def multi2poly(gdf: GDFTYPE) -> GDFTYPE:
             mp_idx = [i for i, g in geo_mp.items() if _get_area_range(g) >= 0.99]
             if mp_idx:
                 gdf_prj.loc[mp_idx, "geometry"] = [
-                    _get_larges(g) for g in gdf_prj.loc[mp_idx, "geometry"]
+                    _get_largest(g) for g in gdf_prj.loc[mp_idx, "geometry"]
                 ]
 
     if isinstance(gdf, gpd.GeoSeries):
