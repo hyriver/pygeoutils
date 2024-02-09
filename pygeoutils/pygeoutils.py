@@ -189,7 +189,7 @@ def xarray_geomask(
 def _to_dataset(
     resp: bytes,
     var_name: str,
-    driver: str,
+    driver: str | None,
     dtypes: dict[str, np.dtype],  # pyright: ignore[reportMissingTypeArgument]
     nodata_dict: dict[str, NUMBER],
     nodata: NUMBER | None,
@@ -269,7 +269,7 @@ def gtiff2xarray(
         var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict}
 
     attrs = utils.get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
-    dtypes: dict[str, type] = {}
+    dtypes: dict[str, np.dtype] = {}  # pyright: ignore[reportMissingTypeArgument]
     nodata_dict: dict[str, NUMBER] = {}
 
     ds = xr.merge(
@@ -297,7 +297,7 @@ def gtiff2xarray(
             ds[v].attrs["nodatavals"] = (nodata_dict[v],)
             ds[v] = ds[v].rio.write_nodata(nodata_dict[v])
 
-    ds = utils.xd_write_crs(ds)
+    ds = utils.xd_write_crs(ds)  # pyright: ignore[reportArgumentType]
     if geometry is not None:
         if geo_crs is None:
             raise MissingCRSError
@@ -311,11 +311,11 @@ def _path2str(path: Path | str) -> str:
 
 
 @overload
-def _path2str(path: list[Path | str]) -> list[str]:
+def _path2str(path: list[Path] | list[str]) -> list[str]:
     ...
 
 
-def _path2str(path: Path | str | list[Path | str]) -> str | list[str]:
+def _path2str(path: Path | str | list[Path] | list[str]) -> str | list[str]:
     if isinstance(path, (list, tuple)):
         return [Path(p).resolve().as_posix() for p in path]
     return Path(path).resolve().as_posix()
@@ -407,7 +407,7 @@ def xarray2geodf(
     geojsons, values = zip(*shapes)
     geojsons = cast("tuple[dict[str, Any], ...]", geojsons)
     return gpd.GeoDataFrame(
-        data={str(da.name): np.array(values, dtype)},
+        {str(da.name): np.array(values, dtype)},
         geometry=[sgeom.shape(g) for g in geojsons],
         crs=crs,
     )
@@ -470,7 +470,7 @@ def geodf2xarray(
                 out_shape=(height, width),
                 transform=affine,
                 dtype=dtype,
-                fill=fill,
+                fill=fill,  # pyright: ignore[reportArgumentType]
             ),
             coords={"x": np.linspace(west, east, width), "y": np.linspace(north, south, height)},
             dims=("y", "x"),

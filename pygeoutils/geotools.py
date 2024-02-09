@@ -94,9 +94,7 @@ class Coordinates:
     @staticmethod
     def __box_geo(bounds: tuple[float, float, float, float] | None) -> Polygon:
         """Get EPSG:4326 CRS."""
-        wgs84_bounds = pyproj.CRS(
-            4326
-        ).area_of_use.bounds  # pyright: ignore[reportOptionalMemberAccess]
+        wgs84_bounds = pyproj.CRS(4326).area_of_use.bounds  # pyright: ignore[reportOptionalMemberAccess]
         if bounds is None:
             return shapely.box(*wgs84_bounds)
 
@@ -115,7 +113,7 @@ class Coordinates:
     @staticmethod
     def __validate(pts: gpd.GeoSeries, bbox: Polygon) -> gpd.GeoSeries:
         """Create a ``geopandas.GeoSeries`` from valid coords within a bounding box."""
-        return pts[pts.sindex.query(bbox)].sort_index()
+        return pts[pts.sindex.query(bbox)].sort_index()  # pyright: ignore[reportReturnType]
 
     def __post_init__(self) -> None:
         """Normalize the longitude value within [-180, 180)."""
@@ -144,7 +142,7 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
 
     Parameters
     ----------
-    geom : list or tuple or any shapely.geometry
+    geom : list or tuple or any shapely.GeometryType
         Input geometry could be a list of coordinates such as ``[(x1, y1), ...]``,
         a bounding box like so ``(xmin, ymin, xmax, ymax)``, or any valid ``shapely``'s
         geometry such as ``Polygon``, ``MultiPolygon``, etc..
@@ -192,24 +190,24 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
         if len(geom) > 4:
             raise TypeError
         if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
-            bbox = shapely.box(*geom)
+            bbox = shapely.box(*geom)  # pyright: ignore[reportArgumentType]
         else:
-            bbox = cast("Polygon", ops.transform(project, shapely.box(*geom)))
-        return tuple(float(p) for p in bbox.bounds)
+            bbox = cast("Polygon", ops.transform(project, shapely.box(*geom)))  # pyright: ignore[reportArgumentType]
+        return tuple(float(p) for p in bbox.bounds)  # pyright: ignore[reportReturnType]
 
     with contextlib.suppress(TypeError, AttributeError, ValueError):
         if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
             point = Point(geom)
         else:
             point = cast("Point", ops.transform(project, Point(geom)))
-        return [(float(point.x), float(point.y))]
+        return [(float(point.x), float(point.y))]  # pyright: ignore[reportReturnType]
 
     with contextlib.suppress(TypeError, AttributeError, ValueError):
         if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
             mp = MultiPoint(geom)
         else:
             mp = cast("MultiPoint", ops.transform(project, MultiPoint(geom)))
-        return [(float(p.x), float(p.y)) for p in mp.geoms]
+        return [(float(p.x), float(p.y)) for p in mp.geoms]  # pyright: ignore[reportReturnType]
 
     gtypes = " ".join(
         (
@@ -245,7 +243,7 @@ def geo2polygon(
     if isinstance(geometry, (Polygon, MultiPolygon)):
         geom = geometry
     elif isinstance(geometry, (tuple, list)) and len(geometry) == 4:
-        geom = shapely.box(*geometry)
+        geom = shapely.box(*geometry)  # pyright: ignore[reportArgumentType]
     else:
         raise InputTypeError("geometry", "(Multi)Polygon or tuple of length 4")
 
@@ -760,15 +758,15 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
 
     crs_proj = lines.crs
     if tol > 0.0:
-        points = snap2nearest(lines, points, tol)
+        points = snap2nearest(lines, points, tol)  # pyright: ignore[reportArgumentType]
 
     mlines = lines.geom_type == "MultiLineString"
     if mlines.any():
         lines.loc[mlines, "geometry"] = lines.loc[mlines, "geometry"].apply(lambda g: list(g.geoms))
-        lines = lines.explode("geometry").set_crs(crs_proj)
+        lines = lines.explode("geometry").set_crs(crs_proj)  # pyright: ignore[reportAssignmentType,reportArgumentType]
 
-    lines = lines.reset_index(drop=True)
-    points = points.reset_index(drop=True)
+    lines = lines.reset_index(drop=True)  # pyright: ignore[reportAssignmentType]
+    points = points.reset_index(drop=True)  # pyright: ignore[reportAssignmentType]
     pts_idx, flw_idx = lines.sindex.query(points.geometry, predicate="intersects")
     if len(pts_idx) == 0:
         msg = "No intersection between lines and points"
@@ -786,7 +784,7 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
         crs=crs_proj,
         index=idx,
     )
-    return gpd.GeoDataFrame(
+    return gpd.GeoDataFrame(  # pyright: ignore[reportReturnType]
         lines.loc[idx].drop(columns="geometry"), geometry=broken_lines, crs=crs_proj
     ).to_crs(lines.crs)
 
@@ -817,7 +815,7 @@ def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineStri
         and len(geometry) == 4
         and all(isinstance(i, (float, int, np.number)) for i in geometry)
     ):
-        return [shapely.box(*geometry)]
+        return [shapely.box(*geometry)]  # pyright: ignore[reportArgumentType]
 
     with contextlib.suppress(TypeError, AttributeError):
         return list(MultiPoint(geometry).geoms)
@@ -898,7 +896,7 @@ def nested_polygons(gdf: gpd.GeoDataFrame | gpd.GeoSeries) -> dict[int | str, li
 
 
 def coords_list(
-    coords: tuple[float, float] | list[tuple[float, float]] | FloatArray
+    coords: tuple[float, float] | list[tuple[float, float]] | FloatArray,
 ) -> list[tuple[float, float]]:
     """Convert a single coordinate or list of coordinates to a list of coordinates.
 
