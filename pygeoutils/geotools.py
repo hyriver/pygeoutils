@@ -1,4 +1,5 @@
 """Some utilities for manipulating GeoSpatial data."""
+
 # pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 

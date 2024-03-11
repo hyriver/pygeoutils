@@ -1,4 +1,5 @@
 """Some utilities for manipulating GeoSpatial data."""
+
 # pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
@@ -306,13 +307,11 @@ def gtiff2xarray(
 
 
 @overload
-def _path2str(path: Path | str) -> str:
-    ...
+def _path2str(path: Path | str) -> str: ...
 
 
 @overload
-def _path2str(path: list[Path] | list[str]) -> list[str]:
-    ...
+def _path2str(path: list[Path] | list[str]) -> list[str]: ...
 
 
 def _path2str(path: Path | str | list[Path] | list[str]) -> str | list[str]:

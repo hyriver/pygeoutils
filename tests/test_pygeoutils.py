@@ -1,4 +1,7 @@
 """Tests for PyGeoUtils."""
+
+from __future__ import annotations
+
 import io
 import subprocess
 
