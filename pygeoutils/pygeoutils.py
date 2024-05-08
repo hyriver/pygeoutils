@@ -78,19 +78,34 @@ def arcgis2geojson(arcgis: str | dict[str, Any], id_attr: str | None = None) -> 
     return utils.convert(arcgis, id_attr)
 
 
+def _gdf_from_features(
+    features: dict[str, Any], in_crs: pyproj.CRS | None, out_crs: pyproj.CRS | None
+) -> gpd.GeoDataFrame:
+    """Create a GeoDataFrame from a list of features."""
+    geodf = gpd.GeoDataFrame.from_features(features)
+    gdf_crs = geodf.crs
+    if gdf_crs is None and not geodf.geometry.is_empty.all():
+        geodf = geodf.set_crs(in_crs)
+    if out_crs is not None:
+        geodf = geodf.to_crs(out_crs)
+    geodf = cast("gpd.GeoDataFrame", geodf)
+    return geodf
+
+
 def json2geodf(
     content: list[dict[str, Any]] | dict[str, Any],
-    in_crs: CRSTYPE = 4326,
-    crs: CRSTYPE = 4326,
+    in_crs: CRSTYPE | None = 4326,
+    crs: CRSTYPE | None = 4326,
 ) -> gpd.GeoDataFrame:
     """Create GeoDataFrame from (Geo)JSON.
 
     Parameters
     ----------
     content : dict or list of dict
-        A (Geo)JSON dictionary e.g., response.json() or a list of them.
+        A (Geo)JSON dictionary or a list of them.
     in_crs : int, str, or pyproj.CRS, optional
-        CRS of the content, defaults to ``epsg:4326``.
+        CRS of the content, defaults to ``epsg:4326``. If the content has no CRS,
+        it will be set to this CRS, otherwise, ``in_crs`` will be ignored.
     crs : int, str, or pyproj.CRS, optional
         The target CRS of the output GeoDataFrame, defaults to ``epsg:4326``.
 
@@ -102,12 +117,19 @@ def json2geodf(
     if not isinstance(content, (list, dict)):
         raise InputTypeError("content", "list or list of dict ((geo)json)")
 
+    if in_crs is not None:
+        in_crs = pyproj.CRS(in_crs)
+    if crs is not None:
+        crs = pyproj.CRS(crs)
+        if crs == in_crs:
+            crs = None
+
     content = content if isinstance(content, list) else [content]
     try:
-        geodf = gpd.GeoDataFrame.from_features(next(iter(content)))
+        geodf = _gdf_from_features(next(iter(content)), in_crs, crs)
     except TypeError:
         content = [arcgis2geojson(c) for c in content]
-        geodf = gpd.GeoDataFrame.from_features(content[0])
+        geodf = _gdf_from_features(content[0], in_crs, crs)
     except StopIteration as ex:
         raise EmptyResponseError from ex
 
@@ -116,14 +138,8 @@ def json2geodf(
             # Ignore FutureWarning of pandas 2.1.0 for all-NaN columns
             warnings.filterwarnings("ignore", category=FutureWarning)
             geodf = gpd.GeoDataFrame(
-                pd.concat((gpd.GeoDataFrame.from_features(c) for c in content), ignore_index=True)
+                pd.concat((_gdf_from_features(c, in_crs, crs) for c in content), ignore_index=True)
             )
-
-    if "geometry" in geodf and not geodf.geometry.is_empty.all():
-        geodf = geodf.set_crs(in_crs)
-        if in_crs != crs:
-            geodf = geodf.to_crs(crs)
-    geodf = cast("gpd.GeoDataFrame", geodf)
     return geodf
 
 
