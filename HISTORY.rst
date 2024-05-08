@@ -7,6 +7,10 @@ History
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
+- Add the ``exceptions`` module to the high-level API to declutter
+  the main module. In the future, all exceptions will be raised from
+  this module and not from the main module. For now, the exceptions
+  are raised from both modules for backward compatibility.
 - Improve robustness of ``json2geodf`` by ensuring that all geojsons are in
   the same CRS.
 
