@@ -6,6 +6,7 @@ import os
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+from pygeoutils import exceptions
 from pygeoutils._utils import get_gtiff_attrs, get_transform, transform2tuple, xd_write_crs
 from pygeoutils.exceptions import (
     EmptyResponseError,
@@ -96,4 +97,6 @@ __all__ = [
     "MatchingCRSError",
     "EmptyResponseError",
     "show_versions",
+    "exceptions",
+    "__version__",
 ]
