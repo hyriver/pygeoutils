@@ -2,6 +2,14 @@
 History
 =======
 
+0.16.2 (2024-XX-XX)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Improve robustness of ``json2geodf`` by ensuring that all geojsons are in
+  the same CRS.
+
 0.16.1 (2024-01-15)
 -------------------
 
