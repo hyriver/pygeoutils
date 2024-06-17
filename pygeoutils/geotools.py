@@ -713,7 +713,7 @@ def snap2nearest(lines: GDFTYPE, points: GDFTYPE, tol: float) -> GDFTYPE:
     _pts = {
         pi: (
             *pts.iloc[pi][cols],
-            ops.nearest_points(lines.iloc[fi].geometry.unary_union, pts.iloc[pi].geometry)[0],
+            ops.nearest_points(shapely.unary_union(lines.iloc[fi].geometry), pts.iloc[pi].geometry)[0],
         )
         for pi, fi in merged_idx.items()
     }
