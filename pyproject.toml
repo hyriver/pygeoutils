@@ -213,7 +213,6 @@ filterwarnings = [
 ]
 testpaths = [
   "tests",
-  "src/pygeoutils",
 ]
 
 [tool.coverage.report]
