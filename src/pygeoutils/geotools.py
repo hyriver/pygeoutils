@@ -679,14 +679,14 @@ def smooth_linestring(
     return LineString(np.c_[spl_x(konts), spl_y(konts)])
 
 
-def snap2nearest(lines: GDFTYPE, points: GDFTYPE, tol: float) -> GDFTYPE:
+def snap2nearest(lines_gdf: GDFTYPE, points_gdf: GDFTYPE, tol: float) -> GDFTYPE:
     """Find the nearest points on a line to a set of points.
 
     Parameters
     ----------
-    lines : geopandas.GeoDataFrame or geopandas.GeoSeries
+    lines_gdf : geopandas.GeoDataFrame or geopandas.GeoSeries
         Lines.
-    points : geopandas.GeoDataFrame or geopandas.GeoSeries
+    points_gdf : geopandas.GeoDataFrame or geopandas.GeoSeries
         Points to snap to lines.
     tol : float, optional
         Tolerance for snapping points to the nearest lines in meters.
@@ -697,32 +697,34 @@ def snap2nearest(lines: GDFTYPE, points: GDFTYPE, tol: float) -> GDFTYPE:
     geopandas.GeoDataFrame or geopandas.GeoSeries
         Points snapped to lines.
     """
-    if lines.crs != points.crs:
+    if lines_gdf.crs != points_gdf.crs:
         raise MatchingCRSError
 
-    if isinstance(points, gpd.GeoSeries):
-        pts = points.to_frame("geometry").reset_index()
+    if isinstance(points_gdf, gpd.GeoSeries):
+        pts = points_gdf.to_frame("geometry").reset_index()
     else:
-        pts = points.copy()
+        pts = points_gdf.copy()
 
     pts = cast("gpd.GeoDataFrame", pts)
     cols = list(pts.columns)
     cols.remove("geometry")
-    pts_idx, ln_idx = lines.sindex.query(pts.buffer(tol))
+    pts_idx, ln_idx = lines_gdf.sindex.query(pts.buffer(tol))
     merged_idx = tlz.merge_with(list, ({p: f} for p, f in zip(pts_idx, ln_idx)))
     _pts = {
         pi: (
             *pts.iloc[pi][cols],
-            ops.nearest_points(shapely.unary_union(lines.iloc[fi].geometry), pts.iloc[pi].geometry)[0],
+            ops.nearest_points(
+                shapely.unary_union(lines_gdf.iloc[fi].geometry), pts.iloc[pi].geometry
+            )[0],
         )
         for pi, fi in merged_idx.items()
     }
     pts = gpd.GeoDataFrame.from_dict(_pts, orient="index")
     pts.columns = [*cols, "geometry"]
-    pts = pts.set_geometry("geometry", crs=points.crs)
+    pts = pts.set_geometry("geometry", crs=points_gdf.crs)
     pts = cast("gpd.GeoDataFrame", pts)
 
-    if isinstance(points, gpd.GeoSeries):
+    if isinstance(points_gdf, gpd.GeoSeries):
         return pts.geometry
     return pts
 
