@@ -30,7 +30,18 @@ BOX_ORD = "(west, south, east, north)"
 FloatArray = npt.NDArray[np.float64]
 
 if TYPE_CHECKING:
-    GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
+    POLYTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
+    GTYPE = Union[
+        Point,
+        MultiPoint,
+        Polygon,
+        MultiPolygon,
+        LineString,
+        MultiLineString,
+        "tuple[float, float, float, float]",
+        "list[float]",
+        "list[tuple[float, float]]",
+    ]
     GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
     CRSTYPE = Union[int, str, pyproj.CRS]
     GEOM = TypeVar(
@@ -191,23 +202,24 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
         if len(geom) > 4:
             raise TypeError
         if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
-            bbox = shapely.box(*geom)  # pyright: ignore[reportArgumentType]
+            bbox = shapely.box(*geom)  # pyright: ignore[reportArgumentType,reportCallIssue]
         else:
-            bbox = cast("Polygon", ops.transform(project, shapely.box(*geom)))  # pyright: ignore[reportArgumentType]
+            bbox = ops.transform(project, shapely.box(*geom))  # pyright: ignore[reportArgumentType,reportCallIssue]
+            bbox = cast("Polygon", bbox)
         return tuple(float(p) for p in bbox.bounds)  # pyright: ignore[reportReturnType]
 
     with contextlib.suppress(TypeError, AttributeError, ValueError):
         if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
             point = Point(geom)
         else:
-            point = cast("Point", ops.transform(project, Point(geom)))
+            point = ops.transform(project, Point(geom))
         return [(float(point.x), float(point.y))]  # pyright: ignore[reportReturnType]
 
     with contextlib.suppress(TypeError, AttributeError, ValueError):
         if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
-            mp = MultiPoint(geom)
+            mp = MultiPoint(geom)  # pyright: ignore[reportArgumentType]
         else:
-            mp = cast("MultiPoint", ops.transform(project, MultiPoint(geom)))
+            mp = ops.transform(project, MultiPoint(geom))  # pyright: ignore[reportArgumentType]
         return [(float(p.x), float(p.y)) for p in mp.geoms]  # pyright: ignore[reportReturnType]
 
     gtypes = " ".join(
@@ -221,7 +233,7 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
 
 
 def geo2polygon(
-    geometry: GTYPE,
+    geometry: POLYTYPE,
     geo_crs: CRSTYPE | None = None,
     crs: CRSTYPE | None = None,
 ) -> Polygon | MultiPolygon:
@@ -249,7 +261,7 @@ def geo2polygon(
         raise InputTypeError("geometry", "(Multi)Polygon or tuple of length 4")
 
     if geo_crs is not None and crs is not None:
-        geom = geometry_reproject(geom, geo_crs, crs)
+        geom = geometry_reproject(geom, geo_crs, crs)  # pyright: ignore[reportArgumentType]
     if not geom.is_valid:
         geom = geom.buffer(0.0)
         geom = cast("Polygon | MultiPolygon", geom)
@@ -606,12 +618,12 @@ def spline_linestring(
     (-97.06127, 32.83200)]
     """
     if isinstance(line, MultiLineString):
-        line = shapely.line_merge(line)
+        line = shapely.line_merge(line)  # pyright: ignore[reportAssignmentType]
 
     if not isinstance(line, LineString):
         raise InputTypeError("line", "LineString")
 
-    points = gpd.GeoSeries([Point(xy) for xy in zip(*line.xy)], crs=crs)
+    points = gpd.GeoSeries([Point(xy) for xy in zip(*line.xy)], crs=crs)  # pyright: ignore[reportCallIssue]
     return GeoSpline(points, n_pts, degree, smoothing).spline
 
 
@@ -660,7 +672,7 @@ def smooth_linestring(
     (-97.06127, 32.83200)]
     """
     if isinstance(line, MultiLineString):
-        line = shapely.line_merge(line)
+        line = shapely.line_merge(line)  # pyright: ignore[reportAssignmentType]
 
     if not isinstance(line, LineString):
         raise InputTypeError("line", "LineString")
@@ -792,7 +804,7 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
     ).to_crs(lines.crs)
 
 
-def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineString]:
+def geometry_list(geometry: GTYPE) -> list[LineString | Point | Polygon]:
     """Convert input geometry to a list of Polygons, Points, or LineStrings.
 
     Parameters
@@ -818,10 +830,10 @@ def geometry_list(geometry: GEOM) -> list[Polygon] | list[Point] | list[LineStri
         and len(geometry) == 4
         and all(isinstance(i, (float, int, np.number)) for i in geometry)
     ):
-        return [shapely.box(*geometry)]  # pyright: ignore[reportArgumentType]
+        return [shapely.box(*geometry)]  # pyright: ignore[reportArgumentType,reportCallIssue]
 
     with contextlib.suppress(TypeError, AttributeError):
-        return list(MultiPoint(geometry).geoms)
+        return list(MultiPoint(geometry).geoms)  # pyright: ignore[reportArgumentType]
 
     valid_geoms = (
         "Polygon",
@@ -914,7 +926,7 @@ def coords_list(
         List of coordinates as ``[(x1, y1), ...]``.
     """
     try:
-        points = MultiPoint(coords)
+        points = MultiPoint(coords)  # pyright: ignore[reportArgumentType]
     except (ValueError, TypeError, AttributeError):
         try:
             point = Point(coords)
