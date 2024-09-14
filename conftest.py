@@ -21,7 +21,7 @@ def _add_standard_imports(doctest_namespace):
     doctest_namespace["geoutils"] = geoutils
 
 
-@pytest.fixture()
+@pytest.fixture
 def wms_resp():
     """Return a WMS response."""
     return WMS(
@@ -38,7 +38,7 @@ def wms_resp():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def gtiff_list():
     """Return a WMS response."""
     return WMS(
