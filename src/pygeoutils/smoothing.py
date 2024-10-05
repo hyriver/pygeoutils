@@ -2,35 +2,31 @@
 
 from __future__ import annotations
 
-import contextlib
 import warnings
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, TypeVar, Union, cast
 
-from scipy.interpolate import CubicSpline
-from scipy.ndimage import gaussian_filter1d
-import geopandas as gpd
 import numpy as np
-import numpy.typing as npt
-import pyproj
 import scipy.interpolate as sci
 import shapely
-from shapely import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon, ops
+from scipy.interpolate import CubicSpline
+from scipy.ndimage import gaussian_filter1d
+from shapely import LineString, MultiLineString, Point
 
 from pygeoutils.exceptions import (
     InputRangeError,
     InputTypeError,
     InputValueError,
-    MatchingCRSError,
-    MissingColumnError,
 )
 
-FloatArray = npt.NDArray[np.float64]
-
 if TYPE_CHECKING:
+    import geopandas as gpd
+    import pyproj
+    from numpy.typing import NDArray
+
     GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
     CRSTYPE = Union[int, str, pyproj.CRS]
+    FloatArray = NDArray[np.float64]
 
 __all__ = [
     "GeoSpline",
@@ -38,8 +34,9 @@ __all__ = [
     "spline_linestring",
     "smooth_linestring",
     "line_curvature",
-    "spline_curvature",
     "anchored_smoothing",
+    "smooth_multilinestring",
+    "spline_curvature",
 ]
 
 
@@ -152,8 +149,10 @@ def spline_curvature(
     return phi, curvature, radius
 
 
-def line_curvature(line: LineString) -> tuple[FloatArray, FloatArray, FloatArray]:
-    r"""Compute the curvature of a Spline curve.
+def line_curvature(
+    line: LineString, k: int = 3, s: float | None = None
+) -> tuple[FloatArray, FloatArray, FloatArray]:
+    r"""Compute the curvature of a LineString.
 
     Notes
     -----
@@ -175,6 +174,14 @@ def line_curvature(line: LineString) -> tuple[FloatArray, FloatArray, FloatArray
     ----------
     line : shapely.LineString
         Line to compute the curvature at.
+    k : int, optional
+        Degree of the smoothing spline. Must be
+        1 <= ``k`` <= 5. Default to 3 which is a cubic spline.
+    s : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``s`` means more smoothing while smaller values of ``s`` indicates
+        less smoothing. If None (default), smoothing is done with all data points.
 
     Returns
     -------
@@ -189,26 +196,14 @@ def line_curvature(line: LineString) -> tuple[FloatArray, FloatArray, FloatArray
         raise InputTypeError("line", "shapely.LineString")
 
     x, y = shapely.get_coordinates(line).T
-    dx = np.diff(x)
-    # Impose symmetric boundary conditions
-    dx[0], dx[-1] = dx[1], dx[-2]
-    dy = np.diff(y)
-    dy[0], dy[-1] = dy[1], dy[-2]
-    phi = np.arctan2(dy, dx)
+    k = np.clip(k, 1, x.size - 1)
+    konts = np.hypot(np.diff(x), np.diff(y)).cumsum()
+    konts = np.insert(konts, 0, 0)
+    konts /= konts[-1]
 
-    ddx = np.diff(dx)
-    ddx = np.insert(ddx, 0, ddx[0])
-    ddx[-1] = ddx[-2]
-    ddy = np.diff(dy)
-    ddy = np.insert(ddy, 0, ddy[0])
-    ddy[-1] = ddy[-2]
-
-    denom = np.float_power(np.square(dx) + np.square(dy), 1.5)
-    denom = np.where(denom == 0, 1, denom)
-    curvature = (dx * ddy - ddx * dy) / denom
-    with np.errstate(divide="ignore"):
-        radius = np.reciprocal(np.abs(curvature))
-    return phi, curvature, radius
+    spl_x = sci.UnivariateSpline(konts, x, k=k, s=s, check_finite=True)
+    spl_y = sci.UnivariateSpline(konts, y, k=k, s=s, check_finite=True)
+    return spline_curvature(spl_x, spl_y, konts)
 
 
 def make_spline(
@@ -268,9 +263,9 @@ class GeoSpline:
 
     Parameters
     ----------
-    points : geopandas.GeoDataFrame or geopandas.GeoSeries
-        Input points as a ``GeoDataFrame`` or ``GeoSeries``. The results
-        will be more accurate if the CRS is projected.
+    points : geopandas.GeoDataFrame or geopandas.GeoSeries or array-like of shapely.Point
+        Input points as a ``GeoDataFrame``, ``GeoSeries``, or array-like of
+        ``shapely.Point``. The results will be more accurate if the CRS is projected.
     npts_sp : int
         Number of points in the output spline curve.
     degree : int, optional
@@ -307,7 +302,11 @@ class GeoSpline:
     """
 
     def __init__(
-        self, points: GDFTYPE, n_pts: int, degree: int = 3, smoothing: float | None = None
+        self,
+        points: GDFTYPE | NDArray[Point],  # pyright: ignore[reportInvalidTypeForm]
+        n_pts: int,
+        degree: int = 3,
+        smoothing: float | None = None,
     ) -> None:
         self.degree = degree
         if not (1 <= degree <= 5):
@@ -315,16 +314,15 @@ class GeoSpline:
 
         self.smoothing = smoothing
 
-        if any(points.geom_type != "Point"):
-            raise InputTypeError("points.geom_type", "Point")
+        if shapely.get_type_id(points).sum() != 0:
+            raise InputTypeError("points", "geometries of type shapely.Point")
         self.points = points
 
         if n_pts < 1:
             raise InputRangeError("n_pts", ">= 1")
         self.n_pts = n_pts
 
-        self.x_ln = points.geometry.x.to_numpy("f8")
-        self.y_ln = points.geometry.y.to_numpy("f8")
+        self.x_ln, self.y_ln = shapely.get_coordinates(points).T
         self.npts_ln = self.x_ln.size
         if self.npts_ln < self.degree:
             raise InputRangeError("degree", f"< {self.npts_ln}")
@@ -338,7 +336,6 @@ class GeoSpline:
 
 def spline_linestring(
     line: LineString | MultiLineString,
-    crs: CRSTYPE,
     n_pts: int,
     degree: int = 3,
     smoothing: float | None = None,
@@ -351,8 +348,6 @@ def spline_linestring(
         Line to smooth. Note that if ``line`` is ``MultiLineString``
         it will be merged into a single ``LineString``. If the merge
         fails, an exception will be raised.
-    crs : int, str, or pyproj.CRS
-        CRS of the input line. It must be a projected CRS.
     n_pts : int
         Number of points in the output spline curve.
     degree : int, optional
@@ -393,13 +388,12 @@ def spline_linestring(
     (-97.06127, 32.83200)]
     """
     if isinstance(line, MultiLineString):
-        line = shapely.line_merge(line)  # pyright: ignore[reportAssignmentType]
+        line = shapely.line_merge(line)
 
     if not isinstance(line, LineString):
         raise InputTypeError("line", "LineString")
 
-    points = gpd.GeoSeries([Point(xy) for xy in zip(*line.xy)], crs=crs)  # pyright: ignore[reportCallIssue]
-    return GeoSpline(points, n_pts, degree, smoothing).spline
+    return GeoSpline(shapely.points(line.coords), n_pts, degree, smoothing).spline
 
 
 def smooth_linestring(
@@ -487,10 +481,9 @@ def anchored_smoothing(
     numpy.ndarray
         The fitted cubic spline.
     """
-
     if not isinstance(line, LineString):
         raise InputTypeError("line", "LineString")
-    
+
     line_coords = shapely.get_coordinates(line)
     npts_ = npts or line_coords.shape[0]
     x, y = np.asarray(line_coords).T
@@ -540,4 +533,6 @@ def smooth_multilinestring(
     npts_list_ = npts_list or [None] * len(mline.geoms)
     if len(npts_list_) != len(mline.geoms):
         raise InputValueError("npts_list", "length of npts_list must match the number of lines")
-    return MultiLineString([anchored_smoothing(line, npts, sigma) for line, npts in zip(mline.geoms, npts_list_)])
+    return MultiLineString(
+        [anchored_smoothing(line, npts, sigma) for line, npts in zip(mline.geoms, npts_list_)]
+    )

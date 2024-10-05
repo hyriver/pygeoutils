@@ -8,33 +8,17 @@ from pathlib import Path
 
 from pygeoutils import exceptions
 from pygeoutils._utils import get_gtiff_attrs, get_transform, transform2tuple, xd_write_crs
-from pygeoutils.exceptions import (
-    EmptyResponseError,
-    InputRangeError,
-    InputTypeError,
-    InputValueError,
-    MatchingCRSError,
-    MissingAttributeError,
-    MissingColumnError,
-    MissingCRSError,
-)
 from pygeoutils.geotools import (
     Coordinates,
-    GeoSpline,
     break_lines,
     coords_list,
     geo2polygon,
     geometry_list,
     geometry_reproject,
-    line_curvature,
-    make_spline,
     multi2poly,
     nested_polygons,
     query_indices,
-    smooth_linestring,
     snap2nearest,
-    spline_curvature,
-    spline_linestring,
 )
 from pygeoutils.print_versions import show_versions
 from pygeoutils.pygeoutils import (
@@ -45,6 +29,16 @@ from pygeoutils.pygeoutils import (
     json2geodf,
     xarray2geodf,
     xarray_geomask,
+)
+from pygeoutils.smoothing import (
+    GeoSpline,
+    anchored_smoothing,
+    line_curvature,
+    make_spline,
+    smooth_linestring,
+    smooth_multilinestring,
+    spline_curvature,
+    spline_linestring,
 )
 
 cert_path = os.getenv("HYRIVER_SSL_CERT")
@@ -87,15 +81,9 @@ __all__ = [
     "spline_linestring",
     "smooth_linestring",
     "line_curvature",
+    "anchored_smoothing",
+    "smooth_multilinestring",
     "spline_curvature",
-    "InputTypeError",
-    "InputValueError",
-    "InputRangeError",
-    "MissingAttributeError",
-    "MissingColumnError",
-    "MissingCRSError",
-    "MatchingCRSError",
-    "EmptyResponseError",
     "show_versions",
     "exceptions",
     "__version__",

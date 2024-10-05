@@ -7,7 +7,7 @@ import contextlib
 import subprocess
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Tuple, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast, overload
 
 import geopandas as gpd
 import numpy as np
@@ -19,7 +19,6 @@ import rioxarray._io as rxr
 import shapely.geometry as sgeom
 import ujson as json
 import xarray as xr
-from pyproj.exceptions import CRSError as ProjCRSError
 from rasterio import MemoryFile
 from rioxarray.exceptions import OneDimensionalRaster
 from shapely import MultiPolygon, Polygon
@@ -37,7 +36,7 @@ from pygeoutils.exceptions import (
 BOX_ORD = "(west, south, east, north)"
 NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
 if TYPE_CHECKING:
-    GTYPE = Union[Polygon, MultiPolygon, Tuple[float, float, float, float]]
+    GTYPE = Union[Polygon, MultiPolygon, tuple[float, float, float, float]]
     GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
     CRSTYPE = Union[int, str, pyproj.CRS]
@@ -505,22 +504,3 @@ def geodf2xarray(
     ds = ds.rio.write_crs(projected_crs)
     ds = ds.rio.write_coordinate_system()
     return ds
-
-
-def validate_crs(crs: CRSTYPE) -> str:
-    """Validate a CRS.
-
-    Parameters
-    ----------
-    crs : str, int, or pyproj.CRS
-        Input CRS.
-
-    Returns
-    -------
-    str
-        Validated CRS as a string.
-    """
-    try:
-        return pyproj.CRS(crs).to_string()
-    except ProjCRSError as ex:
-        raise InputTypeError("crs", "a valid CRS") from ex
