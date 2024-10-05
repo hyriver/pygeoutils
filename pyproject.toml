@@ -36,9 +36,9 @@ dynamic = [
 ]
 dependencies = [
   "cytoolz",
-  "geopandas>=0.10",
+  "geopandas>=1",
   "netcdf4",
-  "numpy>=1.21",
+  "numpy>=2",
   "pyproj>=3.0.1",
   "rasterio>=1.2",
   "rioxarray>=0.11",
