@@ -4,7 +4,7 @@ import pytest
 from shapely import Polygon
 
 import pygeoutils as geoutils
-from pygeoutils import EmptyResponseError, InputTypeError, InputValueError
+from pygeoutils.exceptions import EmptyResponseError, InputTypeError, InputValueError
 
 DEF_CRS = 4326
 GEO_URB = Polygon(

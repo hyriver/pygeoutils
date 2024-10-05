@@ -14,7 +14,7 @@ from shapely import LineString, MultiPolygon, Point, Polygon, box
 
 import pygeoutils as geoutils
 from pygeoogc import ArcGISRESTful, ServiceURL
-from pygeoutils import Coordinates, GeoSpline
+from pygeoutils import Coordinates
 
 DEF_CRS = 4326
 ALT_CRS = 4269
@@ -35,7 +35,7 @@ has_gdal = subprocess.getstatusoutput("gdalinfo --version")[0] == 0
 
 
 def assert_close(a: float, b: float, rtol: float = 1e-3) -> bool:
-    assert np.isclose(a, b, rtol=rtol).all()
+    assert np.allclose(a, b, rtol=rtol)
 
 
 def test_geom_list():
@@ -77,20 +77,25 @@ def test_coords():
 
 
 def test_spline():
-    xl, yl = zip(
-        *[
-            (-97.06138, 32.837),
-            (-97.06133, 32.836),
-            (-97.06124, 32.834),
-            (-97.06127, 32.832),
+    line = LineString(
+        [
+            (-10804823.4, 3873688.4),
+            (-10804817.8, 3873555.9),
+            (-10804807.8, 3873290.9),
+            (-10804811.2, 3873025.9),
         ]
     )
-    pts = gpd.GeoSeries(gpd.points_from_xy(xl, yl, crs=4326)).to_crs(3857)
-    sp = GeoSpline(pts, 10).spline
+    sp = geoutils.spline_linestring(line, n_pts=10)
     assert len(sp.x) == 10
+    assert len(sp.line.coords) == 10
     assert_close(sum(sp.y), 38734230.680)
     assert_close(sp.phi.mean(), -1.552)
-    assert_close(sp.radius.mean(), 75849.471)
+    assert_close(sp.radius.mean(), 327909.057)
+
+    phi, curvature, radius = geoutils.line_curvature(line)
+    assert_close(np.mean(phi), -1.5375)
+    assert_close(np.mean(curvature), -9e-05)
+    assert_close(np.mean(radius), 48781.3819)
 
 
 def test_curvature():
@@ -155,7 +160,7 @@ def test_gtiff2array(wms_resp):
 def test_gtiff2vrt(gtiff_list):
     geoutils.gtiff2vrt(gtiff_list, "cache/cover.vrt")
     cover = rxr.open_rasterio("cache/cover.vrt").squeeze(drop=True)
-    assert assert_close(cover.mean().item(), 45.7423)
+    assert_close(cover.mean().item(), 138.3522)
 
 
 def test_xarray_geodf(wms_resp):
