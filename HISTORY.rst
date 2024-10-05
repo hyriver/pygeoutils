@@ -2,6 +2,32 @@
 History
 =======
 
+0.18.0 (2024-10-05)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a function called ``achored_amoothin``to smooth a ``LineString`` using
+  Cubnic splines that anchores the first and last points of the ``LineString``.
+- Add a function called ``smooth_multilinestring`` to smooth a ``MultiLineString``
+  using the new ``anchored_smoothin`` function.
+- In ``line_curvature`` use ``spline_curvature`` to calculate the curvature
+  of a ``LineString`` at all points along the ``LineString``. This is more
+  accurate than the previous method and users can now specify the smoothing
+  factor (``s``) and degree of the spline (``k``) to control the smoothness
+  of the spline that is used to calculate the curvature.
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Drop support for Python 3.8 since its end-of-life date is October 2024.
+- Remove all exceptions from the main module and raise them from the
+  ``exceptions`` module. This is to declutter the main module and make
+  it easier to maintain.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Move all spline and smoothing functions to a new module called ``smoothing``.
+
 0.17.1 (2024-09-14)
 -------------------
 
