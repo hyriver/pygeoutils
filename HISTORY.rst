@@ -2,6 +2,18 @@
 History
 =======
 
+0.18.1 (2024-XX-XX)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a function called ``sample_window`` to remsample a raster dataset
+  using a window size and a ``rasterio`` supported resampling method.
+  This is an efficient way of sampling large raster datasets without
+  reading the entire dataset into memory. The function returns a generator
+  that yields the sampled values in the order of the input coordinates.
+  This function is based on the ``rasterio.sample.sample_gen`` function.
+
 0.18.0 (2024-10-05)
 -------------------
 
