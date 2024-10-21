@@ -27,9 +27,9 @@ from pygeoutils.pygeoutils import (
     gtiff2vrt,
     gtiff2xarray,
     json2geodf,
+    sample_window,
     xarray2geodf,
     xarray_geomask,
-    sample_window,
 )
 from pygeoutils.smoothing import (
     GeoSpline,

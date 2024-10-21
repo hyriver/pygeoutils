@@ -8,10 +8,10 @@ import subprocess
 import geopandas as gpd
 import numpy as np
 import pytest
+import rasterio
 import rioxarray as rxr
 from scipy.interpolate import UnivariateSpline
 from shapely import LineString, MultiPolygon, Point, Polygon, box
-import rasterio
 
 import pygeoutils as geoutils
 from pygeoogc import ArcGISRESTful, ServiceURL

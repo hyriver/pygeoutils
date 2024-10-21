@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import numpy as np
 from shapely import LineString, MultiLineString
-from pygeoutils import anchored_smoothing, smooth_multilinestring, smooth_linestring
-import pytest
+
+from pygeoutils import anchored_smoothing, smooth_linestring, smooth_multilinestring
+
 
 def assert_close(a: float, b: float, rtol: float = 1e-3) -> bool:
     assert np.allclose(a, b, rtol=rtol)
+
 
 class TestAnchoredSmoothing:
     def setup_method(self):
@@ -39,12 +43,12 @@ class TestAnchoredSmoothing:
         assert_close(smoothed_complex_line.coords[0], (0, 0))
         assert_close(smoothed_complex_line.coords[-1], (4, 0))
 
+
 class TestSmoothMultiLineString:
     def setup_method(self):
-        self.mline = MultiLineString([
-            LineString([(0, 0), (1, 1), (2, 0)]),
-            LineString([(2, 0), (3, 1), (4, 0)])
-        ])
+        self.mline = MultiLineString(
+            [LineString([(0, 0), (1, 1), (2, 0)]), LineString([(2, 0), (3, 1), (4, 0)])]
+        )
 
     def test_simple_multilinestring(self):
         smoothed_mline = smooth_multilinestring(self.mline, npts_list=[10, 10], sigma=1.0)
@@ -73,18 +77,22 @@ class TestSmoothMultiLineString:
         assert isinstance(smoothed_mline_default_npts, MultiLineString)
         assert len(smoothed_mline_default_npts.geoms) == 2
         assert all(isinstance(line, LineString) for line in smoothed_mline_default_npts.geoms)
-        assert all(len(line.coords) == len(orig_line.coords) for line, orig_line in zip(smoothed_mline_default_npts.geoms, self.mline.geoms))
+        assert all(
+            len(line.coords) == len(orig_line.coords)
+            for line, orig_line in zip(smoothed_mline_default_npts.geoms, self.mline.geoms)
+        )
         assert_close(smoothed_mline_default_npts.geoms[0].coords[0], (0, 0))
         assert_close(smoothed_mline_default_npts.geoms[0].coords[-1], (2, 0))
         assert_close(smoothed_mline_default_npts.geoms[1].coords[0], (2, 0))
         assert_close(smoothed_mline_default_npts.geoms[1].coords[-1], (4, 0))
 
     def test_complex_multilinestring(self):
-        complex_mline = MultiLineString([
-            LineString([(0, 0), (1, 2), (2, 1)]),
-            LineString([(2, 1), (3, 3), (4, 0)])
-        ])
-        smoothed_complex_mline = smooth_multilinestring(complex_mline, npts_list=[20, 20], sigma=2.0)
+        complex_mline = MultiLineString(
+            [LineString([(0, 0), (1, 2), (2, 1)]), LineString([(2, 1), (3, 3), (4, 0)])]
+        )
+        smoothed_complex_mline = smooth_multilinestring(
+            complex_mline, npts_list=[20, 20], sigma=2.0
+        )
         assert isinstance(smoothed_complex_mline, MultiLineString)
         assert len(smoothed_complex_mline.geoms) == 2
         assert all(isinstance(line, LineString) for line in smoothed_complex_mline.geoms)
@@ -93,6 +101,7 @@ class TestSmoothMultiLineString:
         assert_close(smoothed_complex_mline.geoms[0].coords[-1], (2, 1))
         assert_close(smoothed_complex_mline.geoms[1].coords[0], (2, 1))
         assert_close(smoothed_complex_mline.geoms[1].coords[-1], (4, 0))
+
 
 class TestSmoothLineString:
     def setup_method(self):

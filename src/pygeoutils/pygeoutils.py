@@ -6,6 +6,7 @@ from __future__ import annotations
 import contextlib
 import subprocess
 import warnings
+from itertools import islice
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, Union, cast, overload
 
@@ -20,14 +21,12 @@ import shapely.geometry as sgeom
 import ujson as json
 import xarray as xr
 from rasterio import MemoryFile
-from rioxarray.exceptions import OneDimensionalRaster
-from shapely import MultiPolygon, Polygon
-from itertools import islice
-import pyproj
-import numpy as np
 from rasterio.enums import MaskFlags, Resampling
 from rasterio.transform import rowcol
 from rasterio.windows import Window
+from rioxarray.exceptions import OneDimensionalRaster
+from shapely import MultiPolygon, Polygon
+
 from pygeoutils import _utils as utils
 from pygeoutils import geotools
 from pygeoutils.exceptions import (
@@ -545,7 +544,7 @@ def sample_window(
     """Interpolate pixel values at given coordinates by interpolation.
 
     .. note::
-    
+
         This function is adapted from
         the ``rasterio.sample.sample_gen`` function of
         `RasterIO <https://rasterio.readthedocs.io/en/latest/api/rasterio.sample.html#rasterio.sample.sample_gen>`__.
