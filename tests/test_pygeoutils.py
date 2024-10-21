@@ -11,6 +11,7 @@ import pytest
 import rioxarray as rxr
 from scipy.interpolate import UnivariateSpline
 from shapely import LineString, MultiPolygon, Point, Polygon, box
+import rasterio
 
 import pygeoutils as geoutils
 from pygeoogc import ArcGISRESTful, ServiceURL
@@ -452,6 +453,18 @@ def test_mp2p():
     )
     gdf = geoutils.multi2poly(gdf)
     assert (gdf.geometry.geom_type == "Polygon").sum() == 2
+
+
+def test_sample_window():
+    url = "/".join(
+        (
+            "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation",
+            "1/TIFF/USGS_Seamless_DEM_1.vrt",
+        )
+    )
+    with rasterio.open(url) as src:
+        elev = list(geoutils.sample_window(src, [(-69.77, 45.07)], 5))
+    assert_close(elev[0][0], 425.442)
 
 
 def test_show_versions():
