@@ -22,7 +22,12 @@ import xarray as xr
 from rasterio import MemoryFile
 from rioxarray.exceptions import OneDimensionalRaster
 from shapely import MultiPolygon, Polygon
-
+from itertools import islice
+import pyproj
+import numpy as np
+from rasterio.enums import MaskFlags, Resampling
+from rasterio.transform import rowcol
+from rasterio.windows import Window
 from pygeoutils import _utils as utils
 from pygeoutils import geotools
 from pygeoutils.exceptions import (
@@ -36,10 +41,17 @@ from pygeoutils.exceptions import (
 BOX_ORD = "(west, south, east, north)"
 NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
 if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable
+
+    from numpy.typing import NDArray
+    from rasterio.io import DatasetReader
+
     GTYPE = Union[Polygon, MultiPolygon, tuple[float, float, float, float]]
     GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
     CRSTYPE = Union[int, str, pyproj.CRS]
+
+    FloatArray = NDArray[np.float64]
 
 __all__ = [
     "json2geodf",
@@ -49,6 +61,7 @@ __all__ = [
     "gtiff2vrt",
     "xarray2geodf",
     "geodf2xarray",
+    "sample_window",
 ]
 
 
@@ -504,3 +517,97 @@ def geodf2xarray(
     ds = ds.rio.write_crs(projected_crs)
     ds = ds.rio.write_coordinate_system()
     return ds
+
+
+def _transform_xy(
+    dataset: DatasetReader, xy: Iterable[tuple[float, float]]
+) -> Generator[tuple[int, int], None, None]:
+    # Transform x, y coordinates to row, col
+    # Chunked to reduce calls, thus unnecessary overhead, to rowcol()
+    dt = dataset.transform
+    _xy = iter(xy)
+    while True:
+        buf = tuple(islice(_xy, 0, 256))
+        if not buf:
+            break
+        x, y = rowcol(dt, *zip(*buf))
+        yield from zip(x, y)
+
+
+def sample_window(
+    dataset: DatasetReader,
+    xy: Iterable[tuple[float, float]],
+    window: int = 5,
+    indexes: int | list[int] | None = None,
+    masked: bool = False,
+    resampling: int = 1,
+) -> Generator[FloatArray, None, None]:
+    """Interpolate pixel values at given coordinates by interpolation.
+
+    .. note::
+    
+        This function is adapted from
+        the ``rasterio.sample.sample_gen`` function of
+        `RasterIO <https://rasterio.readthedocs.io/en/latest/api/rasterio.sample.html#rasterio.sample.sample_gen>`__.
+
+    Parameters
+    ----------
+    dataset : rasterio.DatasetReader
+        Opened in ``"r"`` mode.
+    xy : iterable
+        Pairs of x, y coordinates in the dataset's reference system.
+    window : int, optional
+        Size of the window to read around each point. Must be odd.
+        Default is 5.
+    indexes : int or list of int, optional
+        Indexes of dataset bands to sample, defaults to all bands.
+    masked : bool, optional
+        Whether to mask samples that fall outside the extent of the dataset.
+        Default is ``False``.
+    resampling : int, optional
+        Resampling method to use. See rasterio.enums.Resampling for options.
+        Default is 1, i.e., ``Resampling.bilinear``.
+
+    Yields
+    ------
+    numpy.array
+        An array of length equal to the number of specified indexes
+        containing the interpolated values for the bands corresponding to those indexes.
+    """
+    height = dataset.height
+    width = dataset.width
+    if indexes is None:
+        indexes = dataset.indexes
+    elif isinstance(indexes, int):
+        indexes = [indexes]
+
+    nodata = np.full(len(indexes), (dataset.nodata or 0), dtype=dataset.dtypes[0])
+    if masked:
+        mask_flags = [set(dataset.mask_flag_enums[i - 1]) for i in indexes]
+        dataset_is_masked = any(
+            {MaskFlags.alpha, MaskFlags.per_dataset, MaskFlags.nodata} & enums
+            for enums in mask_flags
+        )
+        mask = [not (dataset_is_masked and enums == {MaskFlags.all_valid}) for enums in mask_flags]
+        nodata = np.ma.array(nodata, mask=mask)
+
+    if window % 2 == 0:
+        raise InputTypeError("window", "odd integer")
+
+    half_window = window // 2
+
+    for row, col in _transform_xy(dataset, xy):
+        if 0 <= row < height and 0 <= col < width:
+            col_start = max(0, col - half_window)
+            row_start = max(0, row - half_window)
+            data = dataset.read(
+                indexes,
+                window=Window(col_start, row_start, window, window),
+                out_shape=(len(indexes), 1, 1),
+                resampling=Resampling(resampling),
+                masked=masked,
+            )
+
+            yield data[:, 0, 0]
+        else:
+            yield nodata

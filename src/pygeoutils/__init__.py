@@ -29,6 +29,7 @@ from pygeoutils.pygeoutils import (
     json2geodf,
     xarray2geodf,
     xarray_geomask,
+    sample_window,
 )
 from pygeoutils.smoothing import (
     GeoSpline,
@@ -71,6 +72,7 @@ __all__ = [
     "transform2tuple",
     "xd_write_crs",
     "xarray_geomask",
+    "sample_window",
     "coords_list",
     "Coordinates",
     "query_indices",
