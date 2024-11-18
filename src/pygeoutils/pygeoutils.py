@@ -579,7 +579,7 @@ def sample_window(
         indexes = dataset.indexes
     elif isinstance(indexes, int):
         indexes = [indexes]
-
+    indexes = cast("list[int]", indexes)
     nodata = np.full(len(indexes), (dataset.nodata or 0), dtype=dataset.dtypes[0])
     if masked:
         mask_flags = [set(dataset.mask_flag_enums[i - 1]) for i in indexes]
@@ -601,7 +601,7 @@ def sample_window(
             row_start = max(0, row - half_window)
             data = dataset.read(
                 indexes,
-                window=Window(col_start, row_start, window, window),
+                window=Window(col_start, row_start, window, window),  # pyright: ignore[reportCallIssue]
                 out_shape=(len(indexes), 1, 1),
                 resampling=Resampling(resampling),
                 masked=masked,
