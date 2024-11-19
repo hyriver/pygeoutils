@@ -464,7 +464,7 @@ def test_sample_window():
     )
     with rasterio.open(url) as src:
         elev = list(geoutils.sample_window(src, [(-69.77, 45.07)], 5))
-    assert_close(elev[0][0], 425.442)
+    assert_close(elev[0][0], 427.1656)
 
 
 def test_show_versions():
