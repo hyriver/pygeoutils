@@ -57,16 +57,16 @@ if TYPE_CHECKING:
     NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
 
 __all__ = [
-    "snap2nearest",
+    "Coordinates",
     "break_lines",
+    "coords_list",
     "geo2polygon",
     "geometry_list",
-    "Coordinates",
-    "query_indices",
-    "nested_polygons",
-    "coords_list",
-    "multi2poly",
     "geometry_reproject",
+    "multi2poly",
+    "nested_polygons",
+    "query_indices",
+    "snap2nearest",
 ]
 
 

@@ -30,13 +30,13 @@ if TYPE_CHECKING:
 
 __all__ = [
     "GeoSpline",
-    "make_spline",
-    "spline_linestring",
-    "smooth_linestring",
-    "line_curvature",
     "anchored_smoothing",
+    "line_curvature",
+    "make_spline",
+    "smooth_linestring",
     "smooth_multilinestring",
     "spline_curvature",
+    "spline_linestring",
 ]
 
 

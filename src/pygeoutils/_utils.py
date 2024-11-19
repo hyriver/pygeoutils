@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
     CRSTYPE = Union[int, str, pyproj.CRS]
 
-__all__ = ["xd_write_crs", "get_gtiff_attrs", "transform2tuple", "get_transform"]
+__all__ = ["get_gtiff_attrs", "get_transform", "transform2tuple", "xd_write_crs"]
 
 
 @dataclass

@@ -1,6 +1,5 @@
 """Some utilities for manipulating GeoSpatial data."""
 
-# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import contextlib
@@ -53,14 +52,14 @@ if TYPE_CHECKING:
     FloatArray = NDArray[np.float64]
 
 __all__ = [
-    "json2geodf",
     "arcgis2geojson",
-    "xarray_geomask",
-    "gtiff2xarray",
-    "gtiff2vrt",
-    "xarray2geodf",
     "geodf2xarray",
+    "gtiff2vrt",
+    "gtiff2xarray",
+    "json2geodf",
     "sample_window",
+    "xarray2geodf",
+    "xarray_geomask",
 ]
 
 
