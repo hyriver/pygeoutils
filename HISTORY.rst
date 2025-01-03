@@ -13,6 +13,8 @@ New Features
   reading the entire dataset into memory. The function returns a generator
   that yields the sampled values in the order of the input coordinates.
   This function is based on the ``rasterio.sample.sample_gen`` function.
+- Add a function called ``geo_transform`` for transforming any Shapely geometry
+  to a new CRS. It could be a single geometry or an array of geometries.
 
 0.18.0 (2024-10-05)
 -------------------
