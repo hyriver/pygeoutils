@@ -348,7 +348,7 @@ def _path2str(path: Path | str | list[Path] | list[str]) -> str | list[str]:
 
 def _create_vrt(tiff_files: list[Path], output_vrt: Path) -> None:
     command = ["gdalbuildvrt", _path2str(output_vrt), *_path2str(tiff_files)]
-    subprocess.run(command, check=True, text=True, capture_output=True)  # noqa: S603
+    subprocess.run(command, check=True, text=True, capture_output=True)
 
 
 def gtiff2vrt(
