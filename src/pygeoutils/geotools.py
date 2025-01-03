@@ -5,14 +5,15 @@ from __future__ import annotations
 import contextlib
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast, overload
 
 import cytoolz.curried as tlz
 import geopandas as gpd
 import numpy as np
-import numpy.typing as npt
 import pyproj
 import shapely
+from pyproj import Transformer
 from shapely import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon, ops
 
 from pygeoutils.exceptions import (
@@ -23,11 +24,13 @@ from pygeoutils.exceptions import (
     MissingColumnError,
 )
 
-FloatArray = npt.NDArray[np.float64]
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from numpy.typing import NDArray
+    from shapely import Geometry
+
+    FloatArray = NDArray[np.float64]
     POLYTYPE = Union[Polygon, MultiPolygon, tuple[float, float, float, float]]
     GTYPE = Union[
         Point,
@@ -61,6 +64,7 @@ __all__ = [
     "break_lines",
     "coords_list",
     "geo2polygon",
+    "geo_transform",
     "geometry_list",
     "geometry_reproject",
     "multi2poly",
@@ -68,6 +72,8 @@ __all__ = [
     "query_indices",
     "snap2nearest",
 ]
+
+TransformerFromCRS = lru_cache(Transformer.from_crs)
 
 
 @dataclass
@@ -173,7 +179,7 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
     >>> geometry_reproject(coords, 3857, 4326)
     [(-69.7636111130079, 45.44549114818127)]
     """
-    project = pyproj.Transformer.from_crs(in_crs, out_crs, always_xy=True).transform
+    project = TransformerFromCRS(in_crs, out_crs, always_xy=True).transform
 
     if isinstance(
         geom,
@@ -566,3 +572,42 @@ def multi2poly(gdf: GDFTYPE) -> GDFTYPE:
         return gdf_prj.geometry
 
     return gdf_prj
+
+
+@overload
+def geo_transform(
+    geometry: Geometry, in_crs: int, out_crs: int, include_z: bool = False
+) -> Geometry: ...
+
+
+@overload
+def geo_transform(
+    geometry: NDArray[Geometry], in_crs: int, out_crs: int, include_z: bool = False
+) -> NDArray[Geometry]: ...
+
+
+def geo_transform(
+    geometry: Geometry | NDArray[Geometry], in_crs: int, out_crs: int, include_z: bool = False
+) -> Geometry | NDArray[Geometry]:
+    """Transform a geometry from one CRS to another.
+
+    Parameters
+    ----------
+    geometry : shapely.geometry.base.BaseGeometry
+        The geometry or an array of geometries to transform.
+    in_crs : int
+        The CRS of the input geometry.
+    out_crs : int
+        The CRS to which the input geometry will be transformed.
+    include_z : bool, optional
+        Whether to include the Z coordinate in the transformation, by default False.
+
+    Returns
+    -------
+    shapely.geometry.base.BaseGeometry
+        The transformed geometry or an array of transformed geometries.
+    """
+    if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
+        return geometry
+    transformer = TransformerFromCRS(in_crs, out_crs, always_xy=True)
+    return shapely.transform(geometry, lambda x: np.c_[transformer.transform(*x.T)], include_z)
