@@ -1,5 +1,6 @@
 """Some utilities for manipulating GeoSpatial data."""
 
+# pyright: reportInvalidTypeForm=false
 from __future__ import annotations
 
 import contextlib
@@ -301,7 +302,7 @@ def snap2nearest(lines_gdf: GDFTYPE, points_gdf: GDFTYPE, tol: float) -> GDFTYPE
         pi: (
             *pts.iloc[pi][cols],
             ops.nearest_points(
-                shapely.unary_union(lines_gdf.iloc[fi].geometry), pts.iloc[pi].geometry
+                shapely.union_all(lines_gdf.iloc[fi].geometry), pts.iloc[pi].geometry
             )[0],
         )
         for pi, fi in merged_idx.items()
