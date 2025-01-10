@@ -51,7 +51,6 @@ dependencies = [
 optional-dependencies.test = [
   "pytest-cov",
   "pytest-sugar",
-  "pytest-xdist[psutil]",
 ]
 urls.Changelog = "https://docs.hyriver.io/changelogs/pygeoutils.html"
 urls.CI = "https://github.com/hyriver/pygeoutils/actions"
@@ -203,9 +202,11 @@ ignore-words-list = "gauge,gauges,params,through"
 addopts = [
   "--import-mode=importlib",
   "--doctest-modules",
-  "-n=auto",
   "-v",
   "--cov",
+  "--cov-append",
+  "--cov-branch",
+  "--cov-report=xml",
   "--junitxml=junit.xml",
   "--durations=5",
 ]
@@ -231,24 +232,21 @@ ignore_errors = true
 
 [tool.coverage.paths]
 source = [ "src", "*/site-packages" ]
-omit = [
-  "**/__init__.py",
-  "**/print_versions.py",
-]
 
 [tool.coverage.run]
 branch = true
 parallel = true
-source = [
+source_pkgs = [
   "pygeoutils",
+]
+omit = [
+  "**/__init__.py",
 ]
 
 [tool.pyright]
 exclude = [
-  ".nox/",
   "**/__pycache__",
   "**/__init__.py",
-  "tests/",
 ]
 include = [
   "src/pygeoutils",
