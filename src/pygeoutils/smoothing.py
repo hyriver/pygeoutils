@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
     GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
     CRSTYPE = Union[int, str, pyproj.CRS]
-    FloatArray = NDArray[np.float64]
+    FloatArray = NDArray[np.floating]
 
 __all__ = [
     "GeoSpline",
@@ -387,13 +387,16 @@ def spline_linestring(
     (-97.06123, 32.83325),
     (-97.06127, 32.83200)]
     """
+    line_ = line
     if isinstance(line, MultiLineString):
-        line = shapely.line_merge(line)
+        line_ = shapely.line_merge(line)
 
-    if not isinstance(line, LineString):
+    if not isinstance(line_, LineString):
         raise InputTypeError("line", "LineString")
 
-    return GeoSpline(shapely.points(line.coords), n_pts, degree, smoothing).spline
+    pts = shapely.points(line_.coords)
+    pts = cast("NDArray[Point]", pts)  # pyright: ignore[reportInvalidTypeForm]
+    return GeoSpline(pts, n_pts, degree, smoothing).spline
 
 
 def smooth_linestring(
