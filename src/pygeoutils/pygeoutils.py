@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import contextlib
-import subprocess
 import warnings
 from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 import geopandas as gpd
 import numpy as np
@@ -332,28 +331,10 @@ def gtiff2xarray(
     return ds
 
 
-@overload
-def _path2str(path: Path | str) -> str: ...
-
-
-@overload
-def _path2str(path: list[Path] | list[str]) -> list[str]: ...
-
-
-def _path2str(path: Path | str | list[Path] | list[str]) -> str | list[str]:
-    if isinstance(path, (list, tuple)):
-        return [Path(p).resolve().as_posix() for p in path]
-    return Path(path).resolve().as_posix()
-
-
-def _create_vrt(tiff_files: list[Path], output_vrt: Path) -> None:
-    command = ["gdalbuildvrt", _path2str(output_vrt), *_path2str(tiff_files)]
-    subprocess.run(command, check=True, text=True, capture_output=True)
-
-
 def gtiff2vrt(
-    file_list: list[Path],
+    tiff_files: list[Path],
     vrt_path: str | Path,
+    relative: bool = False,
 ) -> None:
     """Create a VRT file from a list of (Geo)Tiff files.
 
@@ -363,26 +344,27 @@ def gtiff2vrt(
 
     Parameters
     ----------
-    file_list : list
+    tiff_files : list
         List of paths to the GeoTiff files.
     vrt_path : str or Path
         Path to the output VRT file.
+    relative : bool, optional
+        If True, use paths relative to the VRT file (default is False).
     """
-    exit_code, _ = subprocess.getstatusoutput("gdalinfo --version")
-    if exit_code != 0:
-        raise DependencyError
+    try:
+        from osgeo import gdal  # pyright: ignore[reportMissingImports]
+    except ImportError as e:
+        raise DependencyError from e
 
-    if not isinstance(file_list, (list, tuple)) and not all(
-        isinstance(f, (Path, str)) for f in file_list
-    ):
-        raise InputTypeError("file_list", "list of pathlib.Path")
+    vrt_path = Path(vrt_path).resolve()
+    tiff_files = [Path(f).resolve() for f in tiff_files]
 
-    if not file_list:
-        raise EmptyResponseError
+    if not tiff_files or not all(f.exists() for f in tiff_files):
+        raise ValueError("No valid files found.")
 
-    vrt_path = Path(vrt_path)
-    vrt_path.parent.mkdir(parents=True, exist_ok=True)
-    _create_vrt(file_list, vrt_path)
+    gdal.UseExceptions()
+    vrt_options = gdal.BuildVRTOptions(resampleAlg="nearest", addAlpha=False)
+    _ = gdal.BuildVRT(vrt_path, tiff_files, options=vrt_options, relativeToVRT=relative)
 
 
 def xarray2geodf(
