@@ -292,7 +292,7 @@ def gtiff2xarray(
 
     var_name = dict(zip(r_dict, r_dict))
     if "_dd_" in key1:
-        var_name = {lyr: "_".join(lyr.split("_")[:-3]) for lyr in r_dict}
+        var_name = {lyr: "_".join(lyr.split("_")[:-2]) for lyr in r_dict}
 
     attrs = utils.get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: dict[str, np.dtype] = {}  # pyright: ignore[reportMissingTypeArgument]
