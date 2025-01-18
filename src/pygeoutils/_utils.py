@@ -19,11 +19,12 @@ from shapely import LineString, Point
 from pygeoutils.exceptions import MissingAttributeError
 
 if TYPE_CHECKING:
+    from pyproj import CRS
     from rasterio import Affine
 
-    NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
+    CRSType = int | str | CRS
+    Number = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
-    CRSTYPE = Union[int, str, pyproj.CRS]
 
 __all__ = ["get_gtiff_attrs", "get_transform", "transform2tuple", "xd_write_crs"]
 
@@ -230,13 +231,13 @@ def convert(arcgis: dict[str, Any], id_attr: str | None = None) -> dict[str, Any
 class Attrs:
     """Attributes of a GTiff byte response."""
 
-    nodata: NUMBER
+    nodata: Number
     crs: pyproj.CRS
     dims: tuple[str, str]
     transform: tuple[float, float, float, float, float, float]
 
 
-def get_nodata(src: rio.DatasetReader) -> NUMBER:
+def get_nodata(src: rio.DatasetReader) -> Number:
     """Get the nodata value of a GTiff byte response."""
     if src.nodata is None:
         dtype = src.dtypes[0]
@@ -302,7 +303,7 @@ def transform2tuple(transform: rio.Affine) -> tuple[float, float, float, float, 
     return (transform.a, transform.b, transform.c, transform.d, transform.e, transform.f)
 
 
-def xd_write_crs(ds: XD, crs: CRSTYPE | None = None, grid_mapping_name: str | None = None) -> XD:
+def xd_write_crs(ds: XD, crs: CRSType | None = None, grid_mapping_name: str | None = None) -> XD:
     """Write geo reference info into a dataset or dataarray.
 
     Parameters
@@ -324,12 +325,10 @@ def xd_write_crs(ds: XD, crs: CRSTYPE | None = None, grid_mapping_name: str | No
     grid_mapping_name = grid_mapping_name or ds.rio.grid_mapping
 
     if isinstance(ds, xr.DataArray):
-        if "grid_mapping" in ds.attrs:
-            _ = ds.attrs.pop("grid_mapping")
+        _ = ds.attrs.pop("grid_mapping", None)
     elif isinstance(ds, xr.Dataset):
-        for v in ds.variables:
-            if "grid_mapping" in ds[v].attrs:
-                _ = ds[v].attrs.pop("grid_mapping")
+        for v in ds.data_vars:
+            _ = ds[v].attrs.pop("grid_mapping", None)
     if "spatial_ref" in ds.coords and grid_mapping_name != "spatial_ref":
         ds = ds.drop_vars("spatial_ref")
     ds = ds.rio.write_crs(crs, grid_mapping_name=grid_mapping_name)
@@ -341,7 +340,7 @@ def get_gtiff_attrs(
     resp: bytes,
     ds_dims: tuple[str, str] | None = None,
     driver: str | None = None,
-    nodata: NUMBER | None = None,
+    nodata: Number | None = None,
 ) -> Attrs:
     """Get nodata, CRS, and dimension names in (vertical, horizontal) order from raster in bytes.
 
