@@ -36,19 +36,18 @@ from pygeoutils.exceptions import (
 )
 
 BOX_ORD = "(west, south, east, north)"
-NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
 
     from numpy.typing import NDArray
+    from pyproj import CRS
     from rasterio.io import DatasetReader
 
-    GTYPE = Union[Polygon, MultiPolygon, tuple[float, float, float, float]]
-    GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
-    XD = TypeVar("XD", xr.Dataset, xr.DataArray)
-    CRSTYPE = Union[int, str, pyproj.CRS]
-
-    FloatArray = NDArray[np.float64]
+    CRSType = int | str | CRS
+    GeoType = Polygon | MultiPolygon | tuple[float, float, float, float]
+    GeoDFType = TypeVar("GeoDFType", gpd.GeoDataFrame, gpd.GeoSeries)
+    DataArray = TypeVar("DataArray", xr.Dataset, xr.DataArray)
+    Number = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
 
 __all__ = [
     "arcgis2geojson",
@@ -103,8 +102,8 @@ def _gdf_from_features(
 
 def json2geodf(
     content: list[dict[str, Any]] | dict[str, Any],
-    in_crs: CRSTYPE | None = 4326,
-    crs: CRSTYPE | None = 4326,
+    in_crs: CRSType | None = 4326,
+    crs: CRSType | None = 4326,
 ) -> gpd.GeoDataFrame:
     """Create GeoDataFrame from (Geo)JSON.
 
@@ -153,13 +152,13 @@ def json2geodf(
 
 
 def xarray_geomask(
-    ds: XD,
-    geometry: GTYPE,
-    crs: CRSTYPE,
+    ds: DataArray,
+    geometry: GeoType,
+    crs: CRSType,
     all_touched: bool = False,
     drop: bool = True,
     from_disk: bool = False,
-) -> XD:
+) -> DataArray:
     """Mask a ``xarray.Dataset`` based on a geometry.
 
     Parameters
@@ -217,8 +216,8 @@ def _to_dataset(
     var_name: str,
     driver: str | None,
     dtypes: dict[str, np.dtype],  # pyright: ignore[reportMissingTypeArgument]
-    nodata_dict: dict[str, NUMBER],
-    nodata: NUMBER | None,
+    nodata_dict: dict[str, Number],
+    nodata: Number | None,
 ) -> xr.DataArray:
     with MemoryFile() as memfile:
         memfile.write(resp)
@@ -236,12 +235,12 @@ def _to_dataset(
 
 def gtiff2xarray(
     r_dict: dict[str, bytes],
-    geometry: GTYPE | None = None,
-    geo_crs: CRSTYPE | None = None,
+    geometry: GeoType | None = None,
+    geo_crs: CRSType | None = None,
     ds_dims: tuple[str, str] | None = None,
     driver: str | None = None,
     all_touched: bool = False,
-    nodata: NUMBER | None = None,
+    nodata: Number | None = None,
     drop: bool = True,
 ) -> xr.DataArray | xr.Dataset:
     """Convert (Geo)Tiff byte responses to ``xarray.Dataset``.
@@ -296,7 +295,7 @@ def gtiff2xarray(
 
     attrs = utils.get_gtiff_attrs(r_dict[key1], ds_dims, driver, nodata)
     dtypes: dict[str, np.dtype] = {}  # pyright: ignore[reportMissingTypeArgument]
-    nodata_dict: dict[str, NUMBER] = {}
+    nodata_dict: dict[str, Number] = {}
 
     ds = xr.merge(
         _to_dataset(resp, var_name[lyr], driver, dtypes, nodata_dict, nodata)
@@ -421,11 +420,11 @@ def xarray2geodf(
 
 
 def geodf2xarray(
-    geodf: GDFTYPE,
+    geodf: GeoDFType,
     resolution: float,
     attr_col: str | None = None,
     fill: float = 0,
-    projected_crs: CRSTYPE = 5070,
+    projected_crs: CRSType = 5070,
 ) -> xr.Dataset:
     """Rasterize a ``geopandas.GeoDataFrame`` to ``xarray.DataArray``.
 
@@ -521,7 +520,7 @@ def sample_window(
     indexes: int | list[int] | None = None,
     masked: bool = False,
     resampling: int = 1,
-) -> Generator[FloatArray, None, None]:
+) -> Generator[NDArray[np.float64], None, None]:
     """Interpolate pixel values at given coordinates by interpolation.
 
     .. note::

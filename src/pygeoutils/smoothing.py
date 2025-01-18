@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar, Union, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import numpy as np
 import scipy.interpolate as sci
@@ -21,11 +21,11 @@ from pygeoutils.exceptions import (
 
 if TYPE_CHECKING:
     import geopandas as gpd
-    import pyproj
     from numpy.typing import NDArray
+    from pyproj import CRS
 
-    GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
-    CRSTYPE = Union[int, str, pyproj.CRS]
+    CRSType = int | str | CRS
+    GeoDFType = TypeVar("GeoDFType", gpd.GeoDataFrame, gpd.GeoSeries)
     FloatArray = NDArray[np.floating]
 
 __all__ = [
@@ -303,7 +303,7 @@ class GeoSpline:
 
     def __init__(
         self,
-        points: GDFTYPE | NDArray[Point],  # pyright: ignore[reportInvalidTypeForm]
+        points: GeoDFType | NDArray[Point],  # pyright: ignore[reportInvalidTypeForm]
         n_pts: int,
         degree: int = 3,
         smoothing: float | None = None,
