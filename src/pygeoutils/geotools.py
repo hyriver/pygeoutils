@@ -307,7 +307,7 @@ def geo2polygon(
     geom = cast("BaseGeometry", geom)
     if geo_crs is not None and crs is not None:
         return geo_transform(geom, geo_crs, crs)
-    elif geo_crs is None and crs is not None:
+    elif geo_crs is None and crs is None:
         return geom
     raise InputTypeError("geo_crs/crs", "either both None or both valid CRS")
 
