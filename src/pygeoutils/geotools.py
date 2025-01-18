@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import contextlib
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
 import cytoolz.curried as tlz
 import geopandas as gpd
@@ -29,23 +30,24 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from numpy.typing import NDArray
-    from shapely import Geometry
+    from pyproj import CRS
+    from shapely.geometry.base import BaseGeometry
 
+    CRSType = int | str | CRS
     FloatArray = NDArray[np.float64]
-    POLYTYPE = Union[Polygon, MultiPolygon, tuple[float, float, float, float]]
-    GTYPE = Union[
-        Point,
-        MultiPoint,
-        Polygon,
-        MultiPolygon,
-        LineString,
-        MultiLineString,
-        "tuple[float, float, float, float]",
-        "list[float]",
-        "list[tuple[float, float]]",
-    ]
+    PolyType = Polygon | MultiPolygon | tuple[float, float, float, float]
+    GeoType = (
+        Point
+        | MultiPoint
+        | Polygon
+        | MultiPolygon
+        | LineString
+        | MultiLineString
+        | tuple[float, float, float, float]
+        | list[float]
+        | list[tuple[float, float]]
+    )
     GDFTYPE = TypeVar("GDFTYPE", gpd.GeoDataFrame, gpd.GeoSeries)
-    CRSTYPE = Union[int, str, pyproj.CRS]
     GEOM = TypeVar(
         "GEOM",
         Point,
@@ -58,7 +60,7 @@ if TYPE_CHECKING:
         "list[float]",
         "list[tuple[float, float]]",
     )
-    NUMBER = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
+    Number = int | float | np.number
 
 __all__ = [
     "Coordinates",
@@ -98,8 +100,8 @@ class Coordinates:
     [100.0, -30.0]
     """
 
-    lon: NUMBER | Sequence[NUMBER]
-    lat: NUMBER | Sequence[NUMBER]
+    lon: Number | Sequence[Number]
+    lat: Number | Sequence[Number]
     bounds: tuple[float, float, float, float] | None = None
 
     @staticmethod
@@ -148,7 +150,7 @@ class Coordinates:
         return self._points
 
 
-def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
+def geometry_reproject(geom: GEOM, in_crs: CRSType, out_crs: CRSType) -> GEOM:
     """Reproject a geometry to another CRS.
 
     Parameters
@@ -231,17 +233,59 @@ def geometry_reproject(geom: GEOM, in_crs: CRSTYPE, out_crs: CRSTYPE) -> GEOM:
     raise InputTypeError("geom", gtypes)
 
 
-def geo2polygon(
-    geometry: POLYTYPE,
-    geo_crs: CRSTYPE | None = None,
-    crs: CRSTYPE | None = None,
-) -> Polygon | MultiPolygon:
-    """Convert a geometry to a Shapely's Polygon and transform to any CRS.
+@overload
+def geo_transform(
+    geometry: BaseGeometry, in_crs: CRSType, out_crs: CRSType, include_z: bool = False
+) -> BaseGeometry: ...
+
+
+@overload
+def geo_transform(
+    geometry: NDArray[BaseGeometry], in_crs: CRSType, out_crs: CRSType, include_z: bool = False
+) -> NDArray[BaseGeometry]: ...
+
+
+def geo_transform(
+    geometry: BaseGeometry | NDArray[BaseGeometry],
+    in_crs: CRSType,
+    out_crs: CRSType,
+    include_z: bool = False,
+) -> BaseGeometry | NDArray[BaseGeometry]:
+    """Transform a geometry from one CRS to another.
 
     Parameters
     ----------
-    geometry : Polygon or tuple of length 4
-        Polygon or bounding box (west, south, east, north).
+    geometry : shapely.geometry.base.BaseGeometry
+        The geometry or an array of geometries to transform.
+    in_crs : int
+        The CRS of the input geometry.
+    out_crs : int
+        The CRS to which the input geometry will be transformed.
+    include_z : bool, optional
+        Whether to include the Z coordinate in the transformation, by default False.
+
+    Returns
+    -------
+    shapely.geometry.base.BaseGeometry or numpy.ndarray
+        The transformed geometry or an array of transformed geometries.
+    """
+    if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
+        return geometry
+    transformer = TransformerFromCRS(in_crs, out_crs, always_xy=True)
+    return shapely.transform(geometry, lambda x: np.c_[transformer.transform(*x.T)], include_z)
+
+
+def geo2polygon(
+    geometry: BaseGeometry | tuple[float, float, float, float],
+    geo_crs: CRSType | None = None,
+    crs: CRSType | None = None,
+) -> BaseGeometry:
+    """Return a Shapely geometry and optionally transform to a new CRS.
+
+    Parameters
+    ----------
+    geometry : shaple.Geometry or tuple of length 4
+        Any shapely geometry object or a bounding box (minx, miny, maxx, maxy).
     geo_crs : int, str, or pyproj.CRS, optional
         Spatial reference of the input geometry, defaults to ``None``.
     crs : int, str, or pyproj.CRS
@@ -249,22 +293,23 @@ def geo2polygon(
 
     Returns
     -------
-    shapely.Polygon or shapely.MultiPolygon
-        A (Multi)Polygon in the target CRS, if different from the input CRS.
+    shapely.geometry.base.BaseGeometry
+        A shapely geometry object.
     """
-    if isinstance(geometry, (Polygon, MultiPolygon)):
+    is_geom = np.atleast_1d(shapely.is_geometry(geometry))
+    if is_geom.all() and len(is_geom) == 1:
         geom = geometry
-    elif isinstance(geometry, (tuple, list)) and len(geometry) == 4:
-        geom = shapely.box(*geometry)  # pyright: ignore[reportArgumentType]
+    elif isinstance(geometry, Iterable) and len(geometry) == 4 and np.isfinite(geometry).all():
+        geom = shapely.box(*geometry)
     else:
-        raise InputTypeError("geometry", "(Multi)Polygon or tuple of length 4")
+        raise InputTypeError("geometry", "a shapley geometry or tuple of length 4")
 
+    geom = cast("BaseGeometry", geom)
     if geo_crs is not None and crs is not None:
-        geom = geometry_reproject(geom, geo_crs, crs)  # pyright: ignore[reportArgumentType]
-    if not geom.is_valid:
-        geom = geom.buffer(0.0)
-        geom = cast("Polygon | MultiPolygon", geom)
-    return geom
+        return geo_transform(geom, geo_crs, crs)
+    elif geo_crs is None and crs is not None:
+        return geom
+    raise InputTypeError("geo_crs/crs", "either both None or both valid CRS")
 
 
 def snap2nearest(lines_gdf: GDFTYPE, points_gdf: GDFTYPE, tol: float) -> GDFTYPE:
@@ -380,7 +425,7 @@ def break_lines(lines: GDFTYPE, points: gpd.GeoDataFrame, tol: float = 0.0) -> G
     ).to_crs(lines.crs)
 
 
-def geometry_list(geometry: GTYPE) -> list[LineString | Point | Polygon]:
+def geometry_list(geometry: GeoType) -> list[LineString | Point | Polygon]:
     """Convert input geometry to a list of Polygons, Points, or LineStrings.
 
     Parameters
@@ -573,42 +618,3 @@ def multi2poly(gdf: GDFTYPE) -> GDFTYPE:
         return gdf_prj.geometry
 
     return gdf_prj
-
-
-@overload
-def geo_transform(
-    geometry: Geometry, in_crs: int, out_crs: int, include_z: bool = False
-) -> Geometry: ...
-
-
-@overload
-def geo_transform(
-    geometry: NDArray[Geometry], in_crs: int, out_crs: int, include_z: bool = False
-) -> NDArray[Geometry]: ...
-
-
-def geo_transform(
-    geometry: Geometry | NDArray[Geometry], in_crs: int, out_crs: int, include_z: bool = False
-) -> Geometry | NDArray[Geometry]:
-    """Transform a geometry from one CRS to another.
-
-    Parameters
-    ----------
-    geometry : shapely.geometry.base.BaseGeometry
-        The geometry or an array of geometries to transform.
-    in_crs : int
-        The CRS of the input geometry.
-    out_crs : int
-        The CRS to which the input geometry will be transformed.
-    include_z : bool, optional
-        Whether to include the Z coordinate in the transformation, by default False.
-
-    Returns
-    -------
-    shapely.geometry.base.BaseGeometry
-        The transformed geometry or an array of transformed geometries.
-    """
-    if pyproj.CRS(in_crs) == pyproj.CRS(out_crs):
-        return geometry
-    transformer = TransformerFromCRS(in_crs, out_crs, always_xy=True)
-    return shapely.transform(geometry, lambda x: np.c_[transformer.transform(*x.T)], include_z)
