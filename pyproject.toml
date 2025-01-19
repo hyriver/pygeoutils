@@ -42,11 +42,11 @@ dependencies = [
   "numpy>=2",
   "pyproj>=3.0.1",
   "rasterio>=1.2",
-  "rioxarray>=0.11",
+  "rioxarray>=0.15",
   "scipy",
   "shapely>=2",
   "ujson",
-  "xarray>=2023.1",
+  "xarray>=2024.7",
 ]
 optional-dependencies.test = [
   "pytest-cov",
@@ -230,6 +230,9 @@ exclude_lines = [
   "if TYPE_CHECKING:",
 ]
 ignore_errors = true
+omit = [
+  "**/__init__.py",
+]
 
 [tool.coverage.paths]
 source = [ "src", "*/site-packages" ]
@@ -239,9 +242,6 @@ branch = true
 parallel = true
 source_pkgs = [
   "pygeoutils",
-]
-omit = [
-  "**/__init__.py",
 ]
 
 [tool.pyright]
