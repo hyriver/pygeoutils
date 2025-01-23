@@ -40,12 +40,12 @@ dependencies = [
   "geopandas>=1",
   "netcdf4",
   "numpy>=2",
+  "orjson>=3.10,<4",
   "pyproj>=3.0.1",
   "rasterio>=1.2",
   "rioxarray>=0.15",
   "scipy",
   "shapely>=2",
-  "ujson",
   "xarray>=2024.7",
 ]
 optional-dependencies.test = [
