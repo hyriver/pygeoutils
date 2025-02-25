@@ -8,11 +8,11 @@ from numbers import Number
 from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 import numpy as np
+import orjson as json
 import pyproj
 import rasterio as rio
 import rasterio.transform as rio_transform
 import rioxarray._io as rxr
-import ujson as json
 import xarray as xr
 from shapely import LineString, Point
 

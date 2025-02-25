@@ -10,13 +10,13 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 import geopandas as gpd
 import numpy as np
+import orjson as json
 import pandas as pd
 import pyproj
 import rasterio.features as rio_features
 import rasterio.transform as rio_transform
 import rioxarray._io as rxr
 import shapely.geometry as sgeom
-import ujson as json
 import xarray as xr
 from rasterio import MemoryFile
 from rasterio.enums import MaskFlags, Resampling
