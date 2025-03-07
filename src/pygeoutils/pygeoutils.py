@@ -5,8 +5,9 @@ from __future__ import annotations
 import contextlib
 import warnings
 from itertools import islice
+from numbers import Number
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import geopandas as gpd
 import numpy as np
@@ -47,7 +48,6 @@ if TYPE_CHECKING:
     GeoType = Polygon | MultiPolygon | tuple[float, float, float, float]
     GeoDFType = TypeVar("GeoDFType", gpd.GeoDataFrame, gpd.GeoSeries)
     DataArray = TypeVar("DataArray", xr.Dataset, xr.DataArray)
-    Number = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
 
 __all__ = [
     "arcgis2geojson",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 from numbers import Number
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 import json
@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from rasterio import Affine
 
     CRSType = int | str | CRS
-    Number = Union[int, float, np.number]  # pyright: ignore[reportMissingTypeArgument]
     XD = TypeVar("XD", xr.Dataset, xr.DataArray)
 
 __all__ = ["get_gtiff_attrs", "get_transform", "transform2tuple", "xd_write_crs"]
