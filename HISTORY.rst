@@ -2,15 +2,15 @@
 History
 =======
 
-0.19.4 (2025-03-07)
+0.19.5 (2025-03-07)
 -------------------
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
-- Use ``orjson`` instead of ``ujson`` due to the package not being
-  maintained anymore. The developer of ``ujson`` raised conrcerns
-  about security vulnerabilities and recommended using ``orjson``
-  instead.
+- Use ``json`` instead of ``ujson`` due to the package not being
+  maintained anymore.
+- Use ``numbers.Number`` instead of ``np.number`` for type checking
+  as it's indicated in the ``numpy`` documentation.
 
 0.19.0 (2025-01-17)
 -------------------
