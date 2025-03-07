@@ -40,7 +40,6 @@ dependencies = [
   "geopandas>=1",
   "netcdf4",
   "numpy>=2",
-  "orjson>=3.10,<4",
   "pyproj>=3.0.1",
   "rasterio>=1.2",
   "rioxarray>=0.15",
