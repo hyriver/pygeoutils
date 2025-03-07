@@ -8,7 +8,7 @@ from numbers import Number
 from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 import numpy as np
-import orjson as json
+import json
 import pyproj
 import rasterio as rio
 import rasterio.transform as rio_transform

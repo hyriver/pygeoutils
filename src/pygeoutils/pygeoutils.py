@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 import geopandas as gpd
 import numpy as np
-import orjson as json
+import json
 import pandas as pd
 import pyproj
 import rasterio.features as rio_features
