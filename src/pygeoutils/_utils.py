@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import itertools
+import json
 from dataclasses import dataclass
 from numbers import Number
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
-import json
 import pyproj
 import rasterio as rio
 import rasterio.transform as rio_transform

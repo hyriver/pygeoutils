@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import warnings
 from itertools import islice
-from numbers import Number
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import geopandas as gpd
 import numpy as np
-import json
 import pandas as pd
 import pyproj
 import rasterio.features as rio_features
@@ -39,6 +38,7 @@ from pygeoutils.exceptions import (
 BOX_ORD = "(west, south, east, north)"
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
+    from numbers import Number
 
     from numpy.typing import NDArray
     from pyproj import CRS
